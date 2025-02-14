@@ -223,7 +223,7 @@ def get_part():
 def get_current_lessons():  # 获取当前课程
     global current_lessons
     timeline = get_timeline_data()
-    if config_center.read_conf('General', 'enable_alt_schedule') == '1':
+    if config_center.read_conf('General', 'enable_alt_schedule') == '1' or conf.is_temp_week():
         try:
             if conf.get_week_type():
                 schedule = loaded_data.get('schedule_even')
@@ -942,6 +942,8 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
+        self.animation_rect = None
+        self.animation = None
         self.m_Position = None
         self.p_Position = None
         self.m_flag = None
@@ -1489,9 +1491,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.temperature.setText(f"{db.get_weather_data('temp', weather_data)}")
                 current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · "
                                      f"{weather_name}")
-                update_stylesheet = re.sub(r'border-image: url\((.*?)\);',
-                                           f"border-image: url({db.get_weather_stylesheet(db.get_weather_data('icon', weather_data))});",
-                                           self.backgnd.styleSheet())
+                update_stylesheet = re.sub(
+                    r'border-image: url\((.*?)\);',
+                    f"border-image: url({db.get_weather_stylesheet(db.get_weather_data('icon', weather_data))});",
+                    self.backgnd.styleSheet()
+                )
                 self.backgnd.setStyleSheet(update_stylesheet)
             except Exception as e:
                 logger.error(f'天气组件出错：{e}')
@@ -1653,6 +1657,7 @@ def check_windows_maximize():  # 检查窗口是否最大化
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
+    config_center.write_conf('Temp', 'set_schedule', '')
     if config_center.read_conf('Temp', 'temp_schedule') != '':  # 修复换课重置
         copy(f'{base_directory}/config/schedule/backup.json',
              f'{base_directory}/config/schedule/{config_center.schedule_name}')
