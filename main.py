@@ -1677,10 +1677,23 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
-        return
+        return False
+    # 全字匹配以下关键词排除
+    excluded_titles = {
+        'ResidentSideBar', # 希沃侧边栏
+        'SnippingTool', # 系统截图工具
+    }
+    # 包含以下关键词排除
+    excluded_keywords = {
+        'Overlay',
+        'Snipping',
+        'SideBar',
+    }
     for window in pygetwindow.getAllWindows():
-        if window.isMaximized:  # 最大化或全屏(修复
-            if window.title != 'ResidentSideBar':  # 修复了误检测希沃侧边栏的Bug
+        if window.isMaximized:
+            # 完全匹配和模糊匹配
+            if (window.title not in excluded_titles and 
+                not any(kw in window.title for kw in excluded_keywords)):
                 return True
     return False
 
