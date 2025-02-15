@@ -934,6 +934,10 @@ class openProgressDialog(QWidget):
 
     def closeEvent(self, event):
         event.ignore()
+        self.setMinimumWidth(0)
+        self.position = self.pos()
+        # 关闭时保存一次
+        self.save_position()
         self.deleteLater()
         self.hide()
         p_mgr.temp_window.clear()
@@ -942,12 +946,6 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
-        self.animation_rect = None
-        self.animation = None
-        self.m_Position = None
-        self.p_Position = None
-        self.m_flag = None
-        self.r_Position = None
         self.init_ui()
         self.init_font()
         self.position = None
@@ -955,13 +953,43 @@ class FloatingWidget(QWidget):  # 浮窗
         self.focusing = False
         self.text_changed = False
 
-        self.current_lesson_name_text = self.findChild(QLabel, 'subject')
-        self.activity_countdown = self.findChild(QLabel, 'activity_countdown')
-        self.countdown_progress_bar = self.findChild(ProgressRing, 'progressBar')
+        # 动态获取屏幕尺寸
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
 
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 检查焦点
+        # 加载保存的位置
+        saved_pos = self.load_position()
+        if saved_pos:
+            # 添加边界检查
+            saved_pos = self.adjust_position_to_screen(saved_pos)
+            self.position = saved_pos
+        else:
+            # 使用动态计算的默认位置
+            self.position = QPoint(
+                (screen_width - self.width()) // 2,  # 居中横向
+                50  # 距离顶部 50px
+            )
 
-        update_timer.add_callback(self.update_data)
+
+    def adjust_position_to_screen(self, pos):
+        # 确保浮窗位置在屏幕可视范围内
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        x = max(screen_geometry.left(), min(pos.x(), screen_geometry.right() - self.width()))
+        y = max(screen_geometry.top(), min(pos.y(), screen_geometry.bottom() - self.height()))
+        return QPoint(x, y)
+    
+    def save_position(self):
+        pos = self.pos()
+        config_center.write_conf('FloatingWidget', 'pos_x', str(pos.x()))
+        config_center.write_conf('FloatingWidget', 'pos_y', str(pos.y()))
+
+    def load_position(self):
+        x = config_center.read_conf('FloatingWidget', 'pos_x')
+        y = config_center.read_conf('FloatingWidget', 'pos_y')
+        if x and y:
+            return QPoint(int(x), int(y))
+        return None
 
     def init_ui(self):
         setTheme_()
@@ -1116,6 +1144,8 @@ class FloatingWidget(QWidget):  # 浮窗
     def mouseReleaseEvent(self, event):
         self.r_Position = event.globalPos()  # 获取鼠标相对窗口的位置
         self.m_flag = False
+        # 保存位置到配置文件
+        self.save_position()
         if (
                 hasattr(self, "p_Position")
                 and self.r_Position == self.p_Position
