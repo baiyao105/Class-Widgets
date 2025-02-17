@@ -954,12 +954,24 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
+        self.animation_rect = None
+        self.animation = None
+        self.m_Position = None
+        self.p_Position = None
+        self.m_flag = None
+        self.r_Position = None
         self.init_ui()
         self.init_font()
         self.position = None
         self.animating = False
         self.focusing = False
         self.text_changed = False
+
+        self.current_lesson_name_text = self.findChild(QLabel, 'subject')
+        self.activity_countdown = self.findChild(QLabel, 'activity_countdown')
+        self.countdown_progress_bar = self.findChild(ProgressRing, 'progressBar')
+
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 检查焦点
 
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -979,6 +991,7 @@ class FloatingWidget(QWidget):  # 浮窗
                 50  # 距离顶部 50px
             )
 
+        update_timer.add_callback(self.update_data)
 
     def adjust_position_to_screen(self, pos):
         # 确保浮窗位置在屏幕可视范围内
