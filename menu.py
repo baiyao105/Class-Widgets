@@ -718,6 +718,11 @@ class SettingsMenu(FluentWindow):
         blur_countdown.setChecked(int(config_center.read_conf('General', 'blur_countdown')))
         blur_countdown.checkedChanged.connect(lambda checked: switch_checked('General', 'blur_countdown', checked))
         # 模糊倒计时
+        switch_blur_floating = self.findChild(SwitchButton, 'switch_blur_countdown_2')
+        switch_blur_floating.setChecked(int(config_center.read_conf('General', 'blur_floating_countdown')))
+        switch_blur_floating.checkedChanged.connect(
+            lambda checked: config_center.write_conf('General', 'blur_floating_countdown', int(checked))
+        )
 
         select_weather_api = self.findChild(ComboBox, 'select_weather_api')  # 天气API选择
         select_weather_api.addItems(weather_db.api_config['weather_api_list_zhCN'])

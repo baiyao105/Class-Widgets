@@ -10,6 +10,7 @@
     "hide_method": 0,
     "color_mode": 2,
     "enable_alt_schedule": 0,
+    "blur_floating_countdown": "1",
     "blur_countdown": 0,
     "theme": "default",
     "scale": 1,
