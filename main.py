@@ -1079,6 +1079,7 @@ class FloatingWidget(QWidget):  # 浮窗
                     self.activity_countdown.setText(f"< {minutes} 分钟")
             else:  # 精确显示
                 self.activity_countdown.setText(cd_list[1])
+            self.countdown_progress_bar.setValue(cd_list[2])
 
         self.adjustSize_animation()
 
