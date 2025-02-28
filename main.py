@@ -995,7 +995,7 @@ class FloatingWidget(QWidget):  # 浮窗
         # 加载保存的位置
         saved_pos = self.load_position()
         if saved_pos:
-            # 添加边界检查
+            # 边界检查
             saved_pos = self.adjust_position_to_screen(saved_pos)
             self.position = saved_pos
         else:
@@ -1008,11 +1008,37 @@ class FloatingWidget(QWidget):  # 浮窗
         update_timer.add_callback(self.update_data)
 
     def adjust_position_to_screen(self, pos):
-        # 确保浮窗位置在屏幕可视范围内
-        screen_geometry = QApplication.primaryScreen().availableGeometry()
-        x = max(screen_geometry.left(), min(pos.x(), screen_geometry.right() - self.width()))
-        y = max(screen_geometry.top(), min(pos.y(), screen_geometry.bottom() - self.height()))
-        return QPoint(x, y)
+        screen = QApplication.screenAt(pos)
+        if not screen:
+            screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        window_width = self.width()
+        window_height = self.height()
+        # 计算屏幕边界
+        screen_left = screen_geometry.x()
+        screen_right = screen_geometry.x() + screen_geometry.width()
+        screen_top = screen_geometry.y()
+        screen_bottom = screen_geometry.y() + screen_geometry.height()
+
+        new_x, new_y = pos.x(), pos.y()
+        if pos.x() < screen_left:
+        # 当窗口可见部分不足50%时调整
+            visible_width = (pos.x() + window_width) - screen_left
+            if visible_width < window_width / 2:
+                new_x = screen_left
+        elif (pos.x() + window_width) > screen_right:
+            visible_width = screen_right - pos.x()
+            if visible_width < window_width / 2:
+                new_x = screen_right - window_width
+        if pos.y() < screen_top:
+            visible_height = (pos.y() + window_height) - screen_top
+            if visible_height < window_height / 2:
+                new_y = screen_top
+        elif (pos.y() + window_height) > screen_bottom:
+            visible_height = screen_bottom - pos.y()
+            if visible_height < window_height / 2:
+                new_y = screen_bottom - window_height
+        return QPoint(new_x, new_y)
     
     def save_position(self):
         pos = self.pos()
