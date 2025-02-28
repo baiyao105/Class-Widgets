@@ -778,7 +778,8 @@ class WidgetsManager:
         screen_width = screen_geometry.width()
         screen_height = screen_geometry.height()
 
-        self.start_pos_y = int(config_center.read_conf('General', 'margin'))
+        margin = max(0, int(config_center.read_conf('General', 'margin')))
+        self.start_pos_y = margin
         self.start_pos_x = (screen_width - self.widgets_width) // 2
 
     def calculate_widgets_width(self):  # 计算小组件占用宽度
@@ -1074,6 +1075,8 @@ class FloatingWidget(QWidget):  # 浮窗
                 """)
 
     def update_data(self):
+        if self.animating:  # 执行动画时跳过更新
+            return
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
         cd_list = get_countdown()
         self.text_changed = False
@@ -1130,11 +1133,18 @@ class FloatingWidget(QWidget):  # 浮窗
 
         self.animation_rect = QPropertyAnimation(self, b'geometry')
         self.animation_rect.setDuration(400)
-        main_widget_pos = mgr.get_widget_pos('widget-current-activity.ui') # 获取主组件位置
-        target_rect = QRect(main_widget_pos[0], main_widget_pos[1], 
-                            self.width(), self.height())
+        main_widget = None
+        for widget in mgr.widgets:
+            if widget.path == 'widget-current-activity.ui':
+                main_widget = widget
+                break
+        # 获取确保为实际位置
+        if main_widget:
+            target_rect = QRect(main_widget.x(), main_widget.y(), 
+                               self.width(), self.height())
+        else:
+            target_rect = self.geometry()
         self.animation_rect.setEasingCurve(QEasingCurve.Type.InOutCirc)
-
         self.animation_rect = QPropertyAnimation(self, b'geometry')
         self.animation_rect.setDuration(400)
         self.animation_rect.setEndValue(target_rect) # 移动到主组件位置
@@ -1677,10 +1687,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def animate_show(self):  # 显示窗口
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(625)  # 持续时间
+        self.animation.setDuration(400)  # 持续时间
         # 获取当前窗口的宽度和高度，确保动画过程中保持一致
         self.animation.setEndValue(
-            QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
+        QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)  # 设置动画效果
         self.animation.finished.connect(self.clear_animation)
 
