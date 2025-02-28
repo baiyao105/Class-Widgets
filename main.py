@@ -707,6 +707,11 @@ class WidgetsManager:
         self.start_pos_x = 0  # 小组件起始位置
         self.start_pos_y = 0
 
+    def sync_widget_animation(self, target_pos):
+        for widget in self.widgets:
+            if widget.path == 'widget-current-activity.ui':
+                widget.animate_expand(target_pos) # 主组件形变动画
+
     def init_widgets(self):  # 初始化小组件
         self.widgets_list = list_.get_widget_config()
         self.check_widgets_exist()
@@ -952,7 +957,7 @@ class openProgressDialog(QWidget):
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
-        # 关闭时保存一次
+        # 关闭时保存一次位置
         self.save_position()
         self.deleteLater()
         self.hide()
@@ -1125,11 +1130,19 @@ class FloatingWidget(QWidget):  # 浮窗
 
         self.animation_rect = QPropertyAnimation(self, b'geometry')
         self.animation_rect.setDuration(400)
-        self.animation_rect.setEndValue(
-            QRect((screen_width - self.width()) // 2, 0, self.width(),
-                  self.height()))
+        main_widget_pos = mgr.get_widget_pos('widget-current-activity.ui') # 获取主组件位置
+        target_rect = QRect(main_widget_pos[0], main_widget_pos[1], 
+                            self.width(), self.height())
         self.animation_rect.setEasingCurve(QEasingCurve.Type.InOutCirc)
 
+        self.animation_rect = QPropertyAnimation(self, b'geometry')
+        self.animation_rect.setDuration(400)
+        self.animation_rect.setEndValue(target_rect) # 移动到主组件位置
+        self.animation_rect.setEasingCurve(QEasingCurve.Type.InOutCirc)
+    
+        self.animation = QPropertyAnimation(self, b'windowOpacity')
+        self.animation.setDuration(525)
+        self.animation.setEndValue(0) # 渐隐效果
         self.animating = True
         self.animation.start()
         self.animation_rect.start()
@@ -1381,6 +1394,16 @@ class DesktopWidget(QWidget):  # 主要小组件
                     }}
                 """)
 
+    def animate_expand(self, target_geometry):
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(400)
+        self.animation.setStartValue(QRect(target_geometry.x(), -self.height(), 
+                                          self.width(), self.height()))
+        self.animation.setEndValue(target_geometry)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutBack)
+        self.raise_()
+        self.show()
+
     def init_tray_menu(self):
         if not first_start:
             return
@@ -1603,7 +1626,7 @@ class DesktopWidget(QWidget):  # 主要小组件
     def animate_window(self, target_pos):  # **初次**启动动画
         # 创建位置动画
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(525)  # 持续时间
+        self.animation.setDuration(300)  # 持续时间
         if os.name == 'nt':
             self.animation.setStartValue(QRect(target_pos[0], -self.height(), self.w, self.h))
         else:
