@@ -1758,7 +1758,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def animate_show(self):  # 显示窗口
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(400)  # 持续时间
+        self.animation.setDuration(525)  # 持续时间
         # 获取当前窗口的宽度和高度，确保动画过程中保持一致
         self.animation.setEndValue(
         QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
