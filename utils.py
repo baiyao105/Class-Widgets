@@ -73,11 +73,14 @@ class UnionUpdateTimer(QObject):
     def _on_timeout(self):  # 超时
         for callback in self.callbacks:
             callback()
+        self._schedule_next()
 
-    def _schedule_next(self):  # 调整下一次触发时间
-        next_second = (dt.datetime.now() + dt.timedelta(seconds=1)).replace(microsecond=0)
-        delay = (next_second - dt.datetime.now()).total_seconds() * 1000  # 转换为毫秒
-        self.timer.start(int(delay))  # 设定下一次触发时间
+    def _schedule_next(self):
+        next_tick = dt.datetime.now().replace(microsecond=0) + dt.timedelta(seconds=1)
+        delay = int((next_tick - dt.datetime.now()).total_seconds() * 1000)
+        if delay < 0:
+            delay = 0
+        self.timer.start(delay)
 
     def add_callback(self, callback):  # 添加回调
         if callback not in self.callbacks:
@@ -91,8 +94,8 @@ class UnionUpdateTimer(QObject):
     def remove_all_callbacks(self):
         """ 移除所有回调函数 """
         self.callbacks = [config_center.update_conf]
-
     def start(self):  # 启动定时器
+        self.timer.start(1000)
         self._schedule_next()  # 计算下次触发时间
 
     def stop(self):  # 停止
