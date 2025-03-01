@@ -33,6 +33,7 @@
     "api_key": ""
   },
   "Color": {
+    "floating_time": "959595",
     "attend_class": "DD986F",
     "finish_class": "46B878",
     "prepare_class": "7065D8"

@@ -679,6 +679,8 @@ class SettingsMenu(FluentWindow):
         set_ac_color.clicked.connect(self.ct_set_ac_color)
         set_fc_color = self.findChild(PushButton, 'set_fc_color')
         set_fc_color.clicked.connect(self.ct_set_fc_color)
+        set_floating_time_color = self.findChild(PushButton, 'set_fc_color_2')
+        set_floating_time_color.clicked.connect(self.ct_set_floating_time_color)
 
         open_theme_folder = self.findChild(HyperlinkLabel, 'open_theme_folder')  # 打开主题文件夹
         open_theme_folder.clicked.connect(lambda: open_dir(os.path.join(os.getcwd(), 'ui')))
@@ -1157,6 +1159,13 @@ class SettingsMenu(FluentWindow):
         w = ColorDialog(current_color, "更改课间时主题色", self, enableAlpha=False)
         w.colorChanged.connect(lambda color: config_center.write_conf('Color', 'finish_class', color.name()[1:]))
         w.exec()
+
+    def ct_set_floating_time_color(self):
+        current_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
+        w = ColorDialog(current_color, "更改浮窗时间颜色", self, enableAlpha=False)
+        w.colorChanged.connect(lambda color: config_center.write_conf('Color', 'floating_time', color.name()[1:]))
+        w.exec()
+        self.ct_update_preview()
 
     def cf_export_schedule(self):  # 导出课程表
         file_path, _ = QFileDialog.getSaveFileName(self, "保存文件", config_center.schedule_name, "Json 配置文件 (*.json)")

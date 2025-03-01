@@ -1061,6 +1061,8 @@ class FloatingWidget(QWidget):  # 浮窗
                 """)
 
     def update_data(self):
+        time_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
+        self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
         cd_list = get_countdown()
         self.text_changed = False
