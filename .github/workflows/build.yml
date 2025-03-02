@@ -44,7 +44,7 @@ jobs:
           seconds: 86400 # One day in seconds
           branch: 'main'
       - name: Decide to stop
-        if: ${{ steps.check-new-commits.outputs.has-new-commits != 'true' && github.event_name != 'workflow_dispatch' }}
+        if: ${{ steps.check-new-commits.outputs.has-new-commits != 'true' && github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "::warning title=Stop Workflow::No new commit today."
           stopMarker=$(uuidgen)
@@ -90,7 +90,6 @@ jobs:
           product-name: Class Widgets
           file-version: 1.1.7.1
           windows-icon-from-ico: ./img/favicon.ico
-          mingw64: on
       - name: Build (Linux)
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
         uses: Nuitka/Nuitka-Action@main

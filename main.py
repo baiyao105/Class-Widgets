@@ -6,6 +6,7 @@ import platform
 import re
 import subprocess
 import sys
+import psutil
 import traceback
 from shutil import copy
 from typing import Optional
@@ -430,34 +431,65 @@ class RECT(ctypes.Structure):
                 ("right", ctypes.c_long),
                 ("bottom", ctypes.c_long)]
 
+def get_process_name(pid): # 获取进程名称
+    try:
+        if isinstance(pid, int):
+            pid = ctypes.windll.user32.GetWindowThreadProcessId(pid, None)
+        return psutil.Process(pid).name().lower()
+    except (psutil.NoSuchProcess, AttributeError, ValueError):
+        return "unknown"
 
 def check_fullscreen():  # 检查是否全屏
     if os.name != 'nt':
-        return
+        return False
     user32 = ctypes.windll.user32
     hwnd = user32.GetForegroundWindow()
-    # 获取桌面窗口的矩形
-    desktop_rect = RECT()
-    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(desktop_rect))
-    # 获取当前窗口的矩形
-    app_rect = RECT()
+    if hwnd == 0 or hwnd == user32.GetDesktopWindow() or hwnd == user32.GetShellWindow():
+        return False
+    # 获取窗口标题
     title_buffer = ctypes.create_unicode_buffer(256)
     user32.GetWindowTextW(hwnd, title_buffer, 256)
-    if title_buffer.value == "Application Frame Host":
+    window_title = title_buffer.value.strip()
+    pid = ctypes.c_ulong()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    process_name = get_process_name(pid.value).lower()
+    # 排除系统进程
+    system_processes = {
+        'explorer.exe',  # 桌面
+        'shellexperiencehost.exe',
+        'searchui.exe',  # 搜索
+        'applicationframehost.exe'  # UWP组件
+    }
+    if process_name in system_processes:
         return False
-    user32.GetWindowRect(hwnd, ctypes.byref(app_rect))
-    if hwnd == user32.GetDesktopWindow():
+    # 排除系统窗口
+    system_windows = {
+        "",  # 无标题窗口
+        "program manager",  # 桌面窗口
+        "windows input experience",  # 输入面板
+        "msctfmonitor window",
+        "startmenuexperiencehost"  # 开始菜单
+    }
+    if window_title.lower() in system_windows:
         return False
-    if user32.GetForegroundWindow() == 0 or user32.GetForegroundWindow() == 65972:  # 聚焦桌面则判断否
+    rect = RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    screen_rect = RECT()
+    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(screen_rect))
+    is_fullscreen = (
+        rect.left <= screen_rect.left and
+        rect.top <= screen_rect.top and
+        rect.right >= screen_rect.right and
+        rect.bottom >= screen_rect.bottom
+    )
+    if fw.focusing:
         return False
-    if hwnd != user32.GetDesktopWindow() and hwnd != user32.GetShellWindow():
-        if (app_rect.left <= desktop_rect.left and
-                app_rect.top <= desktop_rect.top and
-                app_rect.right >= desktop_rect.right and
-                app_rect.bottom >= desktop_rect.bottom):
-            return True
-    if fw.focusing:  # 拖动浮窗时返回t
-        return True
+    # 排除窗口大小必须占用屏幕95%,避免诈骗()
+    if is_fullscreen:
+        screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
+        window_area = (rect.right - rect.left) * (rect.bottom - rect.top)
+        return window_area >= screen_area * 0.95
+
     return False
 
 
@@ -1878,15 +1910,45 @@ def check_windows_maximize():  # 检查窗口是否最大化
     excluded_keywords = {
         'Overlay',
         'Snipping',
-        'SideBar',
+        'SideBar'
     }
+    excluded_process_patterns = {
+        'shellexperiencehost', 
+        'searchui', 
+        'startmenuexperiencehost'
+    }
+    max_windows = []
     for window in pygetwindow.getAllWindows():
-        if window.isMaximized:
-            # 完全匹配和模糊匹配
-            if (window.title not in excluded_titles and 
-                not any(kw in window.title for kw in excluded_keywords)):
-                return True
-    return False
+        try:
+            if window.isMaximized and window.visible:
+                title = window.title.strip()
+                pid = window._hWnd  # 获取窗口句柄
+                process_name = get_process_name(pid).lower()
+                title_lower = title.lower()
+                is_system_explorer = (
+                    process_name == "explorer.exe" 
+                    and (title in excluded_titles 
+                         or any(kw in title_lower for kw in excluded_keywords))
+                )
+                is_system_process = any(
+                    pattern in process_name 
+                    for pattern in excluded_process_patterns
+                )
+                # 标题匹配
+                has_excluded_keyword = any(
+                    kw in title_lower for kw in excluded_keywords
+                )
+                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                    max_windows.append({
+                        'title': title,
+                        'process': process_name,
+                        'pid': pid,
+                        'rect': window.box
+                    })
+        except Exception as e:
+            logger.error(f"窗口异常: {str(e)}")
+    return max_windows
+
 
 
 def init_config():  # 重设配置文件
