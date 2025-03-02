@@ -387,7 +387,7 @@ def main(state=1, lesson_name='', title='通知示例', subtitle='副标题',
 def detect_enable_toast(state=0):
     if config_center.read_conf('Toast', 'attend_class') != '1' and state == 1:
         return True
-    if config_center.read_conf('Toast', 'finish_class') != '1' and state == 0 or state == 2:
+    if (config_center.read_conf('Toast', 'finish_class') != '1') and (state in [0, 2]):
         return True
     if config_center.read_conf('Toast', 'prepare_class') != '1' and state == 3:
         return True
