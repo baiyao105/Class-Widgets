@@ -1041,9 +1041,32 @@ class FloatingWidget(QWidget):  # 浮窗
         return QPoint(new_x, new_y)
     
     def save_position(self):
+        current_screen = QApplication.screenAt(self.pos())
+        if not current_screen:
+            current_screen = QApplication.primaryScreen()
+        screen_geometry = current_screen.availableGeometry()
         pos = self.pos()
+        x = pos.x()
+        window_width = self.width()
+        if mgr.state:
+            return
+        screen_left = screen_geometry.left()
+        screen_right = screen_geometry.right()
+        if x < screen_left:
+            visible_width = (x + window_width) - screen_left
+            if visible_width < window_width / 2:
+                x = screen_left
+        elif (x + window_width) > screen_right:
+            if self.animating:
+                return
+            visible_width = screen_right - x
+            if visible_width < window_width / 2:
+                x = screen_right - window_width
+        y = min(max(pos.y(), screen_geometry.top()), screen_geometry.bottom())
+        pos = QPoint(x, y)
         config_center.write_conf('FloatingWidget', 'pos_x', str(pos.x()))
-        config_center.write_conf('FloatingWidget', 'pos_y', str(pos.y()))
+        if not self.animating:
+            config_center.write_conf('FloatingWidget', 'pos_y', str(pos.y()))
 
     def load_position(self):
         x = config_center.read_conf('FloatingWidget', 'pos_x')
@@ -1181,6 +1204,7 @@ class FloatingWidget(QWidget):  # 浮窗
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
+        self.save_position()
         current_screen = QApplication.screenAt(self.pos())
         if not current_screen:
             current_screen = QApplication.primaryScreen()
@@ -1980,6 +2004,10 @@ if __name__ == '__main__':
         get_current_lessons()
         get_current_lesson_name()
         get_next_lessons()
+
+        # 如果在全屏或最大化模式下启动，首先折叠主组件后显示浮动窗口动画。
+        if check_windows_maximize() or check_fullscreen():
+            mgr.decide_to_hide()  # 折叠动画,其实这里可用`mgr.full_hide_windows()`但是播放动画似乎更好()
 
         if current_state == 1:
             setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")
