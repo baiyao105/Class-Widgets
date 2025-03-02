@@ -17,6 +17,12 @@ def restart():
     share.detach()  # 释放共享内存
     os.execl(sys.executable, sys.executable, *sys.argv)
 
+def stop(status=0):
+    logger.debug('停止程序')
+    update_timer.stop()
+    share.detach()  # 释放共享内存
+    sys.exit(status)
+
 
 def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
     screen_geometry = QApplication.primaryScreen().geometry()
@@ -88,6 +94,10 @@ class UnionUpdateTimer(QObject):
 
     def start(self):  # 启动定时器
         self._schedule_next()  # 计算下次触发时间
+
+    def stop(self):  # 停止
+        self.timer.stop()
+        self.remove_all_callbacks()  # 移除所有回调函数
 
 
 tray_icon = None

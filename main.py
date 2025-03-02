@@ -6,6 +6,7 @@ import platform
 import re
 import subprocess
 import sys
+import psutil
 import traceback
 from shutil import copy
 from typing import Optional
@@ -35,7 +36,7 @@ from menu import open_plaza
 from network_thread import check_update, weatherReportThread
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, share, update_timer
+from utils import restart, stop, share, update_timer
 from file import config_center, schedule_center
 
 if os.name == 'nt':
@@ -430,39 +431,74 @@ class RECT(ctypes.Structure):
                 ("right", ctypes.c_long),
                 ("bottom", ctypes.c_long)]
 
+def get_process_name(pid): # 获取进程名称
+    try:
+        if isinstance(pid, int):
+            pid = ctypes.windll.user32.GetWindowThreadProcessId(pid, None)
+        return psutil.Process(pid).name().lower()
+    except (psutil.NoSuchProcess, AttributeError, ValueError):
+        return "unknown"
 
 def check_fullscreen():  # 检查是否全屏
     if os.name != 'nt':
-        return
+        return False
     user32 = ctypes.windll.user32
     hwnd = user32.GetForegroundWindow()
-    # 获取桌面窗口的矩形
-    desktop_rect = RECT()
-    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(desktop_rect))
-    # 获取当前窗口的矩形
-    app_rect = RECT()
+    if hwnd == 0 or hwnd == user32.GetDesktopWindow() or hwnd == user32.GetShellWindow():
+        return False
+    # 获取窗口标题
     title_buffer = ctypes.create_unicode_buffer(256)
     user32.GetWindowTextW(hwnd, title_buffer, 256)
-    if title_buffer.value == "Application Frame Host":
+    window_title = title_buffer.value.strip()
+    pid = ctypes.c_ulong()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    process_name = get_process_name(pid.value).lower()
+    # 排除系统进程
+    system_processes = {
+        'explorer.exe',  # 桌面
+        'shellexperiencehost.exe',
+        'searchui.exe',  # 搜索
+        'applicationframehost.exe'  # UWP组件
+    }
+    if process_name in system_processes:
         return False
-    user32.GetWindowRect(hwnd, ctypes.byref(app_rect))
-    if hwnd == user32.GetDesktopWindow():
+    # 排除系统窗口
+    system_windows = {
+        "",  # 无标题窗口
+        "program manager",  # 桌面窗口
+        "windows input experience",  # 输入面板
+        "msctfmonitor window",
+        "startmenuexperiencehost"  # 开始菜单
+    }
+    if window_title.lower() in system_windows:
         return False
-    if user32.GetForegroundWindow() == 0 or user32.GetForegroundWindow() == 65972:  # 聚焦桌面则判断否
+    rect = RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    screen_rect = RECT()
+    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(screen_rect))
+    is_fullscreen = (
+        rect.left <= screen_rect.left and
+        rect.top <= screen_rect.top and
+        rect.right >= screen_rect.right and
+        rect.bottom >= screen_rect.bottom
+    )
+    if fw.focusing:
         return False
-    if hwnd != user32.GetDesktopWindow() and hwnd != user32.GetShellWindow():
-        if (app_rect.left <= desktop_rect.left and
-                app_rect.top <= desktop_rect.top and
-                app_rect.right >= desktop_rect.right and
-                app_rect.bottom >= desktop_rect.bottom):
-            return True
-    if fw.focusing:  # 拖动浮窗时返回t
-        return True
+    # 排除窗口大小必须占用屏幕95%,避免诈骗()
+    if is_fullscreen:
+        screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
+        window_area = (rect.right - rect.left) * (rect.bottom - rect.top)
+        return window_area >= screen_area * 0.95
+
     return False
 
 
 class ErrorDialog(Dialog):  # 重大错误提示框
     def __init__(self, error_details='Traceback (most recent call last):', parent=None):
+        # KeyboardInterrupt 直接 exit
+        if error_details.endswith('KeyboardInterrupt') or error_details.endswith('KeyboardInterrupt\n'):
+            stop()
+        
         super().__init__(
             'Class Widgets 崩溃报告',
             '抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。'
@@ -703,6 +739,11 @@ class WidgetsManager:
         self.start_pos_x = 0  # 小组件起始位置
         self.start_pos_y = 0
 
+    def sync_widget_animation(self, target_pos):
+        for widget in self.widgets:
+            if widget.path == 'widget-current-activity.ui':
+                widget.animate_expand(target_pos) # 主组件形变动画
+
     def init_widgets(self):  # 初始化小组件
         self.widgets_list = list_.get_widget_config()
         self.check_widgets_exist()
@@ -769,7 +810,8 @@ class WidgetsManager:
         screen_width = screen_geometry.width()
         screen_height = screen_geometry.height()
 
-        self.start_pos_y = int(config_center.read_conf('General', 'margin'))
+        margin = max(0, int(config_center.read_conf('General', 'margin')))
+        self.start_pos_y = margin
         self.start_pos_x = (screen_width - self.widgets_width) // 2
 
     def calculate_widgets_width(self):  # 计算小组件占用宽度
@@ -837,6 +879,10 @@ class WidgetsManager:
                 fw.show()
         else:
             self.hide_windows()
+
+    def stop(self):
+        for widget in self.widgets:
+            widget.stop()
 
 
 class openProgressDialog(QWidget):
@@ -944,7 +990,7 @@ class openProgressDialog(QWidget):
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
-        # 关闭时保存一次
+        # 关闭时保存一次位置
         self.save_position()
         self.deleteLater()
         self.hide()
@@ -981,7 +1027,7 @@ class FloatingWidget(QWidget):  # 浮窗
         # 加载保存的位置
         saved_pos = self.load_position()
         if saved_pos:
-            # 添加边界检查
+            # 边界检查
             saved_pos = self.adjust_position_to_screen(saved_pos)
             self.position = saved_pos
         else:
@@ -994,16 +1040,65 @@ class FloatingWidget(QWidget):  # 浮窗
         update_timer.add_callback(self.update_data)
 
     def adjust_position_to_screen(self, pos):
-        # 确保浮窗位置在屏幕可视范围内
-        screen_geometry = QApplication.primaryScreen().availableGeometry()
-        x = max(screen_geometry.left(), min(pos.x(), screen_geometry.right() - self.width()))
-        y = max(screen_geometry.top(), min(pos.y(), screen_geometry.bottom() - self.height()))
-        return QPoint(x, y)
+        screen = QApplication.screenAt(pos)
+        if not screen:
+            screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        window_width = self.width()
+        window_height = self.height()
+        # 计算屏幕边界
+        screen_left = screen_geometry.x()
+        screen_right = screen_geometry.x() + screen_geometry.width()
+        screen_top = screen_geometry.y()
+        screen_bottom = screen_geometry.y() + screen_geometry.height()
+
+        new_x, new_y = pos.x(), pos.y()
+        if pos.x() < screen_left:
+        # 当窗口可见部分不足50%时调整
+            visible_width = (pos.x() + window_width) - screen_left
+            if visible_width < window_width / 2:
+                new_x = screen_left
+        elif (pos.x() + window_width) > screen_right:
+            visible_width = screen_right - pos.x()
+            if visible_width < window_width / 2:
+                new_x = screen_right - window_width
+        if pos.y() < screen_top:
+            visible_height = (pos.y() + window_height) - screen_top
+            if visible_height < window_height / 2:
+                new_y = screen_top
+        elif (pos.y() + window_height) > screen_bottom:
+            visible_height = screen_bottom - pos.y()
+            if visible_height < window_height / 2:
+                new_y = screen_bottom - window_height
+        return QPoint(new_x, new_y)
     
     def save_position(self):
+        current_screen = QApplication.screenAt(self.pos())
+        if not current_screen:
+            current_screen = QApplication.primaryScreen()
+        screen_geometry = current_screen.availableGeometry()
         pos = self.pos()
+        x = pos.x()
+        window_width = self.width()
+        if mgr.state:
+            return
+        screen_left = screen_geometry.left()
+        screen_right = screen_geometry.right()
+        if x < screen_left:
+            visible_width = (x + window_width) - screen_left
+            if visible_width < window_width / 2:
+                x = screen_left
+        elif (x + window_width) > screen_right:
+            if self.animating:
+                return
+            visible_width = screen_right - x
+            if visible_width < window_width / 2:
+                x = screen_right - window_width
+        y = min(max(pos.y(), screen_geometry.top()), screen_geometry.bottom())
+        pos = QPoint(x, y)
         config_center.write_conf('FloatingWidget', 'pos_x', str(pos.x()))
-        config_center.write_conf('FloatingWidget', 'pos_y', str(pos.y()))
+        if not self.animating:
+            config_center.write_conf('FloatingWidget', 'pos_y', str(pos.y()))
 
     def load_position(self):
         x = config_center.read_conf('FloatingWidget', 'pos_x')
@@ -1061,6 +1156,8 @@ class FloatingWidget(QWidget):  # 浮窗
                 """)
 
     def update_data(self):
+        if self.animating:  # 执行动画时跳过更新
+            return
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
         cd_list = get_countdown()
         self.text_changed = False
@@ -1087,21 +1184,50 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def showEvent(self, event):  # 窗口显示
         logger.info('显示浮窗')
-        self.move((screen_width - self.width()) // 2, 50)
-        if self.position:  # 位置配置
-            self.move(self.position)
-        self.animation = QPropertyAnimation(self, b'windowOpacity')  # 透明度
-        self.animation.setDuration(400)
+        current_screen = QApplication.screenAt(self.pos()) or QApplication.primaryScreen()
+        screen_geometry = current_screen.availableGeometry()
+        
+        if self.position:
+            if self.position.y() > screen_geometry.center().y():
+                # 下半屏
+                start_pos = QPoint(
+                    self.position.x(),
+                    screen_geometry.bottom() + self.height()
+                )
+            else:
+                # 上半屏
+                start_pos = QPoint(
+                    self.position.x(),
+                    screen_geometry.top() - self.height()
+                )
+        else:
+            # 默认:顶部中央滑入
+            start_pos = QPoint(
+                (screen_geometry.width() - self.width()) // 2,
+                screen_geometry.top() - self.height()
+            )
+            self.position = QPoint(
+                (screen_geometry.width() - self.width()) // 2,
+                max(50, int(config_center.read_conf('General', 'margin')))
+            )
+
+        self.animation = QPropertyAnimation(self, b'windowOpacity')
+        self.animation.setDuration(450)
         self.animation.setStartValue(0)
         self.animation.setEndValue(int(config_center.read_conf('General', 'opacity')) / 100)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-        self.animation_rect = QPropertyAnimation(self, b'geometry')  # 位置
-        self.animation_rect.setDuration(500)
-        self.animation_rect.setStartValue(
-            QRect((screen_width - self.width()) // 2, 0, self.width(), self.height()))
-        self.animation_rect.setEndValue(self.geometry())
-        self.animation_rect.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation_rect = QPropertyAnimation(self, b'geometry')
+        self.animation_rect.setDuration(600)
+        self.animation_rect.setStartValue(QRect(start_pos, self.size()))
+        self.animation_rect.setEndValue(QRect(self.position, self.size()))
+        
+        if platform.system() == 'Darwin':
+            self.animation_rect.setEasingCurve(QEasingCurve.Type.OutQuad)
+        elif platform.system() == 'Windows':
+            self.animation_rect.setEasingCurve(QEasingCurve.Type.OutBack)
+        else:
+            self.animation_rect.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.animating = True
         self.animation.start()
@@ -1115,22 +1241,80 @@ class FloatingWidget(QWidget):  # 浮窗
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
-        self.animation = QPropertyAnimation(self, b'windowOpacity')
-        self.animation.setDuration(350)
-        self.animation.setEndValue(0)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
-
-        self.animation_rect = QPropertyAnimation(self, b'geometry')
-        self.animation_rect.setDuration(400)
-        self.animation_rect.setEndValue(
-            QRect((screen_width - self.width()) // 2, 0, self.width(),
-                  self.height()))
-        self.animation_rect.setEasingCurve(QEasingCurve.Type.InOutCirc)
-
+        self.save_position()
+        current_screen = QApplication.screenAt(self.pos())
+        if not current_screen:
+            current_screen = QApplication.primaryScreen()
+        screen_geometry = current_screen.availableGeometry()
+        screen_center_y = screen_geometry.y() + (screen_geometry.height() // 2)
+        # 动态动画
+        current_pos = self.pos()
+        base_duration = 350  # 基础
+        max_duration = 550   # 最大
+        min_duration = 250   # 最小
+        # 获取主组件位置
+        main_widget = next(
+            (w for w in mgr.widgets if w.path == 'widget-current-activity.ui'), 
+            None
+        )
+        if main_widget:
+            if current_pos.y() > screen_center_y:  # 下半屏
+                # 屏幕底部
+                target_y = screen_geometry.bottom() + self.height() + 10
+                # 任务栏补偿
+                if platform.system() == "Windows":
+                    target_y += 30
+                
+                target_pos = QPoint(
+                    main_widget.x(),
+                    target_y
+                )
+                distance = abs(current_pos.y() - target_y)
+            else:  # 上半屏
+                target_pos = main_widget.pos()
+                distance = abs(current_pos.y() - target_pos.y())
+        else:
+            target_pos = QPoint(
+                screen_geometry.center().x() - self.width()//2,
+                int(config_center.read_conf('General', 'margin'))
+            )
+            distance = abs(current_pos.y() - target_pos.y())
+        
+        max_distance = screen_geometry.height()
+        distance_ratio = min(distance / max_distance, 1.0)
+        duration = int(base_duration + (max_duration - base_duration) * (distance_ratio ** 0.7))
+        duration = max(min_duration, min(duration, max_duration))
+        # 多平台兼容
+        if platform.system() == "Darwin":
+            curve = QEasingCurve.Type.OutQuad
+            duration = int(duration * 0.85)
+        elif platform.system() == "Windows":
+            curve = QEasingCurve.Type.OutCubic
+            if current_pos.y() > screen_center_y:
+                duration += 50  # 底部移动稍慢
+            curve = QEasingCurve.Type.InOutQuad
+        
+        self.animation = QPropertyAnimation(self, b"windowOpacity")
+        self.animation.setDuration(int(duration * 1.15))
+        self.animation.setStartValue(self.windowOpacity())
+        self.animation.setEndValue(0.0)
+        
+        self.animation_rect = QPropertyAnimation(self, b"geometry")
+        self.animation_rect.setDuration(duration)
+        self.animation_rect.setStartValue(self.geometry())
+        self.animation_rect.setEndValue(QRect(target_pos, self.size()))
+        self.animation_rect.setEasingCurve(curve)
+        
         self.animating = True
         self.animation.start()
         self.animation_rect.start()
-        self.animation_rect.finished.connect(self.hide)
+        
+        def cleanup():
+            self.hide()
+            self.save_position()
+            self.animating = False
+            
+        self.animation_rect.finished.connect(cleanup)
 
     def hideEvent(self, event):
         event.accept()
@@ -1191,6 +1375,7 @@ class FloatingWidget(QWidget):  # 浮窗
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False):
         super().__init__()
+
         self.tray_menu = None
 
         self.last_widgets = list_.get_widget_config()
@@ -1377,6 +1562,16 @@ class DesktopWidget(QWidget):  # 主要小组件
                     }}
                 """)
 
+    def animate_expand(self, target_geometry):
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(400)
+        self.animation.setStartValue(QRect(target_geometry.x(), -self.height(), 
+                                          self.width(), self.height()))
+        self.animation.setEndValue(target_geometry)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutBack)
+        self.raise_()
+        self.show()
+
     def init_tray_menu(self):
         if not first_start:
             return
@@ -1395,7 +1590,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         ])
         self.tray_menu.addSeparator()
         self.tray_menu.addAction(Action(fIcon.SYNC, '重新启动', triggered=restart))
-        self.tray_menu.addAction(Action(fIcon.CLOSE, '退出', triggered=lambda: sys.exit()))
+        self.tray_menu.addAction(Action(fIcon.CLOSE, '退出', triggered=stop))
         utils.tray_icon.setContextMenu(self.tray_menu)
 
         utils.tray_icon.activated.connect(self.on_tray_icon_clicked)
@@ -1599,7 +1794,7 @@ class DesktopWidget(QWidget):  # 主要小组件
     def animate_window(self, target_pos):  # **初次**启动动画
         # 创建位置动画
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(525)  # 持续时间
+        self.animation.setDuration(300)  # 持续时间
         if os.name == 'nt':
             self.animation.setStartValue(QRect(target_pos[0], -self.height(), self.w, self.h))
         else:
@@ -1650,10 +1845,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def animate_show(self):  # 显示窗口
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(625)  # 持续时间
+        self.animation.setDuration(525)  # 持续时间
         # 获取当前窗口的宽度和高度，确保动画过程中保持一致
         self.animation.setEndValue(
-            QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
+        QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)  # 设置动画效果
         self.animation.finished.connect(self.clear_animation)
 
@@ -1711,21 +1906,54 @@ def check_windows_maximize():  # 检查窗口是否最大化
     # 全字匹配以下关键词排除
     excluded_titles = {
         'ResidentSideBar', # 希沃侧边栏
+        'Program Manager', # Windows桌面
+        'Desktop', # Windows桌面
+        '', #空标题
         'SnippingTool', # 系统截图工具
     }
     # 包含以下关键词排除
     excluded_keywords = {
         'Overlay',
         'Snipping',
-        'SideBar',
+        'SideBar'
     }
+    excluded_process_patterns = {
+        'shellexperiencehost', 
+        'searchui', 
+        'startmenuexperiencehost'
+    }
+    max_windows = []
     for window in pygetwindow.getAllWindows():
-        if window.isMaximized:
-            # 完全匹配和模糊匹配
-            if (window.title not in excluded_titles and 
-                not any(kw in window.title for kw in excluded_keywords)):
-                return True
-    return False
+        try:
+            if window.isMaximized and window.visible:
+                title = window.title.strip()
+                pid = window._hWnd  # 获取窗口句柄
+                process_name = get_process_name(pid).lower()
+                title_lower = title.lower()
+                is_system_explorer = (
+                    process_name == "explorer.exe" 
+                    and (title in excluded_titles 
+                         or any(kw in title_lower for kw in excluded_keywords))
+                )
+                is_system_process = any(
+                    pattern in process_name 
+                    for pattern in excluded_process_patterns
+                )
+                # 标题匹配
+                has_excluded_keyword = any(
+                    kw in title_lower for kw in excluded_keywords
+                )
+                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                    max_windows.append({
+                        'title': title,
+                        'process': process_name,
+                        'pid': pid,
+                        'rect': window.box
+                    })
+        except Exception as e:
+            logger.error(f"窗口异常: {str(e)}")
+    return max_windows
+
 
 
 def init_config():  # 重设配置文件
@@ -1820,7 +2048,7 @@ if __name__ == '__main__':
         msg_box.buttonLayout.insertStretch(0, 1)
         msg_box.setFixedWidth(550)
         msg_box.exec()
-        sys.exit(-1)
+        stop(-1)
     else:
         mgr = WidgetsManager()
 
@@ -1847,6 +2075,10 @@ if __name__ == '__main__':
         get_current_lesson_name()
         get_next_lessons()
 
+        # 如果在全屏或最大化模式下启动，首先折叠主组件后显示浮动窗口动画。
+        if check_windows_maximize() or check_fullscreen():
+            mgr.decide_to_hide()  # 折叠动画,其实这里可用`mgr.full_hide_windows()`但是播放动画似乎更好()
+
         if current_state == 1:
             setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")
         else:
@@ -1857,4 +2089,4 @@ if __name__ == '__main__':
         if config_center.read_conf('Other', 'auto_check_update') == '1':
             check_update()
 
-    sys.exit(app.exec())
+    stop(app.exec())

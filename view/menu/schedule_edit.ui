@@ -143,6 +143,9 @@
             <property name="text">
              <string>若要启用双周课表，请在“高级选项”中 启用单双周课表和设置开学日期</string>
             </property>
+            <property name="wordWrap">
+                 <bool>true</bool>
+            </property>
             <property name="lightColor" stdset="0">
              <color alpha="150">
               <red>0</red>
