@@ -38,8 +38,8 @@ def stop(status=0):
             logger.warning("共享内存未附加")
     except Exception as e:
         logger.error(f"分离共享内存失败: {e}")
-    sys.exit(status)
     os._exit(status)
+    sys.exit(status)
 
 
 def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
