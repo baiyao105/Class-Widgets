@@ -928,6 +928,9 @@ class openProgressDialog(QWidget):
         self.timer.stop()
         self.close()
 
+    def save_position(self):
+        pass
+
     def init_ui(self):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
