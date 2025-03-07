@@ -14,13 +14,16 @@ share = QSharedMemory('ClassWidgets')
 
 def restart():
     logger.debug('重启程序')
-    share.detach()  # 释放共享内存
+    if share.isAttached():
+        share.detach()
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 def stop(status=0):
     logger.debug('停止程序')
     update_timer.stop()
-    share.detach()  # 释放共享内存
+    if share.isAttached():
+        share.detach()  # 释放共享内存
+    QApplication.instance().quit()
     sys.exit(status)
 
 
@@ -90,7 +93,7 @@ class UnionUpdateTimer(QObject):
 
     def remove_all_callbacks(self):
         """ 移除所有回调函数 """
-        self.callbacks = [config_center.update_conf]
+        self.callbacks = []
 
     def start(self):  # 启动定时器
         self._schedule_next()  # 计算下次触发时间
