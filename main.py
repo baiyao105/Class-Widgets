@@ -1891,6 +1891,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         if hasattr(self, 'weather_thread'):
             self.weather_thread.terminate()  # 终止天气线程
             self.weather_thread.quit()  # 退出天气线程
+            self.weather_thread.wait()
         if hasattr(self, 'weather_timer'):
             self.weather_timer.stop()  # 停止定时器
 
