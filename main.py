@@ -7,12 +7,13 @@ import re
 import subprocess
 import sys
 import psutil
+import signal
 import traceback
 from shutil import copy
 from typing import Optional
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject
 from PyQt5.QtGui import QColor, QIcon, QPixmap, QPainter, QDesktopServices
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtSvg import QSvgRenderer
@@ -1233,6 +1234,11 @@ class FloatingWidget(QWidget):  # 浮窗
         self.animating = False
 
     def closeEvent(self, event):
+        # If the application is closing down, skip animations to speed up cleanup
+        if QApplication.instance().closingDown():
+            self.save_position()
+            event.accept()
+            return
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
@@ -1249,7 +1255,7 @@ class FloatingWidget(QWidget):  # 浮窗
         min_duration = 250   # 最小
         # 获取主组件位置
         main_widget = next(
-            (w for w in mgr.widgets if w.path == 'widget-current-activity.ui'), 
+            (w for w in mgr.widgets if w.path == 'widget-current-activity.ui'),
             None
         )
         if main_widget:
@@ -1270,7 +1276,7 @@ class FloatingWidget(QWidget):  # 浮窗
                 distance = abs(current_pos.y() - target_pos.y())
         else:
             target_pos = QPoint(
-                screen_geometry.center().x() - self.width()//2,
+                screen_geometry.center().x() - self.width() // 2,
                 int(config_center.read_conf('General', 'margin'))
             )
             distance = abs(current_pos.y() - target_pos.y())
@@ -1881,14 +1887,28 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 mgr.show_windows()
         else:
-
             event.ignore()
 
     def closeEvent(self, event):
+        if QApplication.instance().closingDown():
+            if hasattr(self, 'weather_thread'):
+                self.weather_thread.terminate()
+            if hasattr(self, 'weather_timer'):
+                self.weather_timer.stop()
+            event.accept()
+            return
+        for child in self.findChildren(QObject):
+            child.deleteLater()
         super().closeEvent(event)
+        self.deleteLater()
         self.destroy()
-
+    
         if hasattr(self, 'weather_thread'):
+            self.weather_thread.terminate()  # 终止天气线程
+            self.weather_thread.quit()  # 退出天气线程
+            self.weather_thread.wait()
+        if hasattr(self, 'weather_timer'):
+            self.weather_timer.stop()  # 停止定时器
             self.weather_thread.terminate()  # 终止天气线程
             self.weather_thread.quit()  # 退出天气线程
             self.weather_thread.wait()
@@ -2015,6 +2035,15 @@ if __name__ == '__main__':
         msg_box.buttonLayout.insertStretch(0, 1)
         msg_box.setFixedWidth(550)
         msg_box.exec()
+
+    def handle_signal(signum, frame):
+        logger.warning(f"收到终止信号 {signum}, 执行清理")
+        stop()
+
+    signal.signal(signal.SIGTERM, handle_signal)  # 捕获终止信号
+    signal.signal(signal.SIGINT, handle_signal)   # 捕获Ctrl+C
+    if os.name == 'posix':
+        signal.signal(signal.SIGQUIT, handle_signal)
 
     # 优化操作系统和版本输出
     system = platform.system()

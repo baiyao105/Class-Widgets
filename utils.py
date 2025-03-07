@@ -8,6 +8,7 @@ from PyQt5.QtCore import QSharedMemory, QTimer, QObject
 import datetime as dt
 
 from file import base_directory, config_center
+import signal
 
 share = QSharedMemory('ClassWidgets')
 
@@ -20,11 +21,26 @@ def restart():
 
 def stop(status=0):
     logger.debug('停止程序')
-    update_timer.stop()
-    if share.isAttached():
-        share.detach()  # 释放共享内存
+    def shutdown_handler(signum, frame):
+        logger.info(f'收到关闭信号: {signum}')
+        update_timer.stop()  # 停止计时器
+        QApplication.instance().quit()
+
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    signal.signal(signal.SIGINT, shutdown_handler)
+    update_timer.stop()  # 停止计时器
     QApplication.instance().quit()
+    try:
+        if share.isAttached():
+            share.detach()
+            logger.debug("成功分离共享内存")
+            share.destroy()
+        else:
+            logger.warning("共享内存未附加")
+    except Exception as e:
+        logger.error(f"分离共享内存失败: {e}")
     sys.exit(status)
+    os._exit(status)
 
 
 def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
@@ -74,8 +90,21 @@ class UnionUpdateTimer(QObject):
         self.callbacks = []  # 存储所有的回调函数
 
     def _on_timeout(self):  # 超时
-        for callback in self.callbacks:
-            callback()
+        if QApplication.instance().closingDown():
+            sys.exit(0)
+            return
+        for callback in self.callbacks[:]:
+            try:
+                callback()
+            except RuntimeError as e:
+                logger.error(f"回调调用错误: {e}")
+                self.callbacks.remove(callback)
+        for callback in self.callbacks[:]:
+            try:
+                callback()
+            except RuntimeError as e:
+                logger.error(f"回调调用错误: {e}")
+                self.callbacks.remove(callback)
 
     def _schedule_next(self):  # 调整下一次触发时间
         next_second = (dt.datetime.now() + dt.timedelta(seconds=1)).replace(microsecond=0)
