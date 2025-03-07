@@ -33,8 +33,7 @@ def stop(status=0):
     try:
         if share.isAttached():
             share.detach()
-            logger.debug("成功分离共享内存")
-            share.destroy()
+            logger.debug("分离共享内存: 成功")
         else:
             logger.warning("共享内存未附加")
     except Exception as e:
@@ -99,12 +98,8 @@ class UnionUpdateTimer(QObject):
             except RuntimeError as e:
                 logger.error(f"回调调用错误: {e}")
                 self.callbacks.remove(callback)
-        for callback in self.callbacks[:]:
-            try:
-                callback()
-            except RuntimeError as e:
-                logger.error(f"回调调用错误: {e}")
-                self.callbacks.remove(callback)
+                stop()
+        self._schedule_next()
 
     def _schedule_next(self):  # 调整下一次触发时间
         next_second = (dt.datetime.now() + dt.timedelta(seconds=1)).replace(microsecond=0)
