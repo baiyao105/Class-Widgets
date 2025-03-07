@@ -10,7 +10,7 @@ from loguru import logger
 
 import list_ as list_
 import conf
-from file import base_directory
+from file import base_directory, config_center
 
 CSES_WEEKS_TEXTS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 CSES_WEEKS = [1, 2, 3, 4, 5, 6, 7]
@@ -44,7 +44,7 @@ class CSES_Converter:
         return self.parser
 
     def load_generator(self):
-        self.generator = cses.CSESGenerator(version=int(conf.read_conf('Other', 'cses_version')))
+        self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Other', 'cses_version')))
 
     def convert_to_cw(self):
         """
