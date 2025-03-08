@@ -655,6 +655,7 @@ class PluginPlaza(MSFluentWindow):
                     logger.error(f'PluginPlaza 无法联网,错误：{error_info}')
                     self.findChild(BodyLabel, 'tips').setText(f'错误原因：{error_info}')
                     self.banner_view.addImage("img/plaza/banner_network-failed.png")
+                    self.banner_view.addImage("img/plaza/banner_network-failed.png")
                     self.splashScreen.hide()
                     self.homeInterface.findChild(SubtitleLabel, 'SubtitleLabel_3').hide()  # 隐藏副标题
                     return
