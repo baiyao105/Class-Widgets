@@ -20,7 +20,11 @@ def restart():
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 def stop(status=0):
+    global share
     logger.debug('停止程序')
+    if hasattr(stop, '_called'):
+        return
+    stop._called = True
     def shutdown_handler(signum, frame):
         logger.info(f'收到关闭信号: {signum}')
         update_timer.stop()  # 停止计时器
@@ -28,8 +32,19 @@ def stop(status=0):
 
     signal.signal(signal.SIGTERM, shutdown_handler)
     signal.signal(signal.SIGINT, shutdown_handler)
-    update_timer.stop()  # 停止计时器
+    if update_timer:
+        update_timer.stop()  # 停止计时器
+        update_timer.remove_all_callbacks()
     QApplication.instance().quit()
+    app = QApplication.instance()
+    if app:
+        try:
+            for w in app.topLevelWidgets():
+                w.close()
+            app.closeAllWindows()
+            app.quit()
+        except Exception as e:
+            logger.error(f"关闭窗口时出错: {e}")
     try:
         if share.isAttached():
             share.detach()
@@ -38,6 +53,9 @@ def stop(status=0):
             logger.warning("共享内存未附加")
     except Exception as e:
         logger.error(f"分离共享内存失败: {e}")
+    finally:
+        del share
+    logger.debug("程序退出")
     os._exit(status)
     sys.exit(status)
 
@@ -98,7 +116,7 @@ class UnionUpdateTimer(QObject):
             except RuntimeError as e:
                 logger.error(f"回调调用错误: {e}")
                 self.callbacks.remove(callback)
-                stop()
+                stop() # 直接停止兼taskkill,会影响部分报错貌似影响不大
         self._schedule_next()
 
     def _schedule_next(self):  # 调整下一次触发时间
@@ -123,7 +141,12 @@ class UnionUpdateTimer(QObject):
         self._schedule_next()  # 计算下次触发时间
 
     def stop(self):  # 停止
-        self.timer.stop()
+        if self.timer:
+            try:
+                self.timer.stop()
+                self.timer.deleteLater()
+            except RuntimeError:
+                logger.warning("计时器已被销毁，跳过停止操作")
         self.remove_all_callbacks()  # 移除所有回调函数
 
 

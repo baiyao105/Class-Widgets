@@ -881,10 +881,26 @@ class WidgetsManager:
         else:
             self.hide_windows()
 
+    def cleanup_resources(self):
+        for widget in self.widgets:
+            if hasattr(widget, 'weather_timer') and widget.weather_timer:
+                try:
+                    widget.weather_timer.stop()
+                except RuntimeError:
+                    logger.warning(f"组件 {widget.path} 的天气定时器已被销毁，跳过停止操作")
+            if hasattr(widget, 'weather_thread') and widget.weather_thread:
+                try:
+                    widget.weather_thread.terminate()
+                    widget.weather_thread.quit()
+                    widget.weather_thread.wait()
+                except RuntimeError:
+                    logger.warning(f"组件 {widget.path} 的天气线程已被销毁，跳过终止操作")
+
     def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
         for widget in self.widgets:
             widget.stop()
-
 
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
@@ -1234,7 +1250,7 @@ class FloatingWidget(QWidget):  # 浮窗
         self.animating = False
 
     def closeEvent(self, event):
-        # If the application is closing down, skip animations to speed up cleanup
+        # 跳过动画
         if QApplication.instance().closingDown():
             self.save_position()
             event.accept()
@@ -1889,32 +1905,34 @@ class DesktopWidget(QWidget):  # 主要小组件
         else:
             event.ignore()
 
-    def closeEvent(self, event):
-        if QApplication.instance().closingDown():
-            if hasattr(self, 'weather_thread'):
-                self.weather_thread.terminate()
-            if hasattr(self, 'weather_timer'):
-                self.weather_timer.stop()
-            event.accept()
-            return
-        for child in self.findChildren(QObject):
-            child.deleteLater()
-        super().closeEvent(event)
-        self.deleteLater()
-        self.destroy()
-    
-        if hasattr(self, 'weather_thread'):
-            self.weather_thread.terminate()  # 终止天气线程
-            self.weather_thread.quit()  # 退出天气线程
-            self.weather_thread.wait()
-        if hasattr(self, 'weather_timer'):
-            self.weather_timer.stop()  # 停止定时器
-            self.weather_thread.terminate()  # 终止天气线程
-            self.weather_thread.quit()  # 退出天气线程
-            self.weather_thread.wait()
-        if hasattr(self, 'weather_timer'):
-            self.weather_timer.stop()  # 停止定时器
+def closeEvent(self, event):
+    if QApplication.instance().closingDown():
+        if hasattr(self, 'weather_thread') and self.weather_thread:
+            try:
+                self.weather_thread.terminate()  # 终止天气线程
+                self.weather_thread.quit()      # 退出天气线程
+                self.weather_thread.wait()      # 等待线程结束
+            except RuntimeError:
+                logger.warning("天气线程已被销毁，跳过终止操作")
+            finally:
+                del self.weather_thread  # 删除引用以避免重复操作
 
+        if hasattr(self, 'weather_timer') and self.weather_timer:
+            try:
+                self.weather_timer.stop()  # 停止定时器
+            except RuntimeError:
+                logger.warning("天气定时器已被销毁，跳过停止操作")
+            finally:
+                del self.weather_timer  # 删除引用以避免重复操作
+
+        event.accept()
+        return
+
+    for child in self.findChildren(QObject):
+        child.deleteLater()
+    super().closeEvent(event)
+    self.deleteLater()
+    self.destroy()
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
@@ -1971,6 +1989,16 @@ def check_windows_maximize():  # 检查窗口是否最大化
     return max_windows
 
 
+def setup_signal_handlers():
+    def shutdown_handler(signum, frame):
+        logger.debug(f"收到终止信号: {signum}, 执行清理")
+        stop(0)
+    
+    signals = [signal.SIGTERM, signal.SIGINT]
+    if os.name == 'posix':
+        signals.append(signal.SIGQUIT)
+    for sig in signals:
+        signal.signal(sig, shutdown_handler)
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
@@ -2016,6 +2044,7 @@ def init():
 
 
 if __name__ == '__main__':
+    setup_signal_handlers()
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
@@ -2035,15 +2064,6 @@ if __name__ == '__main__':
         msg_box.buttonLayout.insertStretch(0, 1)
         msg_box.setFixedWidth(550)
         msg_box.exec()
-
-    def handle_signal(signum, frame):
-        logger.warning(f"收到终止信号 {signum}, 执行清理")
-        stop()
-
-    signal.signal(signal.SIGTERM, handle_signal)  # 捕获终止信号
-    signal.signal(signal.SIGINT, handle_signal)   # 捕获Ctrl+C
-    if os.name == 'posix':
-        signal.signal(signal.SIGQUIT, handle_signal)
 
     # 优化操作系统和版本输出
     system = platform.system()
