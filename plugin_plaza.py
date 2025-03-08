@@ -325,10 +325,10 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
         self.installButton = PrimaryPushButton()
 
         # layout
-        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout = QHBoxLayout()
         self.hBoxLayout_Title = QHBoxLayout()
         self.hBoxLayout_Author = QHBoxLayout()
-        self.vBoxLayout = QVBoxLayout(self)
+        self.vBoxLayout = QVBoxLayout()
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(110)
@@ -376,6 +376,7 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
 
         self.hBoxLayout.addLayout(self.vBoxLayout)
         self.hBoxLayout.addWidget(self.installButton)
+        self.setLayout(self.hBoxLayout)
 
         self.hBoxLayout_Title.setSpacing(12)
         self.hBoxLayout_Title.addWidget(self.titleLabel, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -650,8 +651,9 @@ class PluginPlaza(MSFluentWindow):
                     banner_placeholders = ["img/plaza/banner_pre.png" for _ in range(len(data))]
                     self.banner_view.addImages(banner_placeholders)
                 else:
-                    logger.error(f'PluginPlaza 无法联网，错误：{data["error"]}')
-                    self.findChild(BodyLabel, 'tips').setText(f'错误原因：{data["error"]}')
+                    error_info = data.get("error", "未知错误")
+                    logger.error(f'PluginPlaza 无法联网,错误：{error_info}')
+                    self.findChild(BodyLabel, 'tips').setText(f'错误原因：{error_info}')
                     self.banner_view.addImage("img/plaza/banner_network-failed.png")
                     self.splashScreen.hide()
                     self.homeInterface.findChild(SubtitleLabel, 'SubtitleLabel_3').hide()  # 隐藏副标题
