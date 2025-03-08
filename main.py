@@ -621,7 +621,7 @@ class PluginManager:  # 插件管理器
             "Weather_API": config_center.read_conf('Weather', 'api'),  # 天气API
             "Notification": notification.notification_contents,  # 检测到的通知内容
 
-            "PLUGIN_PATH": f'{conf.PLUGINS_DIR}/{path}',  # 传递插件目录
+            "PLUGIN_PATH": os.path.normpath(os.path.join(conf.PLUGINS_DIR, path)) if path else conf.PLUGINS_DIR,  # 传递插件目录
             "Config_Center": config_center,  # 配置中心实例
             "Schedule_Center": schedule_center,  # 课程表中心实例
             "Base_Directory": base_directory,  # 资源目录
