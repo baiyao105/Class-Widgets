@@ -42,7 +42,6 @@ from file import config_center, schedule_center
 
 if os.name == 'nt':
     import pygetwindow
-    from ctypes import wintypes
 
 # 适配高DPI缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -2047,21 +2046,6 @@ def setup_signal_handlers():
     if os.name == 'posix':
         signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
         signal.signal(signal.SIGHUP, shutdown)   # 终端断开
-    elif os.name == 'nt':
-        signal.signal(signal.SIGBREAK, shutdown)
-        def console_handler(dwCtrlType):
-            # Windows控制台值：
-            # CTRL_C_EVENT      = 0
-            # CTRL_BREAK_EVENT  = 1
-            # CTRL_CLOSE_EVENT  = 2
-            # CTRL_LOGOFF_EVENT = 5
-            # CTRL_SHUTDOWN_EVENT = 6
-            if dwCtrlType in (0, 1, 2, 5, 6):
-                shutdown(signal.SIGTERM, None)
-                return True  # 表示已经处理该事件
-            return False
-        HANDLER_FUNC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)(console_handler)
-        ctypes.windll.kernel32.SetConsoleCtrlHandler(HANDLER_FUNC, True)
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
