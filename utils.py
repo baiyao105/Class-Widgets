@@ -1,5 +1,6 @@
 import os
 import sys
+import psutil
 
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
@@ -21,42 +22,68 @@ def restart():
 
 def stop(status=0):
     global share
-    logger.debug('停止程序')
     if hasattr(stop, '_called'):
         return
     stop._called = True
+
+    def exit_application():
+        logger.debug("强制退出")
+        os._exit(status)
+
     def shutdown_handler(signum, frame):
         logger.info(f'收到关闭信号: {signum}')
-        update_timer.stop()  # 停止计时器
         QApplication.instance().quit()
 
-    signal.signal(signal.SIGTERM, shutdown_handler)
-    signal.signal(signal.SIGINT, shutdown_handler)
-    if update_timer:
-        update_timer.stop()  # 停止计时器
-        update_timer.remove_all_callbacks()
-    QApplication.instance().quit()
+    signal.signal(signal.SIGTERM, shutdown_handler)  # taskkill
+    signal.signal(signal.SIGINT, shutdown_handler)   # Ctrl+C
+    signal.signal(signal.SIGABRT, shutdown_handler)  # 异常中止
+    if os.name == 'posix':
+        signal.signal(signal.SIGQUIT, shutdown_handler)  # POSIX退出
+        signal.signal(signal.SIGHUP, shutdown_handler)   # 终端断开
+    # 强制终止所有子进程
+    try:
+        current_pid = os.getpid()
+        parent = psutil.Process(current_pid)
+        for child in parent.children(recursive=True):
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
+        gone, alive = psutil.wait_procs(parent.children(), timeout=3)
+    except Exception as e:
+        logger.error(f"终止子进程失败: {e}")
+
+    if 'update_timer' in globals():
+        try:
+            update_timer.stop()
+            update_timer.deleteLater()
+        except RuntimeError as e:
+            logger.error(f"停止定时器失败: {e}")
     app = QApplication.instance()
     if app:
         try:
+            app.exit(status)
             for w in app.topLevelWidgets():
                 w.close()
+                w.deleteLater()
             app.closeAllWindows()
             app.quit()
+            QTimer.singleShot(1000, exit_application)  # 1秒后强制退出
         except Exception as e:
             logger.error(f"关闭窗口时出错: {e}")
     try:
         if share.isAttached():
             share.detach()
+            os.remove(share.nativeKey()) if os.name == 'posix' else None
             logger.debug("分离共享内存: 成功")
         else:
             logger.warning("共享内存未附加")
     except Exception as e:
         logger.error(f"分离共享内存失败: {e}")
+        exit_application()
     finally:
         del share
     logger.debug("程序退出")
-    os._exit(status)
     sys.exit(status)
 
 
@@ -116,7 +143,6 @@ class UnionUpdateTimer(QObject):
             except RuntimeError as e:
                 logger.error(f"回调调用错误: {e}")
                 self.callbacks.remove(callback)
-                stop() # 直接停止兼taskkill,会影响部分报错貌似影响不大
         self._schedule_next()
 
     def _schedule_next(self):  # 调整下一次触发时间

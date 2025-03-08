@@ -883,24 +883,37 @@ class WidgetsManager:
 
     def cleanup_resources(self):
         for widget in self.widgets:
+            widget.deleteLater()
             if hasattr(widget, 'weather_timer') and widget.weather_timer:
                 try:
                     widget.weather_timer.stop()
                 except RuntimeError:
-                    logger.warning(f"组件 {widget.path} 的天气定时器已被销毁，跳过停止操作")
+                    logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
             if hasattr(widget, 'weather_thread') and widget.weather_thread:
                 try:
                     widget.weather_thread.terminate()
                     widget.weather_thread.quit()
                     widget.weather_thread.wait()
                 except RuntimeError:
-                    logger.warning(f"组件 {widget.path} 的天气线程已被销毁，跳过终止操作")
+                    logger.warning(f"组件: {widget.path} 的天气线程已被销毁，跳过操作")
+        self.widgets.clear()
+
+    def __del__(self):
+        self.cleanup_resources()
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+            del self.timer
 
     def stop(self):
         if mgr:
             mgr.cleanup_resources()
         for widget in self.widgets:
             widget.stop()
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
 
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
@@ -1388,6 +1401,16 @@ class FloatingWidget(QWidget):  # 浮窗
     def focusOutEvent(self, event):
         self.focusing = False
 
+    def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
+        for widget in self.widgets:
+            widget.stop()
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
 
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False):
@@ -1905,6 +1928,17 @@ class DesktopWidget(QWidget):  # 主要小组件
         else:
             event.ignore()
 
+    def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
+        for widget in self.widgets:
+            widget.stop()
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
+
 def closeEvent(self, event):
     if QApplication.instance().closingDown():
         if hasattr(self, 'weather_thread') and self.weather_thread:
@@ -1990,15 +2024,18 @@ def check_windows_maximize():  # 检查窗口是否最大化
 
 
 def setup_signal_handlers():
-    def shutdown_handler(signum, frame):
+    def shutdown(signum, frame):
         logger.debug(f"收到终止信号: {signum}, 执行清理")
+        if mgr:
+            mgr.cleanup_resources()  # 清理所有小资源
         stop(0)
     
-    signals = [signal.SIGTERM, signal.SIGINT]
+    signal.signal(signal.SIGTERM, shutdown)  # taskkill
+    signal.signal(signal.SIGINT, shutdown)   # Ctrl+C
+    signal.signal(signal.SIGABRT, shutdown)  # 异常中止
     if os.name == 'posix':
-        signals.append(signal.SIGQUIT)
-    for sig in signals:
-        signal.signal(sig, shutdown_handler)
+        signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
+        signal.signal(signal.SIGHUP, shutdown)   # 终端断开
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
@@ -2134,4 +2171,8 @@ if __name__ == '__main__':
         if config_center.read_conf('Other', 'auto_check_update') == '1':
             check_update()
 
-    stop(app.exec())
+    if __name__ == '__main__':
+        try:
+            sys.exit(app.exec())
+        finally:
+            stop(0)
