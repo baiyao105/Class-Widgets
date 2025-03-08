@@ -42,6 +42,7 @@ from file import config_center, schedule_center
 
 if os.name == 'nt':
     import pygetwindow
+    from ctypes import wintypes
 
 # 适配高DPI缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -758,6 +759,14 @@ class WidgetsManager:
             self.widgets.append(widget)
 
         self.create_widgets()
+
+    def close_all_widgets(self):
+        # 统一关闭所有组件
+        if hasattr(self, '_closing'):
+            return
+        self._closing = True
+        for widget in self.widgets:
+            widget.close()  # 触发各个widget的closeEvent
 
     def check_widgets_exist(self):
         for widget in self.widgets_list:
@@ -1958,9 +1967,8 @@ def closeEvent(self, event):
                 logger.warning("天气定时器已被销毁，跳过停止操作")
             finally:
                 del self.weather_timer  # 删除引用以避免重复操作
-
         event.accept()
-        return
+        stop(0)
 
     for child in self.findChildren(QObject):
         child.deleteLater()
@@ -2025,6 +2033,9 @@ def check_windows_maximize():  # 检查窗口是否最大化
 
 def setup_signal_handlers():
     def shutdown(signum, frame):
+        if hasattr(shutdown, '_called'):  # 防止重复处理
+            return
+        shutdown._called = True
         logger.debug(f"收到终止信号: {signum}, 执行清理")
         if mgr:
             mgr.cleanup_resources()  # 清理所有小资源
@@ -2036,6 +2047,21 @@ def setup_signal_handlers():
     if os.name == 'posix':
         signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
         signal.signal(signal.SIGHUP, shutdown)   # 终端断开
+    elif os.name == 'nt':
+        signal.signal(signal.SIGBREAK, shutdown)
+        def console_handler(dwCtrlType):
+            # Windows控制台值：
+            # CTRL_C_EVENT      = 0
+            # CTRL_BREAK_EVENT  = 1
+            # CTRL_CLOSE_EVENT  = 2
+            # CTRL_LOGOFF_EVENT = 5
+            # CTRL_SHUTDOWN_EVENT = 6
+            if dwCtrlType in (0, 1, 2, 5, 6):
+                shutdown(signal.SIGTERM, None)
+                return True  # 表示已经处理该事件
+            return False
+        HANDLER_FUNC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)(console_handler)
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(HANDLER_FUNC, True)
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
