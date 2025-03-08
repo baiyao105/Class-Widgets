@@ -891,19 +891,28 @@ class WidgetsManager:
 
     def cleanup_resources(self):
         for widget in self.widgets:
-            widget.deleteLater()
-            if hasattr(widget, 'weather_timer') and widget.weather_timer:
-                try:
-                    widget.weather_timer.stop()
-                except RuntimeError:
-                    logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
-            if hasattr(widget, 'weather_thread') and widget.weather_thread:
-                try:
-                    widget.weather_thread.terminate()
-                    widget.weather_thread.quit()
-                    widget.weather_thread.wait()
-                except RuntimeError:
-                    logger.warning(f"组件: {widget.path} 的天气线程已被销毁，跳过操作")
+            try:
+                widget.deleteLater()
+
+                if hasattr(widget, 'weather_timer') and widget.weather_timer:
+                    try:
+                        widget.weather_timer.stop()
+                    except RuntimeError:
+                        if logger is not None:
+                            logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
+
+                if hasattr(widget, 'weather_thread') and widget.weather_thread:
+                    try:
+                        widget.weather_thread.terminate()
+                        widget.weather_thread.quit()
+                        widget.weather_thread.wait()
+                    except RuntimeError:
+                        if logger is not None:
+                            logger.warning(f"组件: {widget.path} 的天气线程已被销毁，跳过操作")
+            except Exception as ex:
+                widget_path = getattr(widget, 'path', 'unknown')
+                if logger is not None:
+                    logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
         self.widgets.clear()
 
     def __del__(self):
