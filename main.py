@@ -1792,7 +1792,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             current_city = self.findChild(QLabel, 'current_city')
             try:  # 天气组件
                 self.weather_icon.setPixmap(
-                    QPixmap(db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data)))
+                    QPixmap(os.path.normpath(db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data))))
                 )
                 self.alert_icon.hide()
                 if db.is_supported_alert():
