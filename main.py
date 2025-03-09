@@ -1807,10 +1807,12 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.temperature.setText(f"{db.get_weather_data('temp', weather_data)}")
                 current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · "
                                      f"{weather_name}")
+                new_icon_path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace("\\", "/")
+                original_stylesheet = self.backgnd.styleSheet() or ""
                 update_stylesheet = re.sub(
-                    r'border-image: url\((.*?)\);',
-                    f"border-image: url({db.get_weather_stylesheet(db.get_weather_data('icon', weather_data))});",
-                    self.backgnd.styleSheet()
+                    r'border-image:\s*url\((.*?)\);',
+                    f'border-image: url("{new_icon_path}");',
+                    original_stylesheet
                 )
                 self.backgnd.setStyleSheet(update_stylesheet)
             except Exception as e:
