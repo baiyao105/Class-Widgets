@@ -2139,8 +2139,14 @@ if __name__ == '__main__':
     osVersion = platform.version()
     if system == 'macOS':
         osVersion = 'macOS ' + platform.mac_ver()[0]
+    if system == "Windows":
+        win_release, win_version, win_sp, _ = platform.win32_ver()
+        sp_info = f"-{win_sp}" if win_sp else ""
+    else:
+        sp_info = ""
 
-    logger.info(f"操作系统：{system}，版本：{osRelease}/{osVersion}")
+    logger.info(f"操作系统：{system}，版本：{osRelease}/{osVersion}{sp_info} 架构: {platform.machine()}")
+    logger.info(f"程序运行位置：{os.getcwd()}，Python版本：{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
 
     list_pyttsx3_voices()
 
