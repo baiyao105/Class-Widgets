@@ -2148,7 +2148,11 @@ if __name__ == '__main__':
         sp_info = ""
 
     logger.info(f"操作系统：{system}，版本：{osRelease}/{osVersion}{sp_info} 架构: {platform.machine()}")
-    logger.info(f"程序运行位置：{os.getcwd()}，Python版本：{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    logger.info(f"程序运行位置：{os.getcwd()}")
+    if hasattr(sys, 'frozen'):
+        logger.info(f"Nuitka_Python 版本：{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    else:
+        logger.info(f"Python 版本：{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
 
     list_pyttsx3_voices()
 
