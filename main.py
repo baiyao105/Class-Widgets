@@ -7,12 +7,13 @@ import re
 import subprocess
 import sys
 import psutil
+import signal
 import traceback
 from shutil import copy
 from typing import Optional
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject
 from PyQt5.QtGui import QColor, QIcon, QPixmap, QPainter, QDesktopServices
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtSvg import QSvgRenderer
@@ -621,7 +622,7 @@ class PluginManager:  # 插件管理器
             "Weather_API": config_center.read_conf('Weather', 'api'),  # 天气API
             "Notification": notification.notification_contents,  # 检测到的通知内容
 
-            "PLUGIN_PATH": f'{conf.PLUGINS_DIR}/{path}',  # 传递插件目录
+            "PLUGIN_PATH": os.path.normpath(os.path.join(conf.PLUGINS_DIR, path)) if path else conf.PLUGINS_DIR,  # 传递插件目录
             "Config_Center": config_center,  # 配置中心实例
             "Schedule_Center": schedule_center,  # 课程表中心实例
             "Base_Directory": base_directory,  # 资源目录
@@ -758,6 +759,14 @@ class WidgetsManager:
 
         self.create_widgets()
 
+    def close_all_widgets(self):
+        # 统一关闭所有组件
+        if hasattr(self, '_closing'):
+            return
+        self._closing = True
+        for widget in self.widgets:
+            widget.close()  # 触发各个widget的closeEvent
+
     def check_widgets_exist(self):
         for widget in self.widgets_list:
             if widget not in list_.widget_width.keys():
@@ -880,10 +889,48 @@ class WidgetsManager:
         else:
             self.hide_windows()
 
+    def cleanup_resources(self):
+        for widget in self.widgets:
+            try:
+                widget.deleteLater()
+
+                if hasattr(widget, 'weather_timer') and widget.weather_timer:
+                    try:
+                        widget.weather_timer.stop()
+                    except RuntimeError:
+                        if logger is not None:
+                            logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
+
+                if hasattr(widget, 'weather_thread') and widget.weather_thread:
+                    try:
+                        widget.weather_thread.terminate()
+                        widget.weather_thread.quit()
+                        widget.weather_thread.wait()
+                    except RuntimeError:
+                        if logger is not None:
+                            logger.warning(f"组件: {widget.path} 的天气线程已被销毁，跳过操作")
+            except Exception as ex:
+                widget_path = getattr(widget, 'path', 'unknown')
+                if logger is not None:
+                    logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
+        self.widgets.clear()
+
+    def __del__(self):
+        self.cleanup_resources()
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+            del self.timer
+
     def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
         for widget in self.widgets:
             widget.stop()
-
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
 
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
@@ -927,6 +974,9 @@ class openProgressDialog(QWidget):
     def cancel_action(self):
         self.timer.stop()
         self.close()
+
+    def save_position(self):
+        pass
 
     def init_ui(self):
         self.setWindowFlags(
@@ -1240,6 +1290,11 @@ class FloatingWidget(QWidget):  # 浮窗
         self.animating = False
 
     def closeEvent(self, event):
+        # 跳过动画
+        if QApplication.instance().closingDown():
+            self.save_position()
+            event.accept()
+            return
         event.ignore()
         self.setMinimumWidth(0)
         self.position = self.pos()
@@ -1256,7 +1311,7 @@ class FloatingWidget(QWidget):  # 浮窗
         min_duration = 250   # 最小
         # 获取主组件位置
         main_widget = next(
-            (w for w in mgr.widgets if w.path == 'widget-current-activity.ui'), 
+            (w for w in mgr.widgets if w.path == 'widget-current-activity.ui'),
             None
         )
         if main_widget:
@@ -1277,7 +1332,7 @@ class FloatingWidget(QWidget):  # 浮窗
                 distance = abs(current_pos.y() - target_pos.y())
         else:
             target_pos = QPoint(
-                screen_geometry.center().x() - self.width()//2,
+                screen_geometry.center().x() - self.width() // 2,
                 int(config_center.read_conf('General', 'margin'))
             )
             distance = abs(current_pos.y() - target_pos.y())
@@ -1373,6 +1428,16 @@ class FloatingWidget(QWidget):  # 浮窗
     def focusOutEvent(self, event):
         self.focusing = False
 
+    def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
+        for widget in self.widgets:
+            widget.stop()
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
 
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False):
@@ -1720,6 +1785,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.last_widgets = widgets
             logger.info(f'切换主题：{theme_}，颜色模式{color_mode}')
             mgr.clear_widgets()
+            self.init_ui(self.path)
+            self.init_font()
 
     def update_weather_data(self, weather_data):  # 更新天气数据(已兼容多api)
         global weather_name, temperature, weather_data_temp
@@ -1888,19 +1955,46 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 mgr.show_windows()
         else:
-
             event.ignore()
 
-    def closeEvent(self, event):
-        super().closeEvent(event)
-        self.destroy()
+    def stop(self):
+        if mgr:
+            mgr.cleanup_resources()
+        for widget in self.widgets:
+            widget.stop()
+        if self.animation:
+            self.animation.stop()
+        if self.opacity_animation:
+            self.opacity_animation.stop()
+        self.close()
 
-        if hasattr(self, 'weather_thread'):
-            self.weather_thread.terminate()  # 终止天气线程
-            self.weather_thread.quit()  # 退出天气线程
-        if hasattr(self, 'weather_timer'):
-            self.weather_timer.stop()  # 停止定时器
+def closeEvent(self, event):
+    if QApplication.instance().closingDown():
+        if hasattr(self, 'weather_thread') and self.weather_thread:
+            try:
+                self.weather_thread.terminate()  # 终止天气线程
+                self.weather_thread.quit()      # 退出天气线程
+                self.weather_thread.wait()      # 等待线程结束
+            except RuntimeError:
+                logger.warning("天气线程已被销毁，跳过终止操作")
+            finally:
+                del self.weather_thread  # 删除引用以避免重复操作
 
+        if hasattr(self, 'weather_timer') and self.weather_timer:
+            try:
+                self.weather_timer.stop()  # 停止定时器
+            except RuntimeError:
+                logger.warning("天气定时器已被销毁，跳过停止操作")
+            finally:
+                del self.weather_timer  # 删除引用以避免重复操作
+        event.accept()
+        stop(0)
+
+    for child in self.findChildren(QObject):
+        child.deleteLater()
+    super().closeEvent(event)
+    self.deleteLater()
+    self.destroy()
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
@@ -1957,6 +2051,22 @@ def check_windows_maximize():  # 检查窗口是否最大化
     return max_windows
 
 
+def setup_signal_handlers():
+    def shutdown(signum, frame):
+        if hasattr(shutdown, '_called'):  # 防止重复处理
+            return
+        shutdown._called = True
+        logger.debug(f"收到终止信号: {signum}, 执行清理")
+        if mgr:
+            mgr.cleanup_resources()  # 清理所有小资源
+        stop(0)
+    
+    signal.signal(signal.SIGTERM, shutdown)  # taskkill
+    signal.signal(signal.SIGINT, shutdown)   # Ctrl+C
+    signal.signal(signal.SIGABRT, shutdown)  # 异常中止
+    if os.name == 'posix':
+        signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
+        signal.signal(signal.SIGHUP, shutdown)   # 终端断开
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
@@ -1968,6 +2078,20 @@ def init_config():  # 重设配置文件
 
 
 def init():
+    global theme, radius, mgr, screen_width, first_start, fw
+    update_timer.remove_all_callbacks()
+
+    # 添加主题监听器
+    def on_theme_changed(new_theme):
+        global theme
+        theme = new_theme
+        logger.info(f'检测到主题切换：{theme}')
+        mgr.clear_widgets()
+        init()
+
+    config_center.add_listener('General', 'theme', on_theme_changed)
+
+    theme = config_center.read_conf('General', 'theme')
     global theme, radius, mgr, screen_width, first_start, fw
     update_timer.remove_all_callbacks()
 
@@ -2002,6 +2126,7 @@ def init():
 
 
 if __name__ == '__main__':
+    setup_signal_handlers()
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
@@ -2091,4 +2216,8 @@ if __name__ == '__main__':
         if config_center.read_conf('Other', 'auto_check_update') == '1':
             check_update()
 
-    stop(app.exec())
+    if __name__ == '__main__':
+        try:
+            sys.exit(app.exec())
+        finally:
+            stop(0)
