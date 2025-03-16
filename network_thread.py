@@ -203,18 +203,27 @@ class VersionThread(QThread):  # 获取最新版本号
 
     def __init__(self):
         super().__init__()
-        self._running = True # 运行标志
+        self._running = True
+        self.max_retries = 1 # 最大重试次数
+        self.retry_count = 0
+        self.retry_delay = 5000 # 重试延迟
 
     def run(self):
-        while self._running:
+        while self._running and self.retry_count <= self.max_retries:
             version = self.get_latest_version()
             self.version_signal.emit(version)
+            
+            if 'error' not in version or self.retry_count >= self.max_retries:
+                self._running = False
+            else:
+                self.retry_count += 1
+                self.msleep(self.retry_delay)
 
     @staticmethod
     def get_latest_version():
         url = "https://classwidgets.rinlit.cn/version.json"
         try:
-            response = requests.get(url, proxies=proxies)
+            response = requests.get(url, proxies=proxies, timeout=10) # 添加超时设置
             if response.status_code == 200:
                 data = response.json()
                 return data
@@ -348,6 +357,16 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
 
 def check_update():
     global threads
+    # 终止所有现有的版本检查线程
+    for thread in threads:
+        if isinstance(thread, VersionThread) and thread.isRunning():
+            thread.terminate()
+            thread.wait()
+    
+    # 清理已终止的线程
+    threads = [t for t in threads if t.isRunning()]
+    
+    # 创建新的版本检查线程
     version_thread = VersionThread()
     threads.append(version_thread)
     version_thread.version_signal.connect(check_version)
