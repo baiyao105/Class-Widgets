@@ -1189,15 +1189,29 @@ class SettingsMenu(FluentWindow):
                     f"检查更新失败！\n{version['error']}"
                 )
             return False
+            
+        def normalize_version(v):
+            if v.startswith('v'):
+                v = v[1:]
+            # 处理beta版本格式
+            if '-b' in v:
+                version_parts, beta_part = v.split('-b')
+                version_nums = [int(num) for num in version_parts.split('.')]
+                # beta版本比正式版本低，返回beta标记版本
+                return version_nums + [-1, int(beta_part)]
+            else:
+                return [int(num) for num in v.split('.')] + [0, 0]
         channel = int(config_center.read_conf("Other", "version_channel"))
         new_version = version['version_release' if channel == 0 else 'version_beta']
+        local_version = config_center.read_conf("Other", "version")
 
-        if new_version == config_center.read_conf("Other", "version"):
-            self.version.setText(f'当前版本：{new_version}\n当前为最新版本')
+        logger.debug(f"服务端版本: {normalize_version(new_version)}，本地版本: {normalize_version(local_version)}")
+        if normalize_version(new_version) <= normalize_version(local_version):
+            self.version.setText(f'当前版本：{local_version}\n当前为最新版本')
         else:
-            self.version.setText(f'当前版本：{config_center.read_conf("Other", "version")}\n最新版本：{new_version}')
+            self.version.setText(f'当前版本：{local_version}\n最新版本：{new_version}')
 
-            if new_version != config_center.read_conf("Other", "version") and utils.tray_icon:
+            if utils.tray_icon:
                 utils.tray_icon.push_update_notification(f"新版本速递：{new_version}")
 
     def cf_import_schedule_cses(self):  # 导入课程表（CSES）
