@@ -28,6 +28,7 @@ class ConfigCenter:
         self.check_config()
         self.schedule_name = self.read_conf('General', 'schedule')
         self.old_schedule_name = self.schedule_name
+        self.listeners = {}
 
     def update_conf(self):
         try:
@@ -61,10 +62,30 @@ class ConfigCenter:
         if section not in self.config:
             self.config.add_section(section)
 
+        old_value = self.read_conf(section, key)
         self.config.set(section, key, str(value))
 
         with open(path, 'w', encoding='utf-8') as configfile:
             self.config.write(configfile)
+            
+        # 触发监听器回调
+        if section in self.listeners and key in self.listeners[section]:
+            for callback in self.listeners[section][key]:
+                callback(value)
+                
+    def add_listener(self, section, key, callback):
+        """添加配置监听器
+        
+        Args:
+            section: 配置节
+            key: 配置键
+            callback: 回调函数，当配置变化时调用
+        """
+        if section not in self.listeners:
+            self.listeners[section] = {}
+        if key not in self.listeners[section]:
+            self.listeners[section][key] = []
+        self.listeners[section][key].append(callback)
 
     def check_config(self):
         if not os.path.exists(path):  # 如果配置文件不存在，则copy默认配置文件
