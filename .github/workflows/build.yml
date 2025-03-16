@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "0 16 * * *"
   workflow_dispatch:
+  push:
+    tags:
+      - v*
 
 concurrency:
   group: build-${{ github.ref }}
@@ -13,6 +16,19 @@ permissions:
   contents: write
  
 jobs:
+  check_commit:
+    runs-on: ubuntu-latest
+    outputs:
+      has-new-commit: ${{ steps.check-new-commits.has-new-commits }}
+    steps:
+      - name: Check for new commits today
+        id: check-new-commits
+        uses: adriangl/check-new-commits-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          seconds: 86400
+          branch: 'main'
+
   builder_matrix:
     strategy:
       fail-fast: false
@@ -33,20 +49,9 @@ jobs:
           - os: windows-latest
             arch: x86
     runs-on: ${{ matrix.os }}
+    needs: check_commit
+    if: ${{ needs.check_commit.outputs.has-new-commit == 'true' || github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule') }}
     steps:
-      - name: Check for new commits today
-        id: check-new-commits
-        uses: adriangl/check-new-commits-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          seconds: 86400 # One day in seconds
-          branch: 'main'
-      - name: Decide to stop
-        if: ${{ steps.check-new-commits.outputs.has-new-commits != 'true' && github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          echo "::warning title=Stop Workflow::No new commit today."
-          stopMarker=$(uuidgen)
-          echo "::stop-commands::$stopMarker"
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
       - name: Setup Python
@@ -88,25 +93,6 @@ jobs:
           product-name: Class Widgets
           file-version: 1.1.7.1
           windows-icon-from-ico: ./img/favicon.ico
-      - name: Build (Linux)
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          mode: standalone
-          script-name: main.py
-          output-file: ClassWidgets
-          enable-plugins: pyqt5
-          include-data-files: LICENSE=LICENSE
-          include-data-dir: |
-            audio=audio
-            config=config
-            font=font
-            img=img
-            plugins=plugins
-            ui=ui
-            view=view
-          include-package: pyttsx3.drivers
-          linux-icon: ./img/favicon.ico
       - name: Build (macOS)
         if: ${{ startsWith(matrix.os, 'macos') }}
         uses: Nuitka/Nuitka-Action@main
@@ -137,30 +123,24 @@ jobs:
           xcopy build\main.dist\* ClassWidgets\ /e/y
           ./zip -r -q "./zip/ClassWidgets-Windows-${{ matrix.arch }} (Unsigned).zip" ClassWidgets
 
-      - name: Package (Linux)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cp -R build/main.dist ClassWidgets
-          zip -r -q ./zip/ClassWidgets-UbuntuLatest.zip ClassWidgets
-
       - name: Package (macOS)
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
           cp -R build/main.app Class\ Widgets.app
-          zip -r -q "./zip/Class Widgets-macOS-${{ matrix.arch }}.zip" Class\ Widgets.app
+          zip -r -q "./zip/ClassWidgets-macOS-${{ matrix.arch }}.zip" Class\ Widgets.app
 
       - name: Upload unsigned application
-        if: ${{ ( matrix.os != 'windows-latest' && github.event_name != 'pull_request' ) || github.event_name == 'pull_request' }}
+        if: ${{ matrix.os != 'windows-latest' || !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4.4.2
         with:
           name: ${{ matrix.os }}-${{ matrix.arch }}
           path: ./zip
       - name: Upload unsigned single file
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/') }}
         id: upload-unsigned-artifact
         uses: actions/upload-artifact@v4.4.2
         with:
-          name: windows-${{ matrix.arch }} (Unsigned single)
+          name: windows-${{ matrix.arch }} (Unsigned single - DO NOT use)
           path: ./ClassWidgets/ClassWidgets.exe
       - name: Sign application (Release)
         if: ${{ matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/') }}
@@ -174,12 +154,12 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: '.\ClassWidgets'
       - name: Recompress
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/') }}
         run: |
           del "zip/ClassWidgets-Windows-${{ matrix.arch }} (Unsigned).zip"
           ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip ClassWidgets
       - name: Upload signed application
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-latest-${{ matrix.arch }}
@@ -187,6 +167,8 @@ jobs:
 
   debian:
     runs-on: ubuntu-latest
+    needs: check_commit
+    if: ${{ needs.check_commit.outputs.has-new-commit == 'true' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
     container:
       image: debian:10
     steps:
@@ -224,7 +206,7 @@ jobs:
           uv venv
           source .venv/bin/activate
           uv pip install -r requirements.txt
-          uv pip install nuitka
+          uv pip install nuitka==2.6.7
           python -m nuitka main.py \
             --enable-plugin=pyqt5 \
             --mode=standalone \
@@ -256,4 +238,4 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     uses: ./.github/workflows/release.yml
     with:
-      runid: ${{ github.run_id }}
+      run_id: ${{ github.run_id }}
