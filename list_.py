@@ -81,7 +81,7 @@ widget_width = {  # 默认宽度
     'widget-countdown.ui': 200,
     'widget-current-activity.ui': 360,
     'widget-next-activity.ui': 290,
-    'widget-countdown-custom.ui': 200,
+    'widget-countdown-day.ui': 200,
     'widget-weather.ui': 200
 }
 
@@ -90,7 +90,7 @@ widget_conf = {
     '活动倒计时': 'widget-countdown.ui',
     '当前活动': 'widget-current-activity.ui',
     '更多活动': 'widget-next-activity.ui',
-    '自定义倒计时': 'widget-countdown-custom.ui',
+    '倒计日': 'widget-countdown-day.ui',
     '天气': 'widget-weather.ui'
 }
 
@@ -99,7 +99,7 @@ widget_name = {
     'widget-countdown.ui': '活动倒计时',
     'widget-current-activity.ui': '当前活动',
     'widget-next-activity.ui': '更多活动',
-    'widget-countdown-custom.ui': '自定义倒计时',
+    'widget-countdown-day.ui': '倒计日',
     'widget-weather.ui': '天气'
 }
 
@@ -142,6 +142,8 @@ except Exception as e:
     }
 
 not_exist_themes = []
+
+countdown_modes = ['轮播', '多小组件']
 
 for folder in theme_folder:
     try:

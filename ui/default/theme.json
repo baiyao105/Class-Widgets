@@ -11,7 +11,7 @@
     "widget-countdown.ui": 200,
     "widget-current-activity.ui": 360,
     "widget-next-activity.ui": 290,
-    "widget-countdown-custom.ui": 200,
+    "widget-countdown-day.ui": 200,
     "widget-weather.ui": 200
   }
 }

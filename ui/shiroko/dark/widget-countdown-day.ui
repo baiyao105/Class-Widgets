@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>自定义倒计时</string>
+   <string>倒计日</string>
   </property>
   <widget class="QLabel" name="countdown_custom_title">
    <property name="geometry">
