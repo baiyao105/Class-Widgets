@@ -751,10 +751,12 @@ class WidgetsManager:
         self.spacing = conf.load_theme_config(theme)['spacing']
 
         self.get_start_pos()
+        cnt_all = {}
 
         # 添加小组件实例
         for w in range(len(self.widgets_list)):
-            widget = DesktopWidget(self, self.widgets_list[w], True if w == 0 else False)
+            cnt_all[self.widgets_list[w]] = cnt_all.get(self.widgets_list[w], -1) + 1
+            widget = DesktopWidget(self, self.widgets_list[w], True if w == 0 else False,cnt = cnt_all[self.widgets_list[w]], position=self.get_widget_pos("", w), widget_cnt = w)
             self.widgets.append(widget)
 
         self.create_widgets()
@@ -794,14 +796,14 @@ class WidgetsManager:
             # 调整窗口尺寸
             width = self.get_widget_width(widget.path)
             height = self.get_widgets_height()
-            pos_x = self.get_widget_pos(widget.path)[0]
+            pos_x = self.get_widget_pos(widget.path, widget.widget_cnt)[0]
             op = int(config_center.read_conf('General', 'opacity')) / 100
 
             if widget.animation is None:
                 widget.widget_transition(pos_x, width, height, op)
 
-    def get_widget_pos(self, path):  # 获取小组件位置
-        num = self.widgets_list.index(path)
+    def get_widget_pos(self, path, cnt=None):  # 获取小组件位置
+        num = self.widgets_list.index(path) if cnt is None else cnt
         self.get_start_pos()
         pos_x = self.start_pos_x + self.spacing * num
         for i in range(num):
@@ -1440,8 +1442,11 @@ class FloatingWidget(QWidget):  # 浮窗
         self.close()
 
 class DesktopWidget(QWidget):  # 主要小组件
-    def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False):
+    def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False, cnt=0, position=None, widget_cnt = None):
         super().__init__()
+
+        self.cnt = cnt
+        self.widget_cnt = widget_cnt
 
         self.tray_menu = None
 
@@ -1454,7 +1459,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
         self.w = 100
 
-        self.position = parent.get_widget_pos(self.path)
+        self.position = parent.get_widget_pos(self.path) if position is None else position
         self.animation = None
         self.opacity_animation = None
 
@@ -1503,7 +1508,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         elif path == 'widget-next-activity.ui':  # 接下来的活动
             self.nl_text = self.findChild(QLabel, 'next_lesson_text')
 
-        elif path == 'widget-countdown-custom.ui':  # 自定义倒计时
+        elif path == 'widget-countdown-day.ui':  # 自定义倒计时
             self.custom_title = self.findChild(QLabel, 'countdown_custom_title')
             self.custom_countdown = self.findChild(QLabel, 'custom_countdown')
 
@@ -1758,8 +1763,9 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.ac_title.setText(cd_list[0])
                 self.countdown_progress_bar.setValue(cd_list[2])
 
-        if path == 'widget-countdown-custom.ui':  # 自定义倒计时
-            self.custom_title.setText(f'距离 {config_center.read_conf("Date", "cd_text_custom")} 还有')
+        if path == 'widget-countdown-day.ui':  # 自定义倒计时
+            conf.update_countdown(self.cnt)
+            self.custom_title.setText(f'距离 {conf.get_cd_text_custom()} 还有')
             self.custom_countdown.setText(conf.get_custom_countdown())
         self.update()
 
@@ -1785,8 +1791,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.last_widgets = widgets
             logger.info(f'切换主题：{theme_}，颜色模式{color_mode}')
             mgr.clear_widgets()
-            self.init_ui(self.path)
-            self.init_font()
 
     def update_weather_data(self, weather_data):  # 更新天气数据(已兼容多api)
         global weather_name, temperature, weather_data_temp
@@ -2078,20 +2082,6 @@ def init_config():  # 重设配置文件
 
 
 def init():
-    global theme, radius, mgr, screen_width, first_start, fw
-    update_timer.remove_all_callbacks()
-
-    # 添加主题监听器
-    def on_theme_changed(new_theme):
-        global theme
-        theme = new_theme
-        logger.info(f'检测到主题切换：{theme}')
-        mgr.clear_widgets()
-        init()
-
-    config_center.add_listener('General', 'theme', on_theme_changed)
-
-    theme = config_center.read_conf('General', 'theme')
     global theme, radius, mgr, screen_width, first_start, fw
     update_timer.remove_all_callbacks()
 
