@@ -2078,7 +2078,6 @@ def init():
     global theme, radius, mgr, screen_width, first_start, fw
     update_timer.remove_all_callbacks()
 
-
     theme = config_center.read_conf('General', 'theme')  # 主题
     if not os.path.exists(f'{base_directory}/ui/{theme}/theme.json'):
         logger.warning(f'主题 {theme} 不存在，使用默认主题')

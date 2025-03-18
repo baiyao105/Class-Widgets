@@ -204,19 +204,9 @@ class VersionThread(QThread):  # 获取最新版本号
 
     def __init__(self):
         super().__init__()
-        self._running = True
-        self.max_retries = 1 # 最大重试次数
-        self.retry_count = 0
-        self.retry_delay = 5000 # 重试延迟
-
     def run(self):
-        VersionThread._instance_running = True
-        
         version = self.get_latest_version()
         self.version_signal.emit(version)
-        
-        VersionThread._instance_running = False
-        self._running = False
     
     @classmethod
     def is_running(cls):
@@ -389,16 +379,13 @@ def check_version(version):  # 检查更新
         )
         return False
 
+    from packaging.version import Version
     def normalize_version(v):
         if v.startswith('v'):
             v = v[1:]
         if '-b' in v:
-            version_parts, beta_part = v.split('-b')
-            version_nums = [int(num) for num in version_parts.split('.')]
-            # beta版本比正式版本低，返回beta标记版本
-            return version_nums + [-1, int(beta_part)]
-        else:
-            return [int(num) for num in v.split('.')] + [0, 0]
+            v = v.replace('-b', 'b')
+        return Version(v)
     channel = int(config_center.read_conf("Other", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
     local_version = config_center.read_conf("Other", "version")
