@@ -7,6 +7,7 @@ from datetime import datetime
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from loguru import logger
+from packaging.version import Version
 
 import conf
 import utils
@@ -217,7 +218,7 @@ class VersionThread(QThread):  # 获取最新版本号
         url = "https://classwidgets.rinlit.cn/version.json"
         try:
             logger.info(f"正在获取版本信息")
-            response = requests.get(url, proxies=proxies, timeout=10)
+            response = requests.get(url, proxies=proxies, timeout=30)
             logger.debug(f"更新请求响应: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
@@ -378,8 +379,6 @@ def check_version(version):  # 检查更新
             f"检查更新失败！\n{version['error']}"
         )
         return False
-
-    from packaging.version import Version
     def normalize_version(v):
         if v.startswith('v'):
             v = v[1:]
