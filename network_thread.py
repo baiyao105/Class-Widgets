@@ -379,17 +379,12 @@ def check_version(version):  # 检查更新
             f"检查更新失败！\n{version['error']}"
         )
         return False
-    def normalize_version(v):
-        if v.startswith('v'):
-            v = v[1:]
-        if '-b' in v:
-            v = v.replace('-b', 'b')
-        return Version(v)
+    
     channel = int(config_center.read_conf("Other", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
     local_version = config_center.read_conf("Other", "version")
-    logger.debug(f"服务端版本: {normalize_version(server_version)}，本地版本: {normalize_version(local_version)}")
-    if normalize_version(server_version) > normalize_version(local_version):
+    logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
+    if Version(server_version) > Version(local_version):
         utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
 
 
