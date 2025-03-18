@@ -208,10 +208,6 @@ class VersionThread(QThread):  # 获取最新版本号
     def run(self):
         version = self.get_latest_version()
         self.version_signal.emit(version)
-    
-    @classmethod
-    def is_running(cls):
-        return cls._instance_running
 
     @staticmethod
     def get_latest_version():
@@ -305,7 +301,6 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
             logger.error(f"插件下载/解压失败: {e}")
 
     def stop(self):
-        self._running = False
         self.terminate()
 
     def download_file(self, file_path):
