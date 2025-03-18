@@ -1213,7 +1213,7 @@ class SettingsMenu(FluentWindow):
         new_version = version['version_release' if channel == 0 else 'version_beta']
         local_version = config_center.read_conf("Other", "version")
 
-        logger.debug(f"服务端版本: {new_version}，本地版本: {local_version}")
+        logger.debug(f"服务端版本: {normalize_version(new_version)}，本地版本: {normalize_version(local_version)}")
         if normalize_version(new_version) <= normalize_version(local_version):
             self.version.setText(f'当前版本：{local_version}\n当前为最新版本')
         else:
