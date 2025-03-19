@@ -185,28 +185,6 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           python-version: 3.8.10
-      - name: Install Python dependencies
-        shell: bash
-        run: pip install -r requirements.txt
-      - name: Build (Windows)
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          mode: standalone
-          script-name: main.py
-          output-file: ClassWidgets
-          enable-plugins: pyqt5
-          include-data-files: LICENSE=LICENSE
-          include-data-dir: |
-            audio=audio
-            config=config
-            font=font
-            img=img
-            plugins=plugins
-            ui=ui
-            view=view
-          include-package: |
-            pyttsx3.drivers
-            comtypes
       - name: Setup Environment Variables
         shell: bash
         run: |

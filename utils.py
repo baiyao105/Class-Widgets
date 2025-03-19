@@ -134,7 +134,6 @@ class UnionUpdateTimer(QObject):
         self.callbacks = []  # 存储所有的回调函数
 
     def _on_timeout(self):  # 超时
-
         if QApplication.instance().closingDown():
             sys.exit(0)
             return
