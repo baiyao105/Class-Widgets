@@ -1794,7 +1794,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def update_weather_data(self, weather_data):  # 更新天气数据(已兼容多api)
         global weather_name, temperature, weather_data_temp
-        if type(weather_data) is dict and hasattr(self, 'weather_icon'):
+        if type(weather_data) is dict and hasattr(self, 'weather_icon') and 'error' not in weather_data:
             logger.success('已获取天气数据')
             alert_data = weather_data.get('alert')
             weather_data = weather_data.get('now')
@@ -1829,6 +1829,23 @@ class DesktopWidget(QWidget):  # 主要小组件
                 logger.error(f'天气组件出错：{e}')
         else:
             logger.error(f'获取天气数据出错：{weather_data}')
+            try: 
+                if hasattr(self, 'weather_icon'):
+                    self.weather_icon.setPixmap(QPixmap(f'{base_directory}/img/weather/99.svg'))
+                    self.alert_icon.hide()
+                    self.temperature.setText('--°')
+                    current_city = self.findChild(QLabel, 'current_city')
+                    if current_city:
+                        current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · 未知")
+                    if hasattr(self, 'backgnd'):
+                        update_stylesheet = re.sub(
+                            r'border-image: url\((.*?)\);',
+                            f"border-image: url({db.get_weather_stylesheet('99')});",
+                            self.backgnd.styleSheet()
+                        )
+                        self.backgnd.setStyleSheet(update_stylesheet)
+            except Exception as e:
+                logger.error(f'天气图标设置失败：{e}')
 
     def open_extra_menu(self):
         global ex_menu

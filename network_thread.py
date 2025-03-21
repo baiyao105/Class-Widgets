@@ -7,6 +7,7 @@ from datetime import datetime
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 from loguru import logger
+from packaging.version import Version
 
 import conf
 import utils
@@ -200,30 +201,34 @@ class getReadme(QThread):  # 获取README
 
 class VersionThread(QThread):  # 获取最新版本号
     version_signal = pyqtSignal(dict)
+    _instance_running = False
 
     def __init__(self):
         super().__init__()
-        self._running = True # 运行标志
-
     def run(self):
-        while self._running:
-            version = self.get_latest_version()
-            self.version_signal.emit(version)
+        version = self.get_latest_version()
+        self.version_signal.emit(version)
+    
+    @classmethod
+    def is_running(cls):
+        return cls._instance_running
 
     @staticmethod
     def get_latest_version():
         url = "https://classwidgets.rinlit.cn/version.json"
         try:
-            response = requests.get(url, proxies=proxies)
+            logger.info(f"正在获取版本信息")
+            response = requests.get(url, proxies=proxies, timeout=30)
+            logger.debug(f"更新请求响应: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
                 return data
             else:
-                logger.error(f"无法获取版本信息 错误代码：{response.status_code}")
+                logger.error(f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}")
                 return {'error': f"请求失败，错误代码：{response.status_code}"}
         except requests.exceptions.RequestException as e:
-            logger.error(f"请求失败，错误代码：{e}")
-            return {"error": f"请求失败\n{e}"}
+            logger.error(f"请求失败，错误详情：{str(e)}")
+            return {"error": f"请求失败\n{str(e)}"}
 
 
 class getDownloadUrl(QThread):
@@ -348,6 +353,15 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
 
 def check_update():
     global threads
+
+    if VersionThread.is_running():
+        logger.debug("已存在版本检查线程在运行，跳过本检查")
+        return
+    
+    # 清理已终止的线程
+    threads = [t for t in threads if t.isRunning()]
+    
+    # 创建新的版本检查线程
     version_thread = VersionThread()
     threads.append(version_thread)
     version_thread.version_signal.connect(check_version)
@@ -365,12 +379,13 @@ def check_version(version):  # 检查更新
             f"检查更新失败！\n{version['error']}"
         )
         return False
-
+    
     channel = int(config_center.read_conf("Other", "version_channel"))
-    new_version = version['version_release' if channel == 0 else 'version_beta']
-
-    if new_version != config_center.read_conf("Other", "version"):
-        utils.tray_icon.push_update_notification(f"新版本速递：{new_version}\n请在“设置”中了解更多。")
+    server_version = version['version_release' if channel == 0 else 'version_beta']
+    local_version = config_center.read_conf("Other", "version")
+    logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
+    if Version(server_version) > Version(local_version):
+        utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
 
 
 class weatherReportThread(QThread):  # 获取最新天气信息
