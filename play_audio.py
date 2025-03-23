@@ -47,8 +47,9 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
 
         sound = pygame.mixer.Sound(file_path)
         volume = int(config_center.read_conf('Audio', 'volume')) / 100
-        pygame.mixer.music.set_volume(volume)
+        sound.set_volume(volume)  # 设置Sound对象的音量
         channel = sound.play()
+        channel.set_volume(volume)  # 设置Channel对象的音量
         while channel.get_busy():
             pygame.time.wait(100)
 
