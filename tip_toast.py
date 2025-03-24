@@ -211,7 +211,7 @@ class tip_toast(QWidget):
         # window_list.remove(self)
         self.hide()
         self.deleteLater()
-        event.ignore()aa
+        event.ignore()
 
     def playsound(self, filename):
         try:
