@@ -2113,7 +2113,8 @@ def check_windows_maximize():  # 检查窗口是否最大化
                     })
         except Exception as e:
             logger.error(f"窗口异常: {str(e)}")
-    return max_windows
+    # 返回布尔值而不是列表，如果有最大化窗口则返回True
+    return len(max_windows) > 0
 
 
 def setup_signal_handlers():
