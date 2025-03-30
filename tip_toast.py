@@ -36,6 +36,10 @@ active_windows = []
 class tip_toast(QWidget):
     def __init__(self, pos, width, state=1, lesson_name=None, title=None, subtitle=None, content=None, icon=None, duration=2000):
         super().__init__()
+        self.setWindowFlag(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setAttribute(Qt.WA_PaintOnScreen, False)
         for w in active_windows[:]:
             w.close()
         active_windows.append(self)

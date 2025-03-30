@@ -48,6 +48,8 @@ QApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+QApplication.setAttribute(Qt.AA_UseSoftwareOpenGL)
+QApplication.setStyle('Fusion')
 
 today = dt.date.today()
 
@@ -988,6 +990,7 @@ class openProgressDialog(QWidget):
             Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.resize(self.size() * self.devicePixelRatio())
 
         if isDarkTheme():
             uic.loadUi(f'{base_directory}/ui/default/dark/toast-open_dialog.ui', self)
@@ -1004,6 +1007,9 @@ class openProgressDialog(QWidget):
 
     def init_font(self):
         font_path = f'{base_directory}/font/HarmonyOS_Sans_SC_Bold.ttf'
+        font.setPixelSize(14 * self.devicePixelRatio())
+        font.setStyleStrategy(QFont.PreferAntialias | QFont.PreferQuality | QFont.ForceIntegerMetrics)
+        self.setFont(font)
         font_id = QFontDatabase.addApplicationFont(font_path)
         if font_id != -1:
             font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
@@ -1011,7 +1017,11 @@ class openProgressDialog(QWidget):
             self.setStyleSheet(f"""
                 QLabel, ProgressRing, PushButton{{
                     font-family: "{font_family}";
-                    font-weight: bold
+                    font-weight: bold;
+                    -webkit-font-smoothing: antialiased;
+                    text-rendering: optimizeLegibility;
+                    font-smooth: always;
+                    -moz-osx-font-smoothing: grayscale;
                     }}
                 """)
 
@@ -1766,6 +1776,11 @@ class DesktopWidget(QWidget):  # 主要小组件
             pixmap.fill(Qt.GlobalColor.transparent)
 
             painter = QPainter(pixmap)
+            painter.setRenderHints(QPainter.RenderHint.Antialiasing | 
+                                QPainter.RenderHint.SmoothPixmapTransform | 
+                                QPainter.RenderHint.TextAntialiasing | 
+                                QPainter.RenderHint.HighQualityAntialiasing)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
             render.render(painter)
             if (isDarkTheme() and conf.load_theme_config(theme)['support_dark_mode']
                     or isDarkTheme() and conf.load_theme_config(theme)['default_theme'] == 'dark'):  # 在暗色模式显示亮色图标
@@ -1832,9 +1847,20 @@ class DesktopWidget(QWidget):  # 主要小组件
             weather_name = db.get_weather_by_code(db.get_weather_data('icon', weather_data))
             current_city = self.findChild(QLabel, 'current_city')
             try:  # 天气组件
-                self.weather_icon.setPixmap(
-                    QPixmap(db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data)))
-                )
+                icon_path = db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data))
+                if icon_path.endswith('.svg'):
+                    render = QSvgRenderer(icon_path)
+                    pixmap = QPixmap(render.defaultSize())
+                    pixmap.fill(Qt.GlobalColor.transparent)
+                    painter = QPainter(pixmap)
+                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+                    render.render(painter)
+                    painter.end()
+                    self.weather_icon.setPixmap(pixmap)
+                else:
+                    self.weather_icon.setPixmap(QPixmap(icon_path))
                 self.alert_icon.hide()
                 if db.is_supported_alert():
                     # print(alert_data if alert_data else weather_data)
@@ -1860,7 +1886,18 @@ class DesktopWidget(QWidget):  # 主要小组件
             logger.error(f'获取天气数据出错：{weather_data}')
             try: 
                 if hasattr(self, 'weather_icon'):
-                    self.weather_icon.setPixmap(QPixmap(f'{base_directory}/img/weather/99.svg'))
+                    # 使用QSvgRenderer渲染错误图标以获得更好的质量
+                    error_icon_path = f'{base_directory}/img/weather/99.svg'
+                    render = QSvgRenderer(error_icon_path)
+                    pixmap = QPixmap(render.defaultSize())
+                    pixmap.fill(Qt.GlobalColor.transparent)
+                    painter = QPainter(pixmap)
+                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+                    render.render(painter)
+                    painter.end()
+                    self.weather_icon.setPixmap(pixmap)
                     self.alert_icon.hide()
                     self.temperature.setText('--°')
                     current_city = self.findChild(QLabel, 'current_city')
