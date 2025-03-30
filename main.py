@@ -2084,36 +2084,53 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
-    for window in pygetwindow.getAllWindows():
+    try:
+        all_windows = pygetwindow.getAllWindows()
+    except Exception as e:
+        logger.error(f"获取窗口列表异常: {str(e)}")
+        return False
+    for window in all_windows:
         try:
-            if window.isMaximized and window.visible:
-                title = window.title.strip()
-                pid = window._hWnd  # 获取窗口句柄
-                process_name = get_process_name(pid).lower()
-                title_lower = title.lower()
-                is_system_explorer = (
-                    process_name == "explorer.exe" 
-                    and (title in excluded_titles 
-                         or any(kw in title_lower for kw in excluded_keywords))
-                )
-                is_system_process = any(
-                    pattern in process_name 
-                    for pattern in excluded_process_patterns
-                )
-                # 标题匹配
-                has_excluded_keyword = any(
-                    kw in title_lower for kw in excluded_keywords
-                )
-                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
-                    max_windows.append({
-                        'title': title,
-                        'process': process_name,
-                        'pid': pid,
-                        'rect': window.box
-                    })
+            # 检查窗口是否有效
+            if not window._hWnd:
+                continue
+            # 检查窗口是否可见且最大化
+            try:
+                is_valid = window.visible and window.isMaximized
+                # 获取窗口位置验证窗口存在性
+                window_rect = window.box
+                if not is_valid or not window_rect:
+                    continue
+            except Exception:
+                # 获取窗口属性失败，可能已关闭
+                continue
+            title = window.title.strip()
+            pid = window._hWnd
+            process_name = get_process_name(pid).lower()
+            title_lower = title.lower()
+            is_system_explorer = (
+                process_name == "explorer.exe" 
+                and (title in excluded_titles 
+                     or any(kw in title_lower for kw in excluded_keywords))
+            )
+            is_system_process = any(
+                pattern in process_name 
+                for pattern in excluded_process_patterns
+            )
+            has_excluded_keyword = any(
+                kw in title_lower for kw in excluded_keywords
+            )
+            if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                max_windows.append({
+                    'title': title,
+                    'process': process_name,
+                    'pid': pid,
+                    'rect': window.box
+                })
         except Exception as e:
-            logger.error(f"窗口异常: {str(e)}")
-    # 返回布尔值而不是列表，如果有最大化窗口则返回True
+            logger.error(f"窗口处理异常: {str(e)}")
+            continue
+    # 如果有最大化窗口则返回True
     return len(max_windows) > 0
 
 
