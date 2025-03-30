@@ -894,6 +894,7 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
+        self.hide_status = None # 重置hide_status
         for widget in self.widgets:
             try:
                 widget.deleteLater()
@@ -2028,6 +2029,9 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 def closeEvent(self, event):
     if QApplication.instance().closingDown():
+        if mgr:
+            mgr.hide_status = None # 重置hide_status
+
         if hasattr(self, 'weather_thread') and self.weather_thread:
             try:
                 if self.weather_thread.isRunning():
