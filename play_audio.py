@@ -9,7 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from loguru import logger
 
 import conf
-from file import config_center
+from file import config_center, base_directory
 from generate_speech import TTSEngine
 
 system = platform.system()
@@ -59,7 +59,6 @@ audio_cache = {} # 音频缓存
 # 预加载常用音频文件
 def preload_audio_files():
     try:
-        from file import base_directory
         audio_files = {
             'attend_class': os.path.join(base_directory, 'audio', config_center.read_conf('Audio', 'attend_class')),
             'finish_class': os.path.join(base_directory, 'audio', config_center.read_conf('Audio', 'finish_class')),
