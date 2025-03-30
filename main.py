@@ -483,8 +483,6 @@ def check_fullscreen():  # 检查是否全屏
         rect.right >= screen_rect.right and
         rect.bottom >= screen_rect.bottom
     )
-    if fw.focusing:
-        return False
     # 排除窗口大小必须占用屏幕95%,避免诈骗()
     if is_fullscreen:
         screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
