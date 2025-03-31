@@ -198,8 +198,10 @@ def get_start_time():
                 class_num = 0
                 if len(item_name) > 2:
                     class_num = int(item_name[2:])
-                # 返回排序键（前缀，节点序数，课程序数）
-                return prefix, part_num, class_num
+                if prefix == 'a':
+                    return part_num, class_num, 0
+                else:
+                    return part_num, class_num, 1
             except ValueError:
                 # 如果转换失败，返回原始字符串
                 return item_name
