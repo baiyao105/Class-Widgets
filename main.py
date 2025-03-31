@@ -187,7 +187,27 @@ def get_start_time():
     if paired_sorted:
         parts_start_time, order = zip(*paired_sorted)
 
-    for item_name, item_time in timeline.items():
+    def sort_timeline_key(item):
+        item_name = item[0]
+        prefix = item_name[0]
+        if len(item_name) > 1:
+            try:
+                # 提取节点序数
+                part_num = int(item_name[1])
+                # 提取课程序数
+                class_num = 0
+                if len(item_name) > 2:
+                    class_num = int(item_name[2:])
+                # 返回排序键（前缀，节点序数，课程序数）
+                return prefix, part_num, class_num
+            except ValueError:
+                # 如果转换失败，返回原始字符串
+                return item_name
+        return item_name
+    
+    # 对timeline排序后添加到timeline_data
+    sorted_timeline = sorted(timeline.items(), key=sort_timeline_key)
+    for item_name, item_time in sorted_timeline:
         try:
             timeline_data[item_name] = item_time
         except Exception as e:
