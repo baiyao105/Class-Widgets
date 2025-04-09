@@ -1526,9 +1526,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             content_layout.setSpacing(16)
             self.temperature = self.findChild(QLabel, 'temperature')
             self.weather_icon = self.findChild(QLabel, 'weather_icon')
-            self.alert_icon = IconWidget()
-            self.alert_icon.setFixedSize(24, 24)
-            content_layout.insertWidget(0, self.alert_icon)
+            self.alert_icon = IconWidget(self)
+            self.alert_icon.setFixedSize(24,24)
+            self.alert_icon.setGeometry(20,20,20,20)
+            self.alert_icon.raise_()
 
             # 预警标签
             self.weather_alert_text = QLabel(self)
