@@ -1925,14 +1925,14 @@ class DesktopWidget(QWidget):  # 主要小组件
                         try:
                             alert_title = db.get_weather_data('alert_title', alert_data if alert_data else weather_data)
                             if alert_title:
-                                alert_type_match = re.search(r'发布(.+?)(?:黄|橙|红|蓝)色预警', alert_title)
+                                alert_type_match = re.search(r'发布(\w+)(蓝|黄|橙|红)色预警', alert_title)
                                 if alert_type_match:
-                                    alert_type = alert_type_match.group(1)
-                                    logger.success(f'天气预警: {alert_title} --> {alert_type}')
-                                    alert_text = alert_type
+                                    alert_type = alert_type_match.group(1)  # 类型
+                                    logger.success(f'天气预警: {alert_title} --> {alert_type}预警')
+                                    alert_text = alert_type + '预警'
                                 else:
-                                    logger.success(f'天气预警: {alert_title} --> {alert_title.replace("预警", "")}')
-                                    alert_text = alert_title.replace('预警', '')
+                                    logger.success(f'天气预警: {alert_title} --> {alert_title}')
+                                    alert_text = alert_title
                                 self.weather_alert_text.setFixedWidth(80)
                                 self.weather_alert_text.setFixedHeight(40)
                                 # 调整字体大小
