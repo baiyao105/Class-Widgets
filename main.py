@@ -1527,9 +1527,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.temperature = self.findChild(QLabel, 'temperature')
             self.weather_icon = self.findChild(QLabel, 'weather_icon')
             self.alert_icon = IconWidget(self)
-            self.alert_icon.setFixedSize(24,24)
-            self.alert_icon.setGeometry(20,20,20,20)
-            self.alert_icon.raise_()
+            self.alert_icon.setFixedSize(22,22)
+            self.alert_icon.hide()
 
             # 预警标签
             self.weather_alert_text = QLabel(self)
@@ -1537,6 +1536,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_text.setStyleSheet(self.temperature.styleSheet())
             self.weather_alert_text.setFont(self.temperature.font())
             self.weather_alert_text.hide()
+            content_layout.addWidget(self.alert_icon)
             content_layout.addWidget(self.weather_alert_text)
 
             self.weather_alert_timer = None
@@ -1546,6 +1546,13 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_animation = QPropertyAnimation(self.weather_alert_opacity, b"opacity")
             self.weather_alert_animation.setDuration(1500)
             self.weather_alert_animation.setEasingCurve(QEasingCurve.InOutQuad)
+            self.alert_icon_opacity = QGraphicsOpacityEffect(self)
+            self.alert_icon_opacity.setOpacity(1.0)
+            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+            self.alert_icon_animation = QPropertyAnimation(self.alert_icon_opacity, b"opacity")
+            self.alert_icon_animation.setDuration(1500)
+            self.alert_icon_animation.setEasingCurve(QEasingCurve.InOutQuad)
+            
             self.showing_temperature = True  # 跟踪状态(预警/气温)
 
             self.get_weather_data()
@@ -1839,6 +1846,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             # 切换预警
             self.weather_alert_animation.setStartValue(0.0)
             self.weather_alert_animation.setEndValue(1.0)
+            self.alert_icon_animation.setStartValue(0.0)
+            self.alert_icon_animation.setEndValue(1.0)
             # 渐隐
             self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
             self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
@@ -1858,8 +1867,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.temperature_animation.finished.connect(self.temperature.hide)
             def start_alert_animation():
                 self.weather_alert_text.show()
+                self.alert_icon.show()  # 显示预警图标
                 if not self.showing_temperature:
                     self.weather_alert_animation.start()
+                    self.alert_icon_animation.start()  # 同步启动预警图标动画
                     self.weather_info_timer.start(3000)
             
             self.weather_animation.start()
@@ -1869,6 +1880,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             # 切换到气温
             self.weather_alert_animation.setStartValue(1.0)
             self.weather_alert_animation.setEndValue(0.0)
+            self.alert_icon_animation.setStartValue(1.0)
+            self.alert_icon_animation.setEndValue(0.0)
             self.weather_icon.show()
             self.temperature.show()
             self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
@@ -1888,9 +1901,11 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_animation.start()
             self.temperature_animation.start()
             self.weather_alert_text.hide()
+            self.alert_icon.hide()
         
         if not self.showing_temperature:
             self.weather_alert_animation.start()
+            self.alert_icon_animation.start()
         self.showing_temperature = not self.showing_temperature
 
     def detect_theme_changed(self):
@@ -1925,7 +1940,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                         self.alert_icon.setIcon(
                             db.get_alert_image(alert_type)
                         )
-                        self.alert_icon.show()
+                        self.alert_icon.hide()
                         try:
                             alert_title = db.get_weather_data('alert_title', alert_data if alert_data else weather_data)
                             if alert_title:
@@ -1979,6 +1994,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                 if hasattr(self, 'weather_icon'):
                     self.weather_icon.setPixmap(QPixmap(f'{base_directory}/img/weather/99.svg'))
                     self.alert_icon.hide()
+                    self.weather_alert_text.hide()
                     self.temperature.setText('--°')
                     current_city = self.findChild(QLabel, 'current_city')
                     if current_city:
