@@ -454,6 +454,10 @@ def check_fullscreen():  # 检查是否全屏
     pid = ctypes.c_ulong()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     process_name = get_process_name(pid.value).lower()
+    current_pid = os.getpid()
+    # 排除自身(强调特效)
+    if pid.value == current_pid:
+        return False
     # 排除系统进程
     system_processes = {
         'explorer.exe',  # 桌面
