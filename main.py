@@ -1544,14 +1544,14 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_opacity.setOpacity(1.0)
             self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
             self.weather_alert_animation = QPropertyAnimation(self.weather_alert_opacity, b"opacity")
-            self.weather_alert_animation.setDuration(800)
-            self.weather_alert_animation.setEasingCurve(QEasingCurve.InOutQuad)
+            self.weather_alert_animation.setDuration(700)
+            self.weather_alert_animation.setEasingCurve(QEasingCurve.OutCubic)
             self.alert_icon_opacity = QGraphicsOpacityEffect(self)
             self.alert_icon_opacity.setOpacity(1.0)
             self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
             self.alert_icon_animation = QPropertyAnimation(self.alert_icon_opacity, b"opacity")
-            self.alert_icon_animation.setDuration(800)
-            self.alert_icon_animation.setEasingCurve(QEasingCurve.InOutQuad)
+            self.alert_icon_animation.setDuration(700)
+            self.alert_icon_animation.setEasingCurve(QEasingCurve.OutCubic)
             
             self.showing_temperature = True  # 跟踪状态(预警/气温)
 
@@ -1855,8 +1855,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.temperature.setGraphicsEffect(self.temperature_opacity)
             self.weather_animation = QPropertyAnimation(self.weather_opacity, b'opacity')
             self.temperature_animation = QPropertyAnimation(self.temperature_opacity, b'opacity')
-            self.weather_animation.setDuration(800)
-            self.temperature_animation.setDuration(800)
+            self.weather_animation.setDuration(700)
+            self.temperature_animation.setDuration(700)
             self.weather_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.temperature_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.weather_animation.setStartValue(1.0)
@@ -1875,7 +1875,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             
             self.weather_animation.start()
             self.temperature_animation.start()
-            QTimer.singleShot(500, start_alert_animation)
+            QTimer.singleShot(700, start_alert_animation)
         else:
             # 切换到气温
             self.weather_alert_animation.setStartValue(1.0)
@@ -1892,8 +1892,8 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.temperature.setGraphicsEffect(self.temperature_opacity)
                 self.weather_animation = QPropertyAnimation(self.weather_opacity, b'opacity')
                 self.temperature_animation = QPropertyAnimation(self.temperature_opacity, b'opacity')
-                self.weather_animation.setDuration(800)
-                self.temperature_animation.setDuration(800)
+                self.weather_animation.setDuration(700)
+                self.temperature_animation.setDuration(700)
                 self.weather_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
                 self.temperature_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
                 self.weather_animation.setStartValue(0.0)
@@ -1905,9 +1905,9 @@ class DesktopWidget(QWidget):  # 主要小组件
             
             self.weather_alert_animation.start()
             self.alert_icon_animation.start()
-            QTimer.singleShot(500, start_temperature_animation)  # 添加600毫秒延迟
-            self.weather_alert_text.hide()
-            self.alert_icon.hide()
+            self.weather_alert_animation.finished.connect(lambda: self.weather_alert_text.hide())
+            self.alert_icon_animation.finished.connect(lambda: self.alert_icon.hide())
+            QTimer.singleShot(700, start_temperature_animation)
         
         if not self.showing_temperature:
             self.weather_alert_animation.start()
