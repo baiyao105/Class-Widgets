@@ -13,7 +13,7 @@ from shutil import copy
 from typing import Optional
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject, QParallelAnimationGroup
 from PyQt5.QtGui import QColor, QIcon, QPixmap, QPainter, QDesktopServices
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtSvg import QSvgRenderer
@@ -1853,65 +1853,120 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
             self.weather_icon.setGraphicsEffect(self.weather_opacity)
             self.temperature.setGraphicsEffect(self.temperature_opacity)
-            self.weather_animation = QPropertyAnimation(self.weather_opacity, b'opacity')
-            self.temperature_animation = QPropertyAnimation(self.temperature_opacity, b'opacity')
-            self.weather_animation.setDuration(700)
-            self.temperature_animation.setDuration(700)
-            self.weather_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-            self.temperature_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-            self.weather_animation.setStartValue(1.0)
-            self.weather_animation.setEndValue(0.0)
-            self.temperature_animation.setStartValue(1.0)
-            self.temperature_animation.setEndValue(0.0)
-            self.weather_animation.finished.connect(self.weather_icon.hide)
-            self.temperature_animation.finished.connect(self.temperature.hide)
-            def start_alert_animation():
+            weather_fade_out = QPropertyAnimation(self.weather_opacity, b'opacity')
+            temp_fade_out = QPropertyAnimation(self.temperature_opacity, b'opacity')
+            weather_fade_out.setDuration(700)
+            temp_fade_out.setDuration(700)
+            weather_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            temp_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            weather_fade_out.setStartValue(1.0)
+            weather_fade_out.setEndValue(0.0)
+            temp_fade_out.setStartValue(1.0)
+            temp_fade_out.setEndValue(0.0)
+            # 重置不透明度
+            self.fade_out_group = QParallelAnimationGroup(self)
+            self.fade_out_group.addAnimation(weather_fade_out)
+            self.fade_out_group.addAnimation(temp_fade_out)
+            if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+                self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+                self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+                self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+                self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+
+            alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+            alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+            alert_text_fade_in.setDuration(500)
+            alert_icon_fade_in.setDuration(500)
+            alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_icon_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_text_fade_in.setStartValue(0.0)
+            alert_text_fade_in.setEndValue(1.0)
+            alert_icon_fade_in.setStartValue(0.0)
+            alert_icon_fade_in.setEndValue(1.0)
+
+            self.fade_in_group = QParallelAnimationGroup(self)
+            self.fade_in_group.addAnimation(alert_text_fade_in)
+            self.fade_in_group.addAnimation(alert_icon_fade_in)
+            try: self.fade_out_group.finished.disconnect()
+            except TypeError: pass
+
+            def _start_alert_fade_in():
+                self.weather_icon.hide()
+                self.temperature.hide()
+                self.weather_alert_opacity.setOpacity(0.0)
+                self.alert_icon_opacity.setOpacity(0.0)
                 self.weather_alert_text.show()
-                self.alert_icon.show()  # 显示预警图标
-                if not self.showing_temperature:
-                    self.weather_alert_animation.start()
-                    self.alert_icon_animation.start()  # 同步启动预警图标动画
-                    self.weather_info_timer.start(3000)
-            
-            self.weather_animation.start()
-            self.temperature_animation.start()
-            QTimer.singleShot(700, start_alert_animation)
+                self.alert_icon.show()
+                self.fade_in_group.start()
+                self.weather_info_timer.start(3000)
+
+            self.fade_out_group.finished.connect(_start_alert_fade_in)
+
+            self.fade_out_group.start()
         else:
             # 切换到气温
             self.weather_alert_animation.setStartValue(1.0)
             self.weather_alert_animation.setEndValue(0.0)
             self.alert_icon_animation.setStartValue(1.0)
             self.alert_icon_animation.setEndValue(0.0)
-            
-            def start_temperature_animation():
+            if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+                self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+                self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+                self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+                self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+
+            alert_text_fade_out = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+            alert_icon_fade_out = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+            alert_text_fade_out.setDuration(500)
+            alert_icon_fade_out.setDuration(500)
+            alert_text_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_icon_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_text_fade_out.setStartValue(1.0)
+            alert_text_fade_out.setEndValue(0.0)
+            alert_icon_fade_out.setStartValue(1.0)
+            alert_icon_fade_out.setEndValue(0.0)
+
+            self.fade_out_group = QParallelAnimationGroup(self)
+            self.fade_out_group.addAnimation(alert_text_fade_out)
+            self.fade_out_group.addAnimation(alert_icon_fade_out)
+            if not hasattr(self, 'weather_opacity') or not self.weather_opacity:
+                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+                self.weather_icon.setGraphicsEffect(self.weather_opacity)
+            if not hasattr(self, 'temperature_opacity') or not self.temperature_opacity:
+                self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+                self.temperature.setGraphicsEffect(self.temperature_opacity)
+                
+            weather_fade_in = QPropertyAnimation(self.weather_opacity, b'opacity')
+            temp_fade_in = QPropertyAnimation(self.temperature_opacity, b'opacity')
+            weather_fade_in.setDuration(500)
+            temp_fade_in.setDuration(500)
+            weather_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            temp_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            weather_fade_in.setStartValue(0.0)
+            weather_fade_in.setEndValue(1.0)
+            temp_fade_in.setStartValue(0.0)
+            temp_fade_in.setEndValue(1.0)
+
+            self.fade_in_group = QParallelAnimationGroup(self)
+            self.fade_in_group.addAnimation(weather_fade_in)
+            self.fade_in_group.addAnimation(temp_fade_in)
+            try: self.fade_out_group.finished.disconnect()
+            except TypeError: pass
+
+            def _start_temperature_fade_in():
+                self.weather_alert_text.hide()
+                self.alert_icon.hide()
+                self.weather_opacity.setOpacity(0.0)
+                self.temperature_opacity.setOpacity(0.0)
                 self.weather_icon.show()
                 self.temperature.show()
-                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
-                self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
-                self.weather_icon.setGraphicsEffect(self.weather_opacity)
-                self.temperature.setGraphicsEffect(self.temperature_opacity)
-                self.weather_animation = QPropertyAnimation(self.weather_opacity, b'opacity')
-                self.temperature_animation = QPropertyAnimation(self.temperature_opacity, b'opacity')
-                self.weather_animation.setDuration(700)
-                self.temperature_animation.setDuration(700)
-                self.weather_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-                self.temperature_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-                self.weather_animation.setStartValue(0.0)
-                self.weather_animation.setEndValue(1.0)
-                self.temperature_animation.setStartValue(0.0)
-                self.temperature_animation.setEndValue(1.0)
-                self.weather_animation.start()
-                self.temperature_animation.start()
-            
-            self.weather_alert_animation.start()
-            self.alert_icon_animation.start()
-            self.weather_alert_animation.finished.connect(lambda: self.weather_alert_text.hide())
-            self.alert_icon_animation.finished.connect(lambda: self.alert_icon.hide())
-            QTimer.singleShot(700, start_temperature_animation)
+                self.fade_in_group.start()
+            # 连接淡出组完成信号
+            self.fade_out_group.finished.connect(_start_temperature_fade_in)
+            self.fade_out_group.start()
         
-        if not self.showing_temperature:
-            self.weather_alert_animation.start()
-            self.alert_icon_animation.start()
         self.showing_temperature = not self.showing_temperature
 
     def detect_theme_changed(self):
