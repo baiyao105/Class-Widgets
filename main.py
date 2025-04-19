@@ -1876,8 +1876,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
             alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
             alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
-            alert_text_fade_in.setDuration(500)
-            alert_icon_fade_in.setDuration(500)
+            alert_text_fade_in.setDuration(700)
+            alert_icon_fade_in.setDuration(700)
             alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
             alert_icon_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
             alert_text_fade_in.setStartValue(0.0)
