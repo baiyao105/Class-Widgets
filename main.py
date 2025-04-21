@@ -1410,12 +1410,13 @@ class FloatingWidget(QWidget):  # 浮窗
         self.save_position()
         # 特定隐藏模式下不执行操作
         hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+             return # 阻止手动展开/收起
+
         if (
                 hasattr(self, "p_Position")
                 and self.r_Position == self.p_Position
                 and not self.animating
-                and hide_mode != '1'
-                and hide_mode != '2'
         ): # 非特定隐藏模式下执行点击事件
             mgr.show_windows()
             self.close()
@@ -1861,6 +1862,26 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     @staticmethod
     def hide_show_widgets():  # 隐藏/显示主界面（全部隐藏）
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+            hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
+            w = Dialog(
+                "暂时无法变更“状态”",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态，若变更状态，将修改隐藏模式“无”"
+                "\n您确定要隐藏组件吗?",
+                None
+            )
+            w.yesButton.setText("确定")
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '0'))
+            w.cancelButton.setText("取消")
+            w.buttonLayout.insertStretch(1)
+            if w.exec():
+                if mgr.state:
+                    fw.show()
+                    mgr.full_hide_windows()
+                else:
+                    mgr.show_windows()
+
         if mgr.state:
             mgr.full_hide_windows()
         else:
@@ -1873,7 +1894,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
             w = Dialog(
                 "暂时无法变更“状态”",
-                f"您正在使用{hide_mode_text}模式，将无法变更隐藏状态;若变更状态，将修改隐藏模式“无”"
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态，若变更状态，将修改隐藏模式“无”"
                 "\n您确定要切换到浮窗吗?",
                 None
             )
