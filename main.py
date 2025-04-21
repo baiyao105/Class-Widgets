@@ -1585,6 +1585,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if config_center.read_conf('General', 'hide') == '2' or (not int(config_center.read_conf('General', 'enable_click'))):
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        else:
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         if config_center.read_conf('General', 'pin_on_top') == '1':  # 置顶
             self.setWindowFlags(
