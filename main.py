@@ -1879,15 +1879,14 @@ class DesktopWidget(QWidget):  # 主要小组件
             w.buttonLayout.insertStretch(1)
             if w.exec():
                 if mgr.state:
-                    fw.show()
                     mgr.full_hide_windows()
                 else:
                     mgr.show_windows()
-
-        if mgr.state:
-            mgr.full_hide_windows()
         else:
-            mgr.show_windows()
+            if mgr.state:
+                mgr.full_hide_windows()
+            else:
+                mgr.show_windows()
 
     @staticmethod
     def minimize_to_floating():  # 最小化到浮窗
