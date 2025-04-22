@@ -894,6 +894,7 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
+        log_available = 'logger' in globals() and logger is not None # 鬼知道为什么先给logger释放了
         for widget in self.widgets:
             try:
                 widget.deleteLater()
@@ -902,7 +903,8 @@ class WidgetsManager:
                     try:
                         widget.weather_timer.stop()
                     except RuntimeError:
-                        logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
+                        if log_available:
+                            logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
 
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
@@ -911,12 +913,15 @@ class WidgetsManager:
                             widget.weather_thread.quit()
                             widget.weather_thread.wait()
                         else:
-                            logger.debug(f"组件: {widget.path} 的天气线程已完成任务并销毁，无需终止")
+                            if log_available:
+                                logger.debug(f"组件: {widget.path} 的天气线程已完成任务并销毁，无需终止")
                     except RuntimeError:
-                        logger.warning(f"组件: {widget.path} 的天气线程终止时发生异常，可能已被销毁")
+                        if log_available:
+                            logger.warning(f"组件: {widget.path} 的天气线程终止时发生异常，可能已被销毁")
             except Exception as ex:
                 widget_path = getattr(widget, 'path', 'unknown')
-                logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
+                if log_available:
+                    logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
         self.widgets.clear()
 
     def __del__(self):
