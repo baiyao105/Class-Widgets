@@ -361,23 +361,22 @@ def get_countdown(toast=False):  # 重构好累aaaa
             if prepare_minutes_str != '0' and toast:
                 prepare_minutes = int(prepare_minutes_str)
                 if current_dt == c_time - dt.timedelta(minutes=prepare_minutes):
-                    first_activity_name = '下一节课'
-                    first_activity_key = None
+                    next_lesson_name = None
+                    next_lesson_key = None
                     if timeline_data:
-                        sorted_timeline_keys = sorted(timeline_data.keys())
-                        for key in sorted_timeline_keys:
+                        for key in sorted(timeline_data.keys()):
                             if key.startswith(f'a{str(part)}'):
-                                first_activity_key = key
+                                next_lesson_key = key
                                 break
-
-                    if first_activity_key and first_activity_key in current_lessons:
-                        lesson_name_temp = current_lessons[first_activity_key]
-                        if lesson_name_temp not in excluded_lessons:
-                            first_activity_name = lesson_name_temp
+                    if next_lesson_key and next_lesson_key in current_lessons:
+                        lesson_name = current_lessons[next_lesson_key]
+                        if lesson_name != '暂无课程' and lesson_name not in excluded_lessons:
+                            next_lesson_name = lesson_name
                     if current_state == 0:
                         now = dt.datetime.now()
                         if not last_notify_time or (now - last_notify_time).seconds >= notify_cooldown:
-                            notification.push_notification(3, first_activity_name)
+                            if next_lesson_name != None:
+                                    notification.push_notification(3, next_lesson_name)
             if f'a{part}1' in timeline_data:
                 time_diff = c_time - current_dt
                 minute, sec = divmod(time_diff.seconds, 60)
