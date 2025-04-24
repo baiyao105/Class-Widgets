@@ -296,7 +296,8 @@ def get_countdown(toast=False):  # 重构好累aaaa
         if parts_type[part] == 'break':  # 休息段
             notification.push_notification(0, current_lesson_name)  # 下课
         else:
-            notification.push_notification(2)  # 放学
+            if config_center.read_conf('Toast', 'after_school') == '1':
+                notification.push_notification(2)  # 放学
 
     current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
     return_text = []
