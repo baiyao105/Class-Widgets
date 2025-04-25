@@ -168,12 +168,9 @@ class UnionUpdateTimer(QObject):
         if self.timer:
             try:
                 self.timer.stop()
-                # 不立即 deleteLater，避免在事件循环外操作
             except RuntimeError:
-                # logger 可能已被清理，避免使用
-                # logger.warning("计时器已被销毁，跳过停止操作")
-                pass # 忽略错误，因为程序即将退出
-        self.remove_all_callbacks()  # 移除所有回调函数
+                pass
+        self.remove_all_callbacks()
 
 
 tray_icon = None
