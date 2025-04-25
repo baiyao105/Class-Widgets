@@ -2113,22 +2113,6 @@ def check_windows_maximize():  # 检查窗口是否最大化
     return max_windows
 
 
-def setup_signal_handlers():
-    def shutdown(signum, frame):
-        if hasattr(shutdown, '_called'):  # 防止重复处理
-            return
-        shutdown._called = True
-        logger.debug(f"收到终止信号: {signum}, 执行清理")
-        if mgr:
-            mgr.cleanup_resources()  # 清理所有小资源
-        stop(0)
-    
-    signal.signal(signal.SIGTERM, shutdown)  # taskkill
-    signal.signal(signal.SIGINT, shutdown)   # Ctrl+C
-    signal.signal(signal.SIGABRT, shutdown)  # 异常中止
-    if os.name == 'posix':
-        signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
-        signal.signal(signal.SIGHUP, shutdown)   # 终端断开
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
@@ -2176,8 +2160,9 @@ def init():
 def setup_signal_handlers_optimized(app):
     """退出信号处理器"""
     def signal_handler(signum, frame):
-        logger.debug(f'收到信号 {signal.Signals(signum).name}，请求退出...')
-        app.quit()
+        logger.debug(f'收到信号 {signal.Signals(signum).name},退出...')
+        # utils.stop 处理退出
+        stop(0)
 
     signal.signal(signal.SIGTERM, signal_handler)  # taskkill
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
@@ -2187,7 +2172,19 @@ def setup_signal_handlers_optimized(app):
 
 if __name__ == '__main__':
     if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
-        print('检测到已有实例正在运行') # logger 可能还没准备好
+        logger.debug('不允许多开实例')
+        from qfluentwidgets import Dialog
+        app = QApplication.instance() or QApplication(sys.argv)
+        dlg = Dialog(
+            'Class Widgets 正在运行',
+            'Class Widgets 正在运行！请勿打开多个实例，否则将会出现不可预知的问题。'
+            '\n(若您需要打开多个实例，请在“设置”->“高级选项”中启用“允许程序多开”)'
+        )
+        dlg.yesButton.setText('好')
+        dlg.cancelButton.hide()
+        dlg.buttonLayout.insertStretch(0, 1)
+        dlg.setFixedWidth(550)
+        dlg.exec()
         sys.exit(0)
     if not share.create(1):
         print(f'无法创建共享内存: {share.errorString()}') # logger 可能还没准备好
@@ -2244,9 +2241,7 @@ if __name__ == '__main__':
         stop(-1)
     else:
         mgr = WidgetsManager()
-        # 将清理资源连接到应用程序的退出信号
         app.aboutToQuit.connect(mgr.cleanup_resources)
-        # 在 app 和 mgr 初始化 *之后* 设置信号处理器
         setup_signal_handlers_optimized(app)
 
         if config_center.read_conf('Other', 'initialstartup') == '1':  # 首次启动
