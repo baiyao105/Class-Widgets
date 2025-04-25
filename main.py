@@ -2162,7 +2162,7 @@ def setup_signal_handlers_optimized(app):
     def signal_handler(signum, frame):
         logger.debug(f'收到信号 {signal.Signals(signum).name},退出...')
         # utils.stop 处理退出
-        stop(0)
+        utils.stop(0)
 
     signal.signal(signal.SIGTERM, signal_handler)  # taskkill
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
@@ -2283,6 +2283,4 @@ if __name__ == '__main__':
 
     status = app.exec()
 
-    if not hasattr(utils.stop, '_called') or not utils.stop._called:
-        logger.warning("调用stop(被动)...")
-        utils.stop(status)
+    utils.stop(status)
