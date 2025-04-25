@@ -2106,53 +2106,53 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.opacity_animation.stop()
         self.close()
 
-def closeEvent(self, event):
-    if QApplication.instance().closingDown():
-        logger.info("清理资源...")
-        try:
-            thread_attrs = ['weather_thread', 'update_thread', 'network_thread']
-            for attr in thread_attrs:
-                if hasattr(self, attr):
-                    thread = getattr(self, attr, None)
-                    if thread and thread.isRunning():
-                        try:
-                            # 也许有stop/quit方法
-                            if hasattr(thread, 'quit'):
-                                thread.quit()
-                            elif hasattr(thread, 'stop'):
-                                thread.stop()
-                            if not thread.wait(500):
-                                logger.warning(f"线程 {attr} 未在500ms内退出，强制终止.")
-                                thread.terminate()
-                                thread.wait(100)
-                        except Exception as e:
-                            logger.error(f"终止线程 {attr} 时发生错误: {e}")
+    def closeEvent(self, event):
+        if QApplication.instance().closingDown():
+            logger.info("清理资源...")
+            try:
+                thread_attrs = ['weather_thread', 'update_thread', 'network_thread']
+                for attr in thread_attrs:
                     if hasattr(self, attr):
-                         delattr(self, attr)
-            timer_attrs = ['weather_timer', 'update_timer', 'network_timer']
-            for attr in timer_attrs:
-                if hasattr(self, attr):
-                    timer = getattr(self, attr, None)
-                    if timer and timer.isActive():
-                        try:
-                            timer.stop()
-                        except Exception as e:
-                            logger.error(f"停止定时器 {attr} 时发生错误: {e}")
+                        thread = getattr(self, attr, None)
+                        if thread and thread.isRunning():
+                            try:
+                                # 也许有stop/quit方法
+                                if hasattr(thread, 'quit'):
+                                    thread.quit()
+                                elif hasattr(thread, 'stop'):
+                                    thread.stop()
+                                if not thread.wait(500):
+                                    logger.warning(f"线程 {attr} 未在500ms内退出，强制终止.")
+                                    thread.terminate()
+                                    thread.wait(100)
+                            except Exception as e:
+                                logger.error(f"终止线程 {attr} 时发生错误: {e}")
+                        if hasattr(self, attr):
+                             delattr(self, attr)
+                timer_attrs = ['weather_timer', 'update_timer', 'network_timer']
+                for attr in timer_attrs:
                     if hasattr(self, attr):
-                        delattr(self, attr)
-            if hasattr(self, 'tray_icon') and self.tray_icon:
-                try:
-                    self.tray_icon.hide()
-                except Exception as e:
-                    logger.error(f"清理托盘图标时发生错误: {e}")
-        except Exception as e:
-            logger.critical(f"清理时出现错误: {e}")
-            logger.critical(traceback.format_exc())
-        finally:
-            event.accept()
-            stop(0)
-    else:
-        super().closeEvent(event)
+                        timer = getattr(self, attr, None)
+                        if timer and timer.isActive():
+                            try:
+                                timer.stop()
+                            except Exception as e:
+                                logger.error(f"停止定时器 {attr} 时发生错误: {e}")
+                        if hasattr(self, attr):
+                            delattr(self, attr)
+                if hasattr(self, 'tray_icon') and self.tray_icon:
+                    try:
+                        self.tray_icon.hide()
+                    except Exception as e:
+                        logger.error(f"清理托盘图标时发生错误: {e}")
+            except Exception as e:
+                logger.critical(f"清理时出现错误: {e}")
+                logger.critical(traceback.format_exc())
+            finally:
+                event.accept()
+                stop(0)
+        else:
+            super().closeEvent(event)
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
