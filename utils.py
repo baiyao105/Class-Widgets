@@ -21,70 +21,65 @@ def restart():
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 def stop(status=0):
-    global share
-    if hasattr(stop, '_called'):
+    global share, update_timer
+    if hasattr(stop, '_called') and stop._called:
         return
     stop._called = True
+    logger.debug('退出程序')
+    if 'update_timer' in globals() and update_timer:
+        try:
+            update_timer.stop()
+        except Exception as e:
+            logger.warning(f"停止全局更新定时器时出错: {e}")
+    # 触发aboutToQuit调用cleanup_resources
+    app = QApplication.instance()
+    if app:
+        for window in app.topLevelWidgets():
+            try:
+                window.close()
+            except Exception as e:
+                logger.warning(f"关闭窗口 {window} 时出错: {e}")
+        app.processEvents()
 
-    def exit_application():
-        logger.debug("强制退出")
-        os._exit(status)
-
-    def shutdown_handler(signum, frame):
-        logger.info(f'收到关闭信号: {signum}')
-        QApplication.instance().quit()
-
-    signal.signal(signal.SIGTERM, shutdown_handler)  # taskkill
-    signal.signal(signal.SIGINT, shutdown_handler)   # Ctrl+C
-    signal.signal(signal.SIGABRT, shutdown_handler)  # 异常中止
-    if os.name == 'posix':
-        signal.signal(signal.SIGQUIT, shutdown_handler)  # POSIX退出
-        signal.signal(signal.SIGHUP, shutdown_handler)   # 终端断开
-    # 强制终止所有子进程
     try:
         current_pid = os.getpid()
         parent = psutil.Process(current_pid)
-        for child in parent.children(recursive=True):
-            try:
-                child.terminate()
-            except psutil.NoSuchProcess:
-                pass
-        gone, alive = psutil.wait_procs(parent.children(), timeout=3)
-    except Exception as e:
-        logger.error(f"终止子进程失败: {e}")
+        children = parent.children(recursive=True)
+        if children:
+            for child in children:
+                try:
+                    child.terminate()
+                except psutil.NoSuchProcess:
+                    continue
+                except Exception as e:
+                    logger.warning(f"终止子进程 {child.pid} 时出错: {e}")
 
-    if 'update_timer' in globals():
-        try:
-            update_timer.stop()
-            update_timer.deleteLater()
-        except RuntimeError as e:
-            logger.error(f"停止定时器失败: {e}")
-    app = QApplication.instance()
-    if app:
-        try:
-            app.exit(status)
-            for w in app.topLevelWidgets():
-                w.close()
-                w.deleteLater()
-            app.closeAllWindows()
-            app.quit()
-            QTimer.singleShot(1000, exit_application)  # 1秒后强制退出
-        except Exception as e:
-            logger.error(f"关闭窗口时出错: {e}")
-    try:
-        if share.isAttached():
-            share.detach()
-            os.remove(share.nativeKey()) if os.name == 'posix' else None
-            logger.debug("分离共享内存: 成功")
-        else:
-            logger.warning("共享内存未附加")
+            gone, alive = psutil.wait_procs(children, timeout=1.5)
+            for p in alive:
+                try:
+                    p.kill()
+                except Exception as e:
+                    logger.error(f"强制终止子进程 {p.pid} 失败: {e}")
+    except psutil.NoSuchProcess:
+        logger.warning("无法获取当前进程信息")
     except Exception as e:
-        logger.error(f"分离共享内存失败: {e}")
-        exit_application()
-    finally:
-        del share
-    logger.debug("程序退出")
-    sys.exit(status)
+        logger.error(f"终止子进程时出现意外错误: {e}")
+
+    if 'share' in globals() and share:
+        try:
+            if share.isAttached():
+                share.detach()
+                logger.debug("共享内存已分离")
+        except Exception as e:
+            logger.error(f"分离共享内存时出错: {e}")
+        finally:
+            try:
+                del share
+            except NameError:
+                pass
+
+    logger.debug(f"程序退出({status})")
+    os._exit(status)
 
 
 def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
@@ -173,9 +168,11 @@ class UnionUpdateTimer(QObject):
         if self.timer:
             try:
                 self.timer.stop()
-                self.timer.deleteLater()
+                # 不立即 deleteLater，避免在事件循环外操作
             except RuntimeError:
-                logger.warning("计时器已被销毁，跳过停止操作")
+                # logger 可能已被清理，避免使用
+                # logger.warning("计时器已被销毁，跳过停止操作")
+                pass # 忽略错误，因为程序即将退出
         self.remove_all_callbacks()  # 移除所有回调函数
 
 

@@ -894,35 +894,31 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
-        log_available = 'logger' in globals() and logger is not None # 鬼知道为什么先给logger释放了
-        for widget in self.widgets:
-            try:
-                widget.deleteLater()
+        widgets_to_clean = list(self.widgets)
+        self.widgets.clear()
 
+        for widget in widgets_to_clean:
+            widget_path = getattr(widget, 'path', '未知组件')
+            try:
                 if hasattr(widget, 'weather_timer') and widget.weather_timer:
                     try:
                         widget.weather_timer.stop()
                     except RuntimeError:
-                        if log_available:
-                            logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
+                        pass
 
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
                         if widget.weather_thread.isRunning():
-                            widget.weather_thread.terminate()
                             widget.weather_thread.quit()
-                            widget.weather_thread.wait()
-                        else:
-                            if log_available:
-                                logger.debug(f"组件: {widget.path} 的天气线程已完成任务并销毁，无需终止")
+                            if not widget.weather_thread.wait(500):
+                                logger.warning(f"组件 {widget_path} 的天气线程未正常退出，强制终止")
+                                widget.weather_thread.terminate()
+                                widget.weather_thread.wait()
                     except RuntimeError:
-                        if log_available:
-                            logger.warning(f"组件: {widget.path} 的天气线程终止时发生异常，可能已被销毁")
+                        pass
+                widget.deleteLater()
             except Exception as ex:
-                widget_path = getattr(widget, 'path', 'unknown')
-                if log_available:
-                    logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
-        self.widgets.clear()
+                logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
 
     def __del__(self):
         self.cleanup_resources()
@@ -2177,8 +2173,26 @@ def init():
     first_start = False
 
 
+def setup_signal_handlers_optimized(app):
+    """退出信号处理器"""
+    def signal_handler(signum, frame):
+        logger.debug(f'收到信号 {signal.Signals(signum).name}，请求退出...')
+        app.quit()
+
+    signal.signal(signal.SIGTERM, signal_handler)  # taskkill
+    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+    if os.name == 'posix':
+        signal.signal(signal.SIGQUIT, signal_handler) # 终端退出
+        signal.signal(signal.SIGHUP, signal_handler)  # 终端挂起
+
 if __name__ == '__main__':
-    setup_signal_handlers()
+    if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
+        print('检测到已有实例正在运行') # logger 可能还没准备好
+        sys.exit(0)
+    if not share.create(1):
+        print(f'无法创建共享内存: {share.errorString()}') # logger 可能还没准备好
+        sys.exit(1)
+
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
@@ -2230,6 +2244,10 @@ if __name__ == '__main__':
         stop(-1)
     else:
         mgr = WidgetsManager()
+        # 将清理资源连接到应用程序的退出信号
+        app.aboutToQuit.connect(mgr.cleanup_resources)
+        # 在 app 和 mgr 初始化 *之后* 设置信号处理器
+        setup_signal_handlers_optimized(app)
 
         if config_center.read_conf('Other', 'initialstartup') == '1':  # 首次启动
             try:
@@ -2268,8 +2286,8 @@ if __name__ == '__main__':
         if config_center.read_conf('Other', 'auto_check_update') == '1':
             check_update()
 
-    if __name__ == '__main__':
-        try:
-            sys.exit(app.exec())
-        finally:
-            stop(0)
+    status = app.exec()
+
+    if not hasattr(utils.stop, '_called') or not utils.stop._called:
+        logger.warning("调用stop(被动)...")
+        utils.stop(status)
