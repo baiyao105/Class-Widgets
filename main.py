@@ -951,11 +951,6 @@ class WidgetsManager:
                 widget.deleteLater()
             except Exception as ex:
                 logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
-        def __del__(self):
-            self.cleanup_resources()
-            if hasattr(self, 'timer'):
-                self.timer.stop()
-                self.timer.deleteLater()
 
     def stop(self):
         if mgr:
