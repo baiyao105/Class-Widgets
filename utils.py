@@ -39,7 +39,7 @@ def stop(status=0):
                 window.close()
             except Exception as e:
                 logger.warning(f"关闭窗口 {window} 时出错: {e}")
-        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 100)  # 再处理100ms
+        app.processEvents()
 
     try:
         current_pid = os.getpid()
