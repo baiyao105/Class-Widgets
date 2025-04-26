@@ -2168,8 +2168,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 mgr.show_windows()
                 mgr.hide_status = (current_state, 0)
-                
-            
         else:
             event.ignore()
 
