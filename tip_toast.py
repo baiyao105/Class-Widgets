@@ -179,8 +179,8 @@ class tip_toast(QWidget):
         self.opacity_animation.setDuration(450)
         self.opacity_animation.setStartValue(0)
         self.opacity_animation.setEndValue(1)
+        self.opacity_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
-        # Play sound immediately if set
         if sound_to_play:
             self.playsound(sound_to_play)
 
@@ -199,20 +199,20 @@ class tip_toast(QWidget):
 
         # 放大效果
         self.geometry_animation_close = QPropertyAnimation(self, b"geometry")
-        self.geometry_animation_close.setDuration(400)  # 动画持续时间
+        self.geometry_animation_close.setDuration(500)  # 动画持续时间
         self.geometry_animation_close.setStartValue(QRect(start_x, start_y, total_width, height))
         end_rect = QRect(int(start_x + mini_size_x / 2), int(start_y + mini_size_y / 2),
                        int(total_width - mini_size_x), int(height - mini_size_y))
         self.geometry_animation_close.setEndValue(end_rect)
-        self.geometry_animation_close.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.geometry_animation_close.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
         self.blur_animation_close = QPropertyAnimation(self.blur_effect, b"blurRadius")
-        self.blur_animation_close.setDuration(450)
+        self.blur_animation_close.setDuration(500)
         self.blur_animation_close.setStartValue(0)
         self.blur_animation_close.setEndValue(30)
 
         self.opacity_animation_close = QPropertyAnimation(self, b"windowOpacity")
-        self.opacity_animation_close.setDuration(400)
+        self.opacity_animation_close.setDuration(500)
         self.opacity_animation_close.setStartValue(1)
         self.opacity_animation_close.setEndValue(0)
 
@@ -260,7 +260,7 @@ class wave_Effect(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self._radius = 0
-        self.duration = 1150
+        self.duration = 1200
 
         if state == 1:
             self.color = QColor(attend_class_color)
@@ -302,11 +302,11 @@ class wave_Effect(QWidget):
         dpr = max(1.0, dpr)
         fixed_end_radius = 1000 * dpr # 动画效果值
         self.animation.setEndValue(fixed_end_radius)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.animation.start()
 
         self.fade_animation = QPropertyAnimation(self, b'windowOpacity')
-        self.fade_animation.setDuration(self.duration - self.duration // 5)
+        self.fade_animation.setDuration(self.duration - 150) # Slightly shorter fade out
 
         self.fade_animation.setKeyValues([  # 关键帧
             (0, 0),
@@ -314,7 +314,7 @@ class wave_Effect(QWidget):
             (1, 0)
         ])
 
-        self.fade_animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.fade_animation.finished.connect(self.close)
         self.fade_animation.start()
 
@@ -389,7 +389,7 @@ def main(state=1, lesson_name='', title='通知示例', subtitle='副标题',
             widgets_width += 0
 
     total_width = widgets_width + spacing * (len(widgets) - 1)
- 
+
     start_x = int((screen_width - total_width) / 2)
     margin_base = int(config_center.read_conf('General', 'margin'))
     start_y = int(margin_base * dpr)
