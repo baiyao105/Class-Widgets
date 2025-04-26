@@ -590,12 +590,6 @@ class ErrorDialog(Dialog):  # 重大错误提示框
         if event.button() == Qt.LeftButton:
             self.is_dragging = False
 
-    def closeEvent(self, event):
-        global error_dialog
-        error_dialog = False
-        event.ignore()
-        self.hide()
-        self.deleteLater()
 
 
 class PluginManager:  # 插件管理器
@@ -2029,34 +2023,52 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 def closeEvent(self, event):
     if QApplication.instance().closingDown():
-        if hasattr(self, 'weather_thread') and self.weather_thread:
-            try:
-                if self.weather_thread.isRunning():
-                    self.weather_thread.terminate()  # 终止天气线程
-                    self.weather_thread.quit()      # 退出天气线程
-                    self.weather_thread.wait()      # 等待线程结束
-                else:
-                    logger.debug("天气线程已完成任务并销毁，无需终止")
-            except RuntimeError:
-                logger.warning("天气线程终止过程中发生异常，可能已被销毁")
-            finally:
-                del self.weather_thread  # 删除引用以避免重复操作
+        logger.info("清理资源...")
+        try:
+            thread_attrs = ['weather_thread', 'update_thread', 'network_thread']
+            for attr in thread_attrs:
+                if hasattr(self, attr):
+                    thread = getattr(self, attr, None)
+                    if thread and thread.isRunning():
+                        try:
+                            # 也许有stop/quit方法
+                            if hasattr(thread, 'quit'):
+                                thread.quit()
+                            elif hasattr(thread, 'stop'):
+                                thread.stop()
+                            if not thread.wait(500):
+                                logger.warning(f"线程 {attr} 未在500ms内退出，强制终止.")
+                                thread.terminate()
+                                thread.wait(100)
+                        except Exception as e:
+                            logger.error(f"终止线程 {attr} 时发生错误: {e}")
+                    if hasattr(self, attr):
+                         delattr(self, attr)
+            timer_attrs = ['weather_timer', 'update_timer', 'network_timer']
+            for attr in timer_attrs:
+                if hasattr(self, attr):
+                    timer = getattr(self, attr, None)
+                    if timer and timer.isActive():
+                        try:
+                            timer.stop()
+                        except Exception as e:
+                            logger.error(f"停止定时器 {attr} 时发生错误: {e}")
+                    if hasattr(self, attr):
+                        delattr(self, attr)
+            if hasattr(self, 'tray_icon') and self.tray_icon:
+                try:
+                    self.tray_icon.hide()
+                except Exception as e:
+                    logger.error(f"清理托盘图标时发生错误: {e}")
+        except Exception as e:
+            logger.critical(f"清理时出现错误: {e}")
+            logger.critical(traceback.format_exc())
 
-        if hasattr(self, 'weather_timer') and self.weather_timer:
-            try:
-                self.weather_timer.stop()  # 停止定时器
-            except RuntimeError:
-                logger.warning("天气定时器已被销毁，跳过停止操作")
-            finally:
-                del self.weather_timer  # 删除引用以避免重复操作
-        event.accept()
-        stop(0)
-
-    for child in self.findChildren(QObject):
-        child.deleteLater()
-    super().closeEvent(event)
-    self.deleteLater()
-    self.destroy()
+        finally:
+            event.accept()
+            stop(0)
+    else:
+        super().closeEvent(event)
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
