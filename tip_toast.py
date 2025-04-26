@@ -92,7 +92,6 @@ class tip_toast(QWidget):
             else:
                 subtitle_label.hide()
             lesson.setText(lesson_name)  # 课程名
-            # self.playsound(finish_class) # Remove direct playsound call
             sound_to_play = finish_class
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 2:
@@ -100,7 +99,6 @@ class tip_toast(QWidget):
             title_label.setText('放学')
             subtitle_label.setText('当前课程已结束')
             lesson.setText('')  # 课程名
-            # self.playsound(finish_class) # Remove direct playsound call
             sound_to_play = finish_class
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 3:
@@ -108,7 +106,6 @@ class tip_toast(QWidget):
             title_label.setText('即将开始')  # 同上
             subtitle_label.setText('下一节')
             lesson.setText(lesson_name)
-            # self.playsound(prepare_class) # Remove direct playsound call
             sound_to_play = prepare_class
             setThemeColor(f"#{config_center.read_conf('Color', 'prepare_class')}")
         elif state == 4:
@@ -116,7 +113,6 @@ class tip_toast(QWidget):
             title_label.setText(title)
             subtitle_label.setText(subtitle)
             lesson.setText(content)
-            # self.playsound(prepare_class) # Remove direct playsound call
             sound_to_play = prepare_class
 
         # 设置样式表
