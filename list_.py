@@ -11,7 +11,7 @@ week_type = ['单周', '双周']
 part_type = ['节点', '休息段']
 window_status = ['无', '置于顶部', '置于底部']
 color_mode = ['浅色', '深色', '跟随系统']
-hide_mode = ['无', '上课时自动隐藏', '窗口最大化时隐藏']
+hide_mode = ['无', '上课时自动隐藏', '窗口最大化时隐藏', '灵活隐藏']
 non_nt_hide_mode = ['无', '上课时自动隐藏']
 version_channel = ['正式版 (Release)', '测试版 (Beta)']
 
@@ -29,7 +29,7 @@ subject = {
     '物理': '(130, 85, 180',  # 紫
     '化学': '(84, 135, 190',  # 蓝
     '美术': '(0, 186, 255',  # 蓝
-    '音乐': '255, 101, 158',  # 红
+    '音乐': '(255, 101, 158',  # 红
     '体育': '(255, 151, 135',  # 红
     '信息技术': '(84, 135, 190',  # 蓝
     '电脑': '(84, 135, 190',  # 蓝
@@ -102,6 +102,8 @@ widget_name = {
     'widget-countdown-day.ui': '倒计日',
     'widget-weather.ui': '天气'
 }
+
+native_widget_name = [widget_name[i] for i in widget_name]
 
 try:  # 加载课程/主题配置文件
     subject_info = json.load(open(f'{base_directory}/config/data/subject.json', 'r', encoding='utf-8'))

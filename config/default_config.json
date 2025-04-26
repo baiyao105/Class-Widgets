@@ -10,6 +10,7 @@
     "hide_method": 0,
     "color_mode": 2,
     "enable_alt_schedule": 0,
+    "blur_floating_countdown": "1",
     "blur_countdown": 0,
     "theme": "default",
     "scale": 1,
@@ -24,14 +25,16 @@
     "prepare_minutes": 2,
     "attend_class": 1,
     "finish_class": 1,
-    "prepare_class": 1
+    "prepare_class": 1,
+    "smooth_volume": 0
   },
   "Weather": {
-    "city": 101010100,
+    "city": 0,
     "api": "xiaomi_weather",
     "api_key": ""
   },
   "Color": {
+    "floating_time": "959595",
     "attend_class": "DD986F",
     "finish_class": "46B878",
     "prepare_class": "7065D8"

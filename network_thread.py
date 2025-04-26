@@ -5,7 +5,7 @@ import zipfile  # 解压插件zip
 from datetime import datetime
 
 import requests
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
 from loguru import logger
 from packaging.version import Version
 
@@ -198,6 +198,39 @@ class getReadme(QThread):  # 获取README
             logger.error(f"获取README失败：{e}")
             return ''
 
+class getCity(QThread):
+
+    def __init__(self, url='https://qifu-api.baidubce.com/ip/local/geo/v1/district'):
+        super().__init__()
+        self.download_url = url
+
+    def run(self):
+        try:
+            city_data = self.get_city()
+            config_center.write_conf('Weather', 'city', db.search_code_by_name(city_data))
+        except Exception as e:
+            logger.error(f"获取城市失败: {e}")
+
+    def get_city(self):
+        try:
+            req = requests.get(self.download_url, proxies=proxies)
+            if req.status_code == 200:
+                data = req.json()
+                # {"code":"Success","data":{"continent":"","country":"中国","zipcode":"","owner":"","isp":"","adcode":"","prov":"","city":"","district":""},"ip":"45.192.96.246"}
+                if data['code'] == 'Success':
+                    data = data['data']
+                    logger.info(f"获取城市成功：{data['city']}, {data['district']}")
+                    return (data['city'], data['district'])
+                else:
+                    logger.error(f"获取城市失败：{data['message']}")
+                    return ('', '')
+            else:
+                logger.error(f"获取城市失败：{req.status_code}")    
+                return ('', '')
+            
+        except Exception as e:
+            logger.error(f"获取城市失败：{e}")
+            return ('', '')
 
 class VersionThread(QThread):  # 获取最新版本号
     version_signal = pyqtSignal(dict)
@@ -387,7 +420,6 @@ def check_version(version):  # 检查更新
     if Version(server_version) > Version(local_version):
         utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
 
-
 class weatherReportThread(QThread):  # 获取最新天气信息
     weather_signal = pyqtSignal(dict)
 
@@ -400,10 +432,21 @@ class weatherReportThread(QThread):  # 获取最新天气信息
             self.weather_signal.emit(weather_data)
         except Exception as e:
             logger.error(f"触发天气信息失败: {e}")
+        finally:
+            self.deleteLater()
 
     @staticmethod
     def get_weather_data():
         location_key = config_center.read_conf('Weather', 'city')
+        if location_key == '0':
+            city_thread = getCity()
+            loop = QEventLoop()
+            city_thread.finished.connect(loop.quit)
+            city_thread.start()
+            loop.exec_()  # 阻塞到完成
+            location_key = config_center.read_conf('Weather', 'city')
+            if location_key == '0' or not location_key:
+                location_key = 101010100
         days = 1
         key = config_center.read_conf('Weather', 'api_key')
         url = db.get_weather_url().format(location_key=location_key, days=days, key=key)

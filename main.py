@@ -187,7 +187,29 @@ def get_start_time():
     if paired_sorted:
         parts_start_time, order = zip(*paired_sorted)
 
-    for item_name, item_time in timeline.items():
+    def sort_timeline_key(item):
+        item_name = item[0]
+        prefix = item_name[0]
+        if len(item_name) > 1:
+            try:
+                # 提取节点序数
+                part_num = int(item_name[1])
+                # 提取课程序数
+                class_num = 0
+                if len(item_name) > 2:
+                    class_num = int(item_name[2:])
+                if prefix == 'a':
+                    return part_num, class_num, 0
+                else:
+                    return part_num, class_num, 1
+            except ValueError:
+                # 如果转换失败，返回原始字符串
+                return item_name
+        return item_name
+    
+    # 对timeline排序后添加到timeline_data
+    sorted_timeline = sorted(timeline.items(), key=sort_timeline_key)
+    for item_name, item_time in sorted_timeline:
         try:
             timeline_data[item_name] = item_time
         except Exception as e:
@@ -454,6 +476,10 @@ def check_fullscreen():  # 检查是否全屏
     pid = ctypes.c_ulong()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     process_name = get_process_name(pid.value).lower()
+    current_pid = os.getpid()
+    # 排除自身(强调特效)
+    if pid.value == current_pid:
+        return False
     # 排除系统进程
     system_processes = {
         'explorer.exe',  # 桌面
@@ -483,8 +509,6 @@ def check_fullscreen():  # 检查是否全屏
         rect.right >= screen_rect.right and
         rect.bottom >= screen_rect.bottom
     )
-    if fw.focusing:
-        return False
     # 排除窗口大小必须占用屏幕95%,避免诈骗()
     if is_fullscreen:
         screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
@@ -740,6 +764,8 @@ class WidgetsManager:
         self.start_pos_x = 0  # 小组件起始位置
         self.start_pos_y = 0
 
+        self.hide_status = None
+
     def sync_widget_animation(self, target_pos):
         for widget in self.widgets:
             if widget.path == 'widget-current-activity.ui':
@@ -892,6 +918,7 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
+        self.hide_status = None # 重置hide_status
         for widget in self.widgets:
             try:
                 widget.deleteLater()
@@ -900,21 +927,21 @@ class WidgetsManager:
                     try:
                         widget.weather_timer.stop()
                     except RuntimeError:
-                        if logger is not None:
-                            logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
+                        logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
 
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
-                        widget.weather_thread.terminate()
-                        widget.weather_thread.quit()
-                        widget.weather_thread.wait()
+                        if widget.weather_thread.isRunning():
+                            widget.weather_thread.terminate()
+                            widget.weather_thread.quit()
+                            widget.weather_thread.wait()
+                        else:
+                            logger.debug(f"组件: {widget.path} 的天气线程已完成任务并销毁，无需终止")
                     except RuntimeError:
-                        if logger is not None:
-                            logger.warning(f"组件: {widget.path} 的天气线程已被销毁，跳过操作")
+                        logger.warning(f"组件: {widget.path} 的天气线程终止时发生异常，可能已被销毁")
             except Exception as ex:
                 widget_path = getattr(widget, 'path', 'unknown')
-                if logger is not None:
-                    logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
+                logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
         self.widgets.clear()
 
     def __del__(self):
@@ -1208,6 +1235,8 @@ class FloatingWidget(QWidget):  # 浮窗
                 """)
 
     def update_data(self):
+        time_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
+        self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
         if self.animating:  # 执行动画时跳过更新
             return
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
@@ -1219,10 +1248,15 @@ class FloatingWidget(QWidget):  # 浮窗
         self.current_lesson_name_text.setText(current_lesson_name)
 
         if cd_list:  # 模糊倒计时
-            if cd_list[1] == '00:00':
-                self.activity_countdown.setText(f"< - 分钟")
-            else:
-                self.activity_countdown.setText(f"< {int(cd_list[1].split(':')[0]) + 1} 分钟")
+            blur_floating = config_center.read_conf('General', 'blur_floating_countdown') == '1'
+            if blur_floating:  # 模糊显示
+                if cd_list[1] == '00:00':
+                    self.activity_countdown.setText(f"< - 分钟")
+                else:
+                    minutes = int(cd_list[1].split(':')[0]) + 1
+                    self.activity_countdown.setText(f"< {minutes} 分钟")
+            else:  # 精确显示
+                self.activity_countdown.setText(cd_list[1])
             self.countdown_progress_bar.setValue(cd_list[2])
 
         self.adjustSize_animation()
@@ -1459,6 +1493,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.position = parent.get_widget_pos(self.path) if position is None else position
         self.animation = None
         self.opacity_animation = None
+        mgr.hide_status = None
 
         try:
             self.w = conf.load_theme_config(theme)['widget_width'][self.path]
@@ -1595,10 +1630,20 @@ class DesktopWidget(QWidget):  # 主要小组件
             )
 
         elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
+            # 避免使用WindowStaysOnBottomHint,防止争夺底层
             self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
+                Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowDoesNotAcceptFocus
             )
+            if os.name == 'nt':
+                import ctypes
+                def set_window_pos():
+                    hwnd = self.winId().__int__()
+                    # 稍高于最底层的值
+                    ctypes.windll.user32.SetWindowPos(hwnd, 2, 0, 0, 0, 0, 0x0214)
+                QTimer.singleShot(100, set_window_pos)
+            else:
+                QTimer.singleShot(100, self.lower)
         else:
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
@@ -1675,6 +1720,16 @@ class DesktopWidget(QWidget):  # 主要小组件
                     mgr.decide_to_hide()
                 else:
                     mgr.show_windows()
+        elif config_center.read_conf('General', 'hide') == '3':
+            if reason == QSystemTrayIcon.ActivationReason.Trigger:
+                if mgr.state:
+                    mgr.decide_to_hide()
+                    mgr.hide_status = (True, 1)
+                else:
+                    mgr.show_windows()
+                    mgr.hide_status = (True, 0)
+                
+
 
     def rightReleaseEvent(self, event):  # 右键事件
         event.ignore()
@@ -1694,7 +1749,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         get_excluded_lessons()
         get_next_lessons()
 
-        if config_center.read_conf('General', 'hide') == '1':  # 上课自动隐藏
+        if (hide_mode:=config_center.read_conf('General', 'hide')) == '1':  # 上课自动隐藏
             if current_state:
                 if not current_lesson_name in excluded_lessons:
                     mgr.decide_to_hide()
@@ -1702,11 +1757,27 @@ class DesktopWidget(QWidget):  # 主要小组件
                     mgr.show_windows()
             else:
                 mgr.show_windows()
-        elif config_center.read_conf('General', 'hide') == '2':  # 最大化/全屏自动隐藏
+        elif hide_mode == '2': # 最大化/全屏自动隐藏
             if check_windows_maximize() or check_fullscreen():
                 mgr.decide_to_hide()
             else:
                 mgr.show_windows()
+        elif hide_mode == '3': # 灵活隐藏
+            if mgr.hide_status is None:
+                mgr.hide_status = (False, current_state)
+            elif mgr.hide_status[0] and mgr.hide_status[1] == current_state:
+                mgr.hide_status = (False, current_state)
+            elif not mgr.hide_status[0]:
+                mgr.hide_status = (False, current_state)
+            if mgr.hide_status[1]:
+                if not current_lesson_name in excluded_lessons:
+                    mgr.decide_to_hide()
+                else:
+                    mgr.show_windows()
+            else:
+                mgr.show_windows()
+
+            
 
         if conf.is_temp_week():  # 调休日
             current_week = config_center.read_conf('Temp', 'set_week')
@@ -2013,6 +2084,14 @@ class DesktopWidget(QWidget):  # 主要小组件
                 mgr.decide_to_hide()
             else:
                 mgr.show_windows()
+        elif config_center.read_conf('General', 'hide') == '3':  # 隐藏
+            if mgr.state:
+                mgr.decide_to_hide()
+                mgr.hide_status = (True, 1)
+            else:
+                mgr.show_windows()
+                mgr.hide_status = (True, 0)
+            
         else:
             event.ignore()
 
@@ -2029,13 +2108,19 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 def closeEvent(self, event):
     if QApplication.instance().closingDown():
+        if mgr:
+            mgr.hide_status = None # 重置hide_status
+
         if hasattr(self, 'weather_thread') and self.weather_thread:
             try:
-                self.weather_thread.terminate()  # 终止天气线程
-                self.weather_thread.quit()      # 退出天气线程
-                self.weather_thread.wait()      # 等待线程结束
+                if self.weather_thread.isRunning():
+                    self.weather_thread.terminate()  # 终止天气线程
+                    self.weather_thread.quit()      # 退出天气线程
+                    self.weather_thread.wait()      # 等待线程结束
+                else:
+                    logger.debug("天气线程已完成任务并销毁，无需终止")
             except RuntimeError:
-                logger.warning("天气线程已被销毁，跳过终止操作")
+                logger.warning("天气线程终止过程中发生异常，可能已被销毁")
             finally:
                 del self.weather_thread  # 删除引用以避免重复操作
 
@@ -2078,36 +2163,54 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
-    for window in pygetwindow.getAllWindows():
+    try:
+        all_windows = pygetwindow.getAllWindows()
+    except Exception as e:
+        logger.error(f"获取窗口列表异常: {str(e)}")
+        return False
+    for window in all_windows:
         try:
-            if window.isMaximized and window.visible:
-                title = window.title.strip()
-                pid = window._hWnd  # 获取窗口句柄
-                process_name = get_process_name(pid).lower()
-                title_lower = title.lower()
-                is_system_explorer = (
-                    process_name == "explorer.exe" 
-                    and (title in excluded_titles 
-                         or any(kw in title_lower for kw in excluded_keywords))
-                )
-                is_system_process = any(
-                    pattern in process_name 
-                    for pattern in excluded_process_patterns
-                )
-                # 标题匹配
-                has_excluded_keyword = any(
-                    kw in title_lower for kw in excluded_keywords
-                )
-                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
-                    max_windows.append({
-                        'title': title,
-                        'process': process_name,
-                        'pid': pid,
-                        'rect': window.box
-                    })
+            # 检查窗口是否有效
+            if not window._hWnd:
+                continue
+            # 检查窗口是否可见且最大化
+            try:
+                is_valid = window.visible and window.isMaximized
+                # 获取窗口位置验证窗口存在性
+                window_rect = window.box
+                if not is_valid or not window_rect:
+                    continue
+            except Exception:
+                # 获取窗口属性失败，可能已关闭
+                continue
+            title = window.title.strip()
+            pid = window._hWnd
+            process_name = get_process_name(pid).lower()
+            title_lower = title.lower()
+            is_system_explorer = (
+                process_name == "explorer.exe" 
+                and (title in excluded_titles 
+                     or any(kw in title_lower for kw in excluded_keywords))
+            )
+            is_system_process = any(
+                pattern in process_name 
+                for pattern in excluded_process_patterns
+            )
+            has_excluded_keyword = any(
+                kw in title_lower for kw in excluded_keywords
+            )
+            if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                max_windows.append({
+                    'title': title,
+                    'process': process_name,
+                    'pid': pid,
+                    'rect': window.box
+                })
         except Exception as e:
-            logger.error(f"窗口异常: {str(e)}")
-    return max_windows
+            logger.error(f"窗口处理异常: {str(e)}")
+            continue
+    # 如果有最大化窗口则返回True
+    return len(max_windows) > 0
 
 
 def setup_signal_handlers():
@@ -2134,6 +2237,7 @@ def init_config():  # 重设配置文件
         copy(f'{base_directory}/config/schedule/backup.json',
              f'{base_directory}/config/schedule/{config_center.schedule_name}')
         config_center.write_conf('Temp', 'temp_schedule', '')
+        schedule_center.update_schedule()
 
 
 def init():

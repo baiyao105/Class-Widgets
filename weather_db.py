@@ -32,19 +32,39 @@ def search_by_name(search_term):
 
 
 def search_code_by_name(search_term):
+    if search_term == ('', ''):
+        return 101010100
     update_path()
     conn = sqlite3.connect(path)
     cursor = conn.cursor()
 
-    cursor.execute('SELECT * FROM citys WHERE name LIKE ?', ('%' + search_term + '%',))  # 模糊查询
-    cities_results = cursor.fetchall()
+    logger.info(f"Searching for city: {search_term}")
+    search_term = (search_term[0].replace('市',''), search_term[1].replace('区',''))
+
+    cursor.execute('SELECT * FROM citys WHERE name = ?', (f"{search_term[0]}.{search_term[1]}",))
+    exact_results = cursor.fetchall()
+    
+    if not exact_results:
+        search_term = search_term[0]
+        cursor.execute('SELECT * FROM citys WHERE name LIKE ?', ('%' + f"{search_term}" + '%',))
+        cities_results = cursor.fetchall()
+    else:
+        cities_results = exact_results
+    
     conn.close()
 
     if cities_results:
+        # 多结果优先完全匹配,否则返回第一个
+        for city in cities_results:
+            if city[2] == search_term or city[2] == search_term + '市' or city[2] + '市' == search_term:
+                logger.debug(f"找到城市: {city[2]}，代码: {city[3]}")
+                return city[3]
         result = cities_results[0][3]
+        logger.debug(f"模糊找到城市: {cities_results[0][2]}，代码: {result}")
     else:
-        result = 101010100  # 默认城市代码
-    # 返回两个表的搜索结果
+        result = "101010100"  # 默认城市代码
+        logger.warning(f'未找到城市: {search_term}，使用默认城市代码')
+
     return result
 
 
@@ -208,7 +228,7 @@ if __name__ == '__main__':
         print(num_results)
         cities_results_ = search_by_name('上海')  # [3]城市代码
         print(cities_results_)
-        cities_results_ = search_code_by_name('上海')  # [3]城市代码
+        cities_results_ = search_code_by_name('上海','')  # [3]城市代码
         print(cities_results_)
         get_weather_by_code(3)
     except Exception as e:
