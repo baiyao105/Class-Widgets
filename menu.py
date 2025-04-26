@@ -615,11 +615,6 @@ class SettingsMenu(FluentWindow):
         switch_enable_pin_toast.checkedChanged.connect(lambda checked: switch_checked('Toast', 'pin_on_top', checked))
         # 置顶开关
 
-        switch_smooth_volume = self.findChild(SwitchButton, 'switch_enable_pin_toast_2')
-        switch_smooth_volume.setChecked(int(config_center.read_conf('Toast', 'smooth_volume')))
-        switch_smooth_volume.checkedChanged.connect(lambda checked: switch_checked('Toast', 'smooth_volume', checked))
-        # 灵动通知开关
-
         slider_volume = self.findChild(Slider, 'slider_volume')
         slider_volume.setValue(int(config_center.read_conf('Audio', 'volume')))
         slider_volume.valueChanged.connect(self.save_volume)  # 音量滑块
