@@ -1940,14 +1940,16 @@ class DesktopWidget(QWidget):  # 主要小组件
             hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
             w = Dialog(
                 "暂时无法变更“状态”",
-                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态，若变更状态，将修改隐藏模式“无”"
-                "\n您确定要隐藏组件吗?",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您稍后可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
                 None
             )
             w.yesButton.setText("确定")
-            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '0'))
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
             w.cancelButton.setText("取消")
             w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
             if w.exec():
                 if mgr.state:
                     mgr.full_hide_windows()
@@ -1966,14 +1968,16 @@ class DesktopWidget(QWidget):  # 主要小组件
             hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
             w = Dialog(
                 "暂时无法变更“状态”",
-                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态，若变更状态，将修改隐藏模式“无”"
-                "\n您确定要切换到浮窗吗?",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
                 None
             )
             w.yesButton.setText("确定")
-            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '0'))
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
             w.cancelButton.setText("取消")
             w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
             if w.exec():
                 if mgr.state:
                     fw.show()
