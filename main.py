@@ -890,7 +890,6 @@ class WidgetsManager:
     def cleanup_resources(self):
         widgets_to_clean = list(self.widgets)
         self.widgets.clear()
-
         for widget in widgets_to_clean:
             widget_path = getattr(widget, 'path', '未知组件')
             try:
@@ -899,7 +898,6 @@ class WidgetsManager:
                         widget.weather_timer.stop()
                     except RuntimeError:
                         pass
-
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
                         if widget.weather_thread.isRunning():
@@ -913,12 +911,11 @@ class WidgetsManager:
                 widget.deleteLater()
             except Exception as ex:
                 logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
-
-    def __del__(self):
-        self.cleanup_resources()
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-            del self.timer
+        def __del__(self):
+            self.cleanup_resources()
+            if hasattr(self, 'timer'):
+                self.timer.stop()
+                self.timer.deleteLater()
 
     def stop(self):
         if mgr:
