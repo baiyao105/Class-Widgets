@@ -296,7 +296,8 @@ def get_countdown(toast=False):  # 重构好累aaaa
         if parts_type[part] == 'break':  # 休息段
             notification.push_notification(0, current_lesson_name)  # 下课
         else:
-            notification.push_notification(2)  # 放学
+            if config_center.read_conf('Toast', 'after_school') == '1':
+                notification.push_notification(2)  # 放学
 
     current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
     return_text = []
@@ -446,6 +447,20 @@ def get_current_lesson_name():
                             current_state = 0
                         return
 
+def get_hide_status_from_current_state():
+    # 1 -> hide, 0 -> show
+    # 满分啦（
+    # 祝所有用 Class Widgets 的、不用 Class Widgets 的学子体测满分啊（（
+    global current_state, current_lesson_name, excluded_lessons
+    # if current_state:
+    #     if not current_lesson_name in excluded_lessons:
+    #         return 0
+    #     else:
+    #         return 1
+    # else:
+    #     return 1
+    return current_state ^ (current_lesson_name in excluded_lessons)
+
 
 # 定义 RECT 结构体
 class RECT(ctypes.Structure):
@@ -476,6 +491,10 @@ def check_fullscreen():  # 检查是否全屏
     pid = ctypes.c_ulong()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     process_name = get_process_name(pid.value).lower()
+    current_pid = os.getpid()
+    # 排除自身(强调特效)
+    if pid.value == current_pid:
+        return False
     # 排除系统进程
     system_processes = {
         'explorer.exe',  # 桌面
@@ -505,8 +524,6 @@ def check_fullscreen():  # 检查是否全屏
         rect.right >= screen_rect.right and
         rect.bottom >= screen_rect.bottom
     )
-    if fw.focusing:
-        return False
     # 排除窗口大小必须占用屏幕95%,避免诈骗()
     if is_fullscreen:
         screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
@@ -762,7 +779,7 @@ class WidgetsManager:
         self.start_pos_x = 0  # 小组件起始位置
         self.start_pos_y = 0
 
-        self.hide_status = None
+        self.hide_status = None # [0] -> 在 current_state 设置的灵活隐藏， [1] -> 隐藏模式
 
     def sync_widget_animation(self, target_pos):
         for widget in self.widgets:
@@ -916,6 +933,7 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
+        self.hide_status = None # 重置hide_status
         for widget in self.widgets:
             try:
                 widget.deleteLater()
@@ -1439,12 +1457,16 @@ class FloatingWidget(QWidget):  # 浮窗
         self.m_flag = False
         # 保存位置到配置文件
         self.save_position()
+        # 特定隐藏模式下不执行操作
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+             return # 阻止手动展开/收起
+
         if (
                 hasattr(self, "p_Position")
                 and self.r_Position == self.p_Position
                 and not self.animating
-
-        ):  # 开启自动隐藏忽略点击事件
+        ): # 非特定隐藏模式下执行点击事件
             mgr.show_windows()
             self.close()
 
@@ -1613,6 +1635,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if config_center.read_conf('General', 'hide') == '2' or (not int(config_center.read_conf('General', 'enable_click'))):
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        else:
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         if config_center.read_conf('General', 'pin_on_top') == '1':  # 置顶
             self.setWindowFlags(
@@ -1621,10 +1645,20 @@ class DesktopWidget(QWidget):  # 主要小组件
             )
 
         elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
+            # 避免使用WindowStaysOnBottomHint,防止争夺底层
             self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
+                Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowDoesNotAcceptFocus
             )
+            if os.name == 'nt':
+                import ctypes
+                def set_window_pos():
+                    hwnd = self.winId().__int__()
+                    # 稍高于最底层的值
+                    ctypes.windll.user32.SetWindowPos(hwnd, 2, 0, 0, 0, 0, 0x0214)
+                QTimer.singleShot(100, set_window_pos)
+            else:
+                QTimer.singleShot(100, self.lower)
         else:
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
@@ -1705,10 +1739,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             if reason == QSystemTrayIcon.ActivationReason.Trigger:
                 if mgr.state:
                     mgr.decide_to_hide()
-                    mgr.hide_status = (True, 1)
+                    mgr.hide_status = (current_state, 1)
                 else:
                     mgr.show_windows()
-                    mgr.hide_status = (True, 0)
+                    mgr.hide_status = (current_state, 0)
                 
 
 
@@ -1729,13 +1763,11 @@ class DesktopWidget(QWidget):  # 主要小组件
         get_current_lesson_name()
         get_excluded_lessons()
         get_next_lessons()
+        hide_status = get_hide_status_from_current_state()
 
         if (hide_mode:=config_center.read_conf('General', 'hide')) == '1':  # 上课自动隐藏
-            if current_state:
-                if not current_lesson_name in excluded_lessons:
-                    mgr.decide_to_hide()
-                else:
-                    mgr.show_windows()
+            if hide_status:
+                mgr.decide_to_hide()
             else:
                 mgr.show_windows()
         elif hide_mode == '2': # 最大化/全屏自动隐藏
@@ -1745,16 +1777,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                 mgr.show_windows()
         elif hide_mode == '3': # 灵活隐藏
             if mgr.hide_status is None:
-                mgr.hide_status = (False, current_state)
-            elif mgr.hide_status[0] and mgr.hide_status[1] == current_state:
-                mgr.hide_status = (False, current_state)
-            elif not mgr.hide_status[0]:
-                mgr.hide_status = (False, current_state)
+                mgr.hide_status = (-1, hide_status)
+            elif mgr.hide_status[0] != current_state:
+                mgr.hide_status = (-1, hide_status)
             if mgr.hide_status[1]:
-                if not current_lesson_name in excluded_lessons:
-                    mgr.decide_to_hide()
-                else:
-                    mgr.show_windows()
+                mgr.decide_to_hide()
             else:
                 mgr.show_windows()
 
@@ -1916,18 +1943,61 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     @staticmethod
     def hide_show_widgets():  # 隐藏/显示主界面（全部隐藏）
-        if mgr.state:
-            mgr.full_hide_windows()
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+            hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
+            w = Dialog(
+                "暂时无法变更“状态”",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您稍后可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
+                None
+            )
+            w.yesButton.setText("确定")
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
+            w.cancelButton.setText("取消")
+            w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
+            if w.exec():
+                if mgr.state:
+                    mgr.full_hide_windows()
+                else:
+                    mgr.show_windows()
         else:
-            mgr.show_windows()
+            if mgr.state:
+                mgr.full_hide_windows()
+            else:
+                mgr.show_windows()
 
     @staticmethod
     def minimize_to_floating():  # 最小化到浮窗
-        if mgr.state:
-            fw.show()
-            mgr.full_hide_windows()
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+            hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
+            w = Dialog(
+                "暂时无法变更“状态”",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
+                None
+            )
+            w.yesButton.setText("确定")
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
+            w.cancelButton.setText("取消")
+            w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
+            if w.exec():
+                if mgr.state:
+                    fw.show()
+                    mgr.full_hide_windows()
+                else:
+                    mgr.show_windows()
         else:
-            mgr.show_windows()
+            if mgr.state:
+                fw.show()
+                mgr.full_hide_windows()
+            else:
+                mgr.show_windows()
 
     def clear_animation(self):  # 清除动画
         self.animation = None
@@ -2029,10 +2099,11 @@ class DesktopWidget(QWidget):  # 主要小组件
         elif config_center.read_conf('General', 'hide') == '3':  # 隐藏
             if mgr.state:
                 mgr.decide_to_hide()
-                mgr.hide_status = (True, 1)
+                mgr.hide_status = (current_state, 1)
             else:
                 mgr.show_windows()
-                mgr.hide_status = (True, 0)
+                mgr.hide_status = (current_state, 0)
+                
             
         else:
             event.ignore()
@@ -2050,6 +2121,9 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 def closeEvent(self, event):
     if QApplication.instance().closingDown():
+        if mgr:
+            mgr.hide_status = None # 重置hide_status
+
         if hasattr(self, 'weather_thread') and self.weather_thread:
             try:
                 if self.weather_thread.isRunning():
@@ -2102,36 +2176,54 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
-    for window in pygetwindow.getAllWindows():
+    try:
+        all_windows = pygetwindow.getAllWindows()
+    except Exception as e:
+        logger.error(f"获取窗口列表异常: {str(e)}")
+        return False
+    for window in all_windows:
         try:
-            if window.isMaximized and window.visible:
-                title = window.title.strip()
-                pid = window._hWnd  # 获取窗口句柄
-                process_name = get_process_name(pid).lower()
-                title_lower = title.lower()
-                is_system_explorer = (
-                    process_name == "explorer.exe" 
-                    and (title in excluded_titles 
-                         or any(kw in title_lower for kw in excluded_keywords))
-                )
-                is_system_process = any(
-                    pattern in process_name 
-                    for pattern in excluded_process_patterns
-                )
-                # 标题匹配
-                has_excluded_keyword = any(
-                    kw in title_lower for kw in excluded_keywords
-                )
-                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
-                    max_windows.append({
-                        'title': title,
-                        'process': process_name,
-                        'pid': pid,
-                        'rect': window.box
-                    })
+            # 检查窗口是否有效
+            if not window._hWnd:
+                continue
+            # 检查窗口是否可见且最大化
+            try:
+                is_valid = window.visible and window.isMaximized
+                # 获取窗口位置验证窗口存在性
+                window_rect = window.box
+                if not is_valid or not window_rect:
+                    continue
+            except Exception:
+                # 获取窗口属性失败，可能已关闭
+                continue
+            title = window.title.strip()
+            pid = window._hWnd
+            process_name = get_process_name(pid).lower()
+            title_lower = title.lower()
+            is_system_explorer = (
+                process_name == "explorer.exe" 
+                and (title in excluded_titles 
+                     or any(kw in title_lower for kw in excluded_keywords))
+            )
+            is_system_process = any(
+                pattern in process_name 
+                for pattern in excluded_process_patterns
+            )
+            has_excluded_keyword = any(
+                kw in title_lower for kw in excluded_keywords
+            )
+            if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                max_windows.append({
+                    'title': title,
+                    'process': process_name,
+                    'pid': pid,
+                    'rect': window.box
+                })
         except Exception as e:
-            logger.error(f"窗口异常: {str(e)}")
-    return max_windows
+            logger.error(f"窗口处理异常: {str(e)}")
+            continue
+    # 如果有最大化窗口则返回True
+    return len(max_windows) > 0
 
 
 def setup_signal_handlers():
