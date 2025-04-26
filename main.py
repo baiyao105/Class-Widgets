@@ -84,10 +84,13 @@ if os.name == 'nt':
     import pygetwindow
 
 # 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+else:
+    logger.warning('不兼容的系统,跳过高DPI标识')
 
 today = dt.date.today()
 
@@ -162,6 +165,11 @@ sys.excepthook = global_exceptHook  # 设置全局异常捕获
 
 
 def setTheme_():  # 设置主题
+    if platform.system() == 'Windows' and platform.release() == '7':
+        setTheme(Theme.LIGHT)
+        logger.warning('不支持的系统,强制使用亮色主题')
+        return
+
     if config_center.read_conf('General', 'color_mode') == '2':  # 自动
         if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
             return
@@ -1301,7 +1309,10 @@ class FloatingWidget(QWidget):  # 浮窗
         self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
         if self.animating:  # 执行动画时跳过更新
             return
-        self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        if platform.system() == 'Windows' and platform.release() != '7':
+            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        else:
+            self.setWindowOpacity(1.0)
         cd_list = get_countdown()
         self.text_changed = False
         if self.current_lesson_name_text.text() != current_lesson_name:
@@ -1624,20 +1635,30 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
             img = self.findChild(QLabel, 'img')
-            opacity = QGraphicsOpacityEffect(self)
-            opacity.setOpacity(0.65)
-            img.setGraphicsEffect(opacity)
+            # Add platform check for opacity effect
+            if platform.system() == 'Windows' and platform.release() != '7':
+                opacity = QGraphicsOpacityEffect(self)
+                opacity.setOpacity(0.65)
+                img.setGraphicsEffect(opacity)
 
         self.resize(self.w, self.height())
 
         # 设置窗口位置
         if first_start:
             self.animate_window(self.position)
-            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            # Add platform check for opacity
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            else:
+                self.setWindowOpacity(1.0) # Force full opacity on Win7 or non-Windows
         else:
-            self.setWindowOpacity(0)
-            self.animate_show_opacity()
-            self.move(self.position[0], self.position[1])
+            # Add platform check for opacity
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(0)
+                self.animate_show_opacity()
+            else:
+                self.setWindowOpacity(1.0) # Force full opacity on Win7 or non-Windows
+                self.move(self.position[0], self.position[1]) # Ensure window is positioned correctly without animation
             self.resize(self.w, self.height())
 
         self.update_data('')
@@ -2190,6 +2211,10 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
+    # Add platform check for pygetwindow
+    if platform.system() == 'Windows' and platform.release() == '7':
+        logger.warning("Windows 7 不支持检测全屏窗口，已跳过此功能。")
+        return False # Skip check on Windows 7
     try:
         all_windows = pygetwindow.getAllWindows()
     except Exception as e:
