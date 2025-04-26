@@ -370,7 +370,7 @@ def get_countdown(toast=False):  # 重构好累aaaa
                                 break
                     if next_lesson_key and next_lesson_key in current_lessons:
                         lesson_name = current_lessons[next_lesson_key]
-                        if lesson_name != '暂无课程' and lesson_name not in excluded_lessons:
+                        if lesson_name != '暂无课程':
                             next_lesson_name = lesson_name
                     if current_state == 0:
                         now = dt.datetime.now()
