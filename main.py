@@ -1635,7 +1635,6 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
             img = self.findChild(QLabel, 'img')
-            # Add platform check for opacity effect
             if platform.system() == 'Windows' and platform.release() != '7':
                 opacity = QGraphicsOpacityEffect(self)
                 opacity.setOpacity(0.65)
@@ -1646,19 +1645,17 @@ class DesktopWidget(QWidget):  # 主要小组件
         # 设置窗口位置
         if first_start:
             self.animate_window(self.position)
-            # Add platform check for opacity
             if platform.system() == 'Windows' and platform.release() != '7':
                 self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
             else:
-                self.setWindowOpacity(1.0) # Force full opacity on Win7 or non-Windows
+                self.setWindowOpacity(1.0)
         else:
-            # Add platform check for opacity
             if platform.system() == 'Windows' and platform.release() != '7':
                 self.setWindowOpacity(0)
                 self.animate_show_opacity()
             else:
-                self.setWindowOpacity(1.0) # Force full opacity on Win7 or non-Windows
-                self.move(self.position[0], self.position[1]) # Ensure window is positioned correctly without animation
+                self.setWindowOpacity(1.0)
+                self.move(self.position[0], self.position[1])
             self.resize(self.w, self.height())
 
         self.update_data('')
@@ -2211,10 +2208,6 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
-    # Add platform check for pygetwindow
-    if platform.system() == 'Windows' and platform.release() == '7':
-        logger.warning("Windows 7 不支持检测全屏窗口，已跳过此功能。")
-        return False # Skip check on Windows 7
     try:
         all_windows = pygetwindow.getAllWindows()
     except Exception as e:
