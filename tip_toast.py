@@ -306,7 +306,7 @@ class wave_Effect(QWidget):
         self.animation.start()
 
         self.fade_animation = QPropertyAnimation(self, b'windowOpacity')
-        self.fade_animation.setDuration(self.duration - 150) # Slightly shorter fade out
+        self.fade_animation.setDuration(self.duration - 150)
 
         self.fade_animation.setKeyValues([  # 关键帧
             (0, 0),
