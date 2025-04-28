@@ -77,7 +77,7 @@ from menu import open_plaza
 from network_thread import check_update, weatherReportThread
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, stop, share, update_timer
+from utils import restart, stop, share, update_timer, DarkModeWatcher
 from file import config_center, schedule_center
 
 if os.name == 'nt':
@@ -126,6 +126,7 @@ ignore_errors = []
 last_error_time = dt.datetime.now() - error_cooldown  # 上一次错误
 
 ex_menu = None
+dark_mode_watcher = None
 
 if config_center.read_conf('Other', 'do_not_log') != '1':
     logger.add(f"{base_directory}/log/ClassWidgets_main_{{time}}.log", rotation="1 MB", encoding="utf-8",
@@ -160,24 +161,37 @@ def global_exceptHook(exc_type, exc_value, exc_tb):  # 全局异常捕获
 
 sys.excepthook = global_exceptHook  # 设置全局异常捕获
 
+def handle_dark_mode_change(is_dark):
+    """处理DarkModeWatcher触发的UI更新"""
+    if config_center.read_conf('General', 'color_mode') == '2':
+        logger.info(f"系统颜色模式更新: {'深色' if is_dark else '浅色'}")
+        current_theme = Theme.DARK if is_dark else Theme.LIGHT
+        setTheme(current_theme)
+        if mgr: 
+            mgr.clear_widgets()
+        else:
+            logger.warning("主题更改时,mgr还未初始化")
+        # if current_state == 1:
+        #      setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")
+        # else:
+        #      setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
+
 
 def setTheme_():  # 设置主题
-    if config_center.read_conf('General', 'color_mode') == '2':  # 自动
-        if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
-            return
-        if platform.system() == 'Windows':
-            # 检查Windows版本是否支持深色模式（Windows 10 build 14393及以上）
-            try:
-                win_build = sys.getwindowsversion().build
-                if win_build < 14393:  # 不支持深色模式的最低版本
-                    return
-            except AttributeError:
-                # 无法获取版本信息，保守返回
-                return
-        if platform.system() == 'Linux':
-            return
-        setTheme(Theme.AUTO)
-    elif config_center.read_conf('General', 'color_mode') == '1':
+    global theme
+    color_mode = config_center.read_conf('General', 'color_mode')
+    logger.info(f"颜色模式: {color_mode}")
+
+    if color_mode == '2':  # 自动
+        if dark_mode_watcher and dark_mode_watcher.isDark() is not None:
+            # 初始主题由 darkModeChanged 信号在 _initial_check 后触发
+            pass # 等待 watcher 信号
+        elif dark_mode_watcher is None:
+            logger.warning("DarkModeWatcher 未被初始化")
+            setTheme(Theme.LIGHT)
+        else:
+             setTheme(Theme.LIGHT)
+    elif color_mode == '1':
         setTheme(Theme.DARK)
     else:
         setTheme(Theme.LIGHT)
@@ -2346,6 +2360,13 @@ if __name__ == '__main__':
     share.create(1)  # 创建共享内存
     logger.info(
         f"共享内存：{share.isAttached()} 是否允许多开实例：{config_center.read_conf('Other', 'multiple_programs')}")
+    try:
+        dark_mode_watcher = DarkModeWatcher(parent=app)
+        dark_mode_watcher.darkModeChanged.connect(handle_dark_mode_change) # 连接信号
+        # 初始主题设置依赖于 darkModeChanged 信号
+    except Exception as e:
+        logger.error(f"初始化颜色模式监测器时出错: {e}")
+        dark_mode_watcher = None
 
     if scale_factor > 1.8 or scale_factor < 1.0:
         logger.warning("当前缩放系数可能导致显示异常，建议使缩放系数在 100% 到 180% 之间")

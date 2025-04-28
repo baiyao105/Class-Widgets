@@ -5,7 +5,8 @@ import psutil
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
 from loguru import logger
-from PyQt5.QtCore import QSharedMemory, QTimer, QObject
+from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
+import darkdetect
 import datetime as dt
 
 from file import base_directory, config_center
@@ -109,6 +110,35 @@ def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
     height = int(screen_height * p_h)
 
     return (width, height), (int(screen_width / 2 - width / 2), 150)
+
+class DarkModeWatcher(QObject):
+    darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号
+    def __init__(self, interval=500, parent=None):
+        super().__init__(parent)
+        self._isDarkMode = darkdetect.isDark()  # 初始状态
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._checkTheme)
+        self._timer.start(interval)  # 轮询间隔（毫秒）
+
+    def _checkTheme(self):
+        currentMode = darkdetect.isDark()
+        if currentMode != self._isDarkMode:
+            self._isDarkMode = currentMode
+            self.darkModeChanged.emit(currentMode)  # 发出变化信号
+
+    def isDark(self):
+        """返回当前是否暗黑模式"""
+        return self._isDarkMode
+
+    def stop(self):
+        """停止监听"""
+        self._timer.stop()
+
+    def start(self, interval=None):
+        """开始监听"""
+        if interval:
+            self._timer.setInterval(interval)
+        self._timer.start()
 
 
 class TrayIcon(QSystemTrayIcon):
