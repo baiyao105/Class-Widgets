@@ -181,7 +181,10 @@ def setTheme_():  # 设置主题
     global theme
     color_mode = config_center.read_conf('General', 'color_mode')
     logger.info(f"颜色模式: {color_mode}")
-
+    # Win7特殊处理
+    if platform.system() == 'Windows' and sys.getwindowsversion().major == 6 and sys.getwindowsversion().minor == 1:
+        setTheme(Theme.LIGHT)
+        return
     if color_mode == '2':  # 自动
         if dark_mode_watcher and dark_mode_watcher.isDark() is not None:
             # 初始主题由 darkModeChanged 信号在 _initial_check 后触发
