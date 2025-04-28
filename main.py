@@ -84,10 +84,13 @@ if os.name == 'nt':
     import pygetwindow
 
 # 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+else:
+    logger.warning('不兼容的系统,跳过高DPI标识')
 
 today = dt.date.today()
 
@@ -181,11 +184,25 @@ def setTheme_():  # 设置主题
     global theme
     color_mode = config_center.read_conf('General', 'color_mode')
     logger.info(f"颜色模式: {color_mode}")
-    # Win7特殊处理
-    if platform.system() == 'Windows' and sys.getwindowsversion().major == 6 and sys.getwindowsversion().minor == 1:
-        setTheme(Theme.LIGHT)
-        return
+    
     if color_mode == '2':  # 自动
+        if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
+            return
+        if platform.system() == 'Windows':
+            # Windows 7特殊处理
+            if sys.getwindowsversion().major == 6 and sys.getwindowsversion().minor == 1:
+                setTheme(Theme.LIGHT)
+                return
+            # 检查Windows版本是否支持深色模式（Windows 10 build 14393及以上）
+            try:
+                win_build = sys.getwindowsversion().build 
+                if win_build < 14393:  # 不支持深色模式的最低版本 
+                    return 
+            except AttributeError:
+                # 无法获取版本信息，保守返回 
+                return
+        if platform.system() == 'Linux':
+            return
         if dark_mode_watcher and dark_mode_watcher.isDark() is not None:
             # 初始主题由 darkModeChanged 信号在 _initial_check 后触发
             pass # 等待 watcher 信号
@@ -456,7 +473,7 @@ def get_next_lessons():
         c_time, part = get_part()
 
         def before_class():
-            if part == 0:
+            if part == 0 or part == 3:
                 return True
             else:
                 if current_dt >= parts_start_time[part] - dt.timedelta(minutes=60):
@@ -1337,7 +1354,10 @@ class FloatingWidget(QWidget):  # 浮窗
         self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
         if self.animating:  # 执行动画时跳过更新
             return
-        self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        if platform.system() == 'Windows' and platform.release() != '7':
+            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        else:
+            self.setWindowOpacity(1.0)
         cd_list = get_countdown()
         self.text_changed = False
         if self.current_lesson_name_text.text() != current_lesson_name:
@@ -1660,20 +1680,27 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
             img = self.findChild(QLabel, 'img')
-            opacity = QGraphicsOpacityEffect(self)
-            opacity.setOpacity(0.65)
-            img.setGraphicsEffect(opacity)
+            if platform.system() == 'Windows' and platform.release() != '7':
+                opacity = QGraphicsOpacityEffect(self)
+                opacity.setOpacity(0.65)
+                img.setGraphicsEffect(opacity)
 
         self.resize(self.w, self.height())
 
         # 设置窗口位置
         if first_start:
             self.animate_window(self.position)
-            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            else:
+                self.setWindowOpacity(1.0)
         else:
-            self.setWindowOpacity(0)
-            self.animate_show_opacity()
-            self.move(self.position[0], self.position[1])
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(0)
+                self.animate_show_opacity()
+            else:
+                self.setWindowOpacity(1.0)
+                self.move(self.position[0], self.position[1])
             self.resize(self.w, self.height())
 
         self.update_data('')
@@ -2186,8 +2213,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 mgr.show_windows()
                 mgr.hide_status = (current_state, 0)
-                
-            
         else:
             event.ignore()
 
