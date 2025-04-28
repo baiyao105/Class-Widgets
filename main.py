@@ -439,7 +439,7 @@ def get_next_lessons():
         c_time, part = get_part()
 
         def before_class():
-            if part == 0:
+            if part == 0 or part == 3:
                 return True
             else:
                 if current_dt >= parts_start_time[part] - dt.timedelta(minutes=60):
