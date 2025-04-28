@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import configparser as config
 from pathlib import Path
 
@@ -248,6 +249,7 @@ def get_custom_countdown():
         custom_countdown = li[countdown_cnt]
         if custom_countdown == '':
             return '未设置'
+        custom_countdown = re.sub(r'\s*星期[一二三四五六日天]\s*', '', custom_countdown).strip()
         try:
             custom_countdown = parser.parse(custom_countdown)
         except Exception as e:
