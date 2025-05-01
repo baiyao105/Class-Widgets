@@ -47,10 +47,9 @@ class TTSAudioThread(QThread):
 
     def run(self):
         try:
-            logger.info(f"开始生成TTS语音: '{self.text}'")
             audio_path = generate_speech_sync(self.text, voice=self.voice_id, auto_fallback=True)
             if audio_path and os.path.exists(audio_path):
-                logger.info(f"TTS语音生成成功: {audio_path}, 开始播放...")
+                logger.info(f"TTS语音生成成功,开始播放...")
                 play_audio(audio_path, tts_delete_after=True)
             else:
                 logger.error("TTS语音生成失败或文件未找到")
@@ -155,7 +154,7 @@ class tip_toast(QWidget):
             sound_to_play = prepare_class
 
         if tts_enabled and tts_text and tts_voice_id:
-            logger.info(f"准备启动TTS线程，文本: '{tts_text}', 语音ID: {tts_voice_id}")
+            logger.info(f"TTS文本: '{tts_text}', 语音ID: {tts_voice_id}")
             self.tts_audio_thread = TTSAudioThread(tts_text, tts_voice_id)
             self.tts_audio_thread.start()
         elif tts_enabled and tts_text and not tts_voice_id:

@@ -12,32 +12,41 @@ import pyttsx3
 from loguru import logger
 
 
-def get_tts_voices(engine: str = "edge"):
-    """
-    获取指定TTS引擎的可用语音列表
-    参数：engine (str): 'edge' 或 'pyttsx3'
-    返回：list[dict]，每个元素包含'id'和'name'
-    """
+def get_tts_voices():
+    """获取可用的TTS语音列表(中文)，包括Edge TTS和Pyttsx3."""
     voices = []
-    if engine == "edge":
-        try:
-            voices = asyncio.get_event_loop().run_until_complete(edge_tts.list_voices())
-            return [{"id": v.get("ShortName"), "name": v.get("DisplayName", v.get("ShortName", "Unknown Voice"))} for v in voices if v.get("ShortName")]
-        except Exception as e:
-            logger.error(f"获取edge语音失败: {e}")
-            return []
-    elif engine == "pyttsx3":
-        try:
-            engine_ = pyttsx3.init()
-            for v in engine_.getProperty('voices'):
-                voices.append({"id": v.id, "name": v.name})
-            return voices
-        except Exception as e:
-            logger.error(f"获取pyttsx3语音失败: {e}")
-            return []
-    else:
-        logger.error(f"不支持的TTS引擎: {engine}")
-        return []
+    try:
+        edge_voices = asyncio.run(edge_tts.list_voices())
+        for voice in edge_voices:
+            if 'zh' in voice['Locale'].lower(): # 筛选中文语音
+                voices.append({'name': f"{voice['FriendlyName']} (Edge)", 'id': voice['Name']})
+        logger.debug(f"成功筛选了 {len(voices)} 个 Edge TTS 语音")
+    except Exception as e:
+        logger.error(f"获取 Edge TTS 语音列表失败: {e}")
+    # 获取 Pyttsx3 语音
+    try:
+        engine = pyttsx3.init()
+        pyttsx3_voices = engine.getProperty('voices')
+        engine.stop() # 释放引擎资源
+        for voice in pyttsx3_voices:
+            name = voice.name
+            # Tip：pyttsx3语言信息不标准
+            lang_check_passed = False
+            if hasattr(voice, 'languages') and voice.languages:
+                if any('zh' in lang.lower() for lang in voice.languages):
+                    lang_check_passed = True
+            elif 'chinese' in name.lower() or 'mandarin' in name.lower(): # 备用
+                 lang_check_passed = True
+            if not hasattr(voice, 'languages') or not voice.languages or lang_check_passed:
+                 voices.append({'name': f"{name} (System)", 'id': voice.id})
+        logger.debug(f"成功筛选了 {len(pyttsx3_voices)} 个 Pyttsx3 语音")
+    except Exception as e:
+        logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
+
+    if not voices:
+        logger.warning("未能获取到任何 TTS 语音")
+
+    return voices
 
 def get_voice_id_by_name(name: str, engine: str = "edge"):
     """
@@ -45,7 +54,7 @@ def get_voice_id_by_name(name: str, engine: str = "edge"):
     参数：name (str): 语音显示名称
     返回：str，语音ID
     """
-    voices = get_tts_voices(engine)
+    voices = get_tts_voices()
     for v in voices:
         if v["name"] == name:
             return v["id"]
@@ -281,7 +290,7 @@ class TTSEngine:
                 if not os.path.exists(actual_path):
                     raise RuntimeError(f"语音文件生成失败: {actual_path}")
 
-                logger.info(f"成功生成语音 | 引擎: {current_engine} | 路径: {actual_path}")
+                logger.info(f"成功生成语音 | 引擎: {current_engine} | 文件: {actual_filename}")
                 return actual_path
 
             except Exception as e:
@@ -309,9 +318,9 @@ class TTSEngine:
         """
         for attempt in range(retries):
             try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    logger.info(f"成功删除音频文件: {file_path}")
+                #if os.path.exists(file_path):
+                    #os.remove(file_path)
+                    #logger.info(f"成功删除音频文件: {file_path}")
                     return True
             except Exception as e:
                 if attempt < retries - 1:
@@ -343,15 +352,15 @@ def generate_speech_sync(
 
 
 def list_pyttsx3_voices():
-    """跨平台语音列表显示"""
-    engine = pyttsx3.init()
-    voices = engine.getProperty('voices')
-    current_os = platform.system()
-
-    for idx, voice in enumerate(voices):
-        logger.info(f"\n[{current_os} 平台Pyttsx3可用语音包]"
-                    f"\n{idx + 1}. ID: {voice.id}"
-                    f"\n   名称: {voice.name}"
-                    f"\n   语言: {voice.languages[0] if voice.languages else '未知'}"
-                    f"\n   性别: {voice.gender}"
-                    f"\n" + "-" * 60)
+    """列出所有可用的 Pyttsx3 语音."""
+    try:
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+        engine.stop()
+        voice_list = []
+        for voice in voices:
+            voice_list.append({'name': voice.name, 'id': voice.id})
+        return voice_list
+    except Exception as e:
+        logger.error(f"列出 Pyttsx3 语音时出错: {e}")
+        return []

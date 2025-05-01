@@ -56,7 +56,7 @@
         <x>0</x>
         <y>0</y>
         <width>697</width>
-        <height>734</height>
+        <height>750</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_9">
@@ -432,7 +432,8 @@
               <item>
                <widget class="CaptionLabel" name="CaptionLabel_13">
                 <property name="text">
-                 <string>启用后将在提醒后使用TTS播报</string>
+                 <string>启用后将在提醒后使用TTS播报信息
+*若带Edge标识则需网络请求</string>
                 </property>
                 <property name="lightColor" stdset="0">
                  <color alpha="150">

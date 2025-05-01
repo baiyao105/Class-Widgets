@@ -63,7 +63,6 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
             else:
                 sound = pygame.mixer.Sound(file_path)
                 sound_cache[file_path] = sound
-                logger.debug(f'缓存音频: {file_path}')
         except pygame.error as e_load:
             logger.error(f"加载音频文件失败: {file_path} | 错误: {e_load}")
             return
