@@ -12,7 +12,7 @@ import conf
 from conf import base_directory
 import list_
 from file import config_center
-from play_audio import PlayAudio, play_audio # Import play_audio directly
+from play_audio import PlayAudio, play_audio
 from generate_speech import generate_speech_sync, get_voice_id_by_name
 import platform
 
