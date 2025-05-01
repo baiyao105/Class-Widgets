@@ -64,7 +64,13 @@ class tip_toast(QWidget):
             w.close()
         active_windows.append(self)
         self.audio_thread = None
-        self.tts_audio_thread = None # 初始化TTS
+        if hasattr(tip_toast, 'active_tts_thread') and tip_toast.active_tts_thread and tip_toast.active_tts_thread.isRunning():
+            logger.debug("已有TTS线程正在运行，跳过")
+            self.tts_audio_thread = None
+        else:
+            self.tts_audio_thread = None # 初始化TTS
+            tip_toast.active_tts_thread = None # 确保类变量存在
+
         uic.loadUi(f"{base_directory}/view/widget-toast-bar.ui", self)
 
         try:
@@ -155,14 +161,20 @@ class tip_toast(QWidget):
 
         if tts_enabled and tts_text and tts_voice_id:
             logger.info(f"TTS文本: '{tts_text}', 语音ID: {tts_voice_id}")
-            self.tts_audio_thread = TTSAudioThread(tts_text, tts_voice_id)
-            self.tts_audio_thread.start()
+            if hasattr(tip_toast, 'active_tts_thread') and tip_toast.active_tts_thread and tip_toast.active_tts_thread.isRunning():
+                logger.debug("已有TTS线程正在运行，本次请求被跳过。")
+            else:
+                self.tts_audio_thread = TTSAudioThread(tts_text, tts_voice_id)
+                tip_toast.active_tts_thread = self.tts_audio_thread
+                self.tts_audio_thread.finished.connect(lambda: setattr(tip_toast, 'active_tts_thread', None))
+                self.tts_audio_thread.start()
+                logger.debug("启动新的TTS线程。")
         elif tts_enabled and tts_text and not tts_voice_id:
-             logger.warning(f"TTS已启用，但找不到名为 '{tts_voice_id}' 的语音ID，无法播放TTS。")
+             # 这里的警告现在意味着配置的名称无效或列表加载失败
+             logger.warning(f"TTS已启用，但未能根据配置的名称 '{tts_voice_name}' 找到有效的语音ID，无法播放TTS。")
         elif tts_enabled and not tts_text:
              logger.debug("TTS已启用，但当前状态没有对应的TTS文本。")
-        else:
-            logger.debug(f"TTS未启用，tts_enabled={tts_enabled}，tts_text={tts_text}，tts_voice_id={tts_voice_id}")
+        # 不再需要 else 分支记录未启用的情况，因为上面已有检查逻辑
 
         # 设置样式表
         if state == 1:  # 上课铃声
