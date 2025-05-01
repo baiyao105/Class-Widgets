@@ -1741,7 +1741,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                             utils.update_timer.add_callback(self._ensure_topmost)
                             self._is_topmost_callback_added = True
                             self._ensure_topmost() # 立即执行一次确保初始置顶
-                            logger.debug("已添加置顶定时回调。")
+                            #logger.debug("已添加置顶定时回调。")
                         else:
                             logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
                     except Exception as e:
