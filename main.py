@@ -1671,6 +1671,21 @@ class DesktopWidget(QWidget):  # 主要小组件
         # 初始位置和大小
         self.setGeometry(self.position[0], self.position[1], self.w, self.h)
         self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+        # 设置窗口位置
+        if first_start:
+            self.animate_window(self.position)
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            else:
+                self.setWindowOpacity(1.0)
+        else:
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(0)
+                self.animate_show_opacity()
+            else:
+                self.setWindowOpacity(1.0)
+                self.move(self.position[0], self.position[1])
+            self.resize(self.w, self.height())
 
         self.update_data('')
 
