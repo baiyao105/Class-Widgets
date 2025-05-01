@@ -867,7 +867,7 @@ class WidgetsManager:
                                   widget_cnt=w,
                                   target_position=self.get_widget_pos("", w))
             self.widgets.append(widget)
-        self.create_widgets_with_animation()
+        self.create_widgets()
 
     def close_all_widgets(self):
         # 统一关闭所有组件
@@ -898,13 +898,8 @@ class WidgetsManager:
         for widget in self.widgets:
             widget.show()
             logger.info(f'显示小组件：{widget.path, widget.windowTitle()}')
-            
-    def create_widgets_with_animation(self):
-        for widget in self.widgets:
-            widget.show()
-            logger.info(f'显示小组件（动画模式）：{widget.path, widget.windowTitle()}')
         QTimer.singleShot(100, self.animate_widgets_down)
-    
+
     def animate_widgets_down(self):
         for widget in self.widgets:
             widget.animate_move_down()
@@ -913,8 +908,10 @@ class WidgetsManager:
         self.animation_delay_timer.setSingleShot(True)
         self.animation_delay_timer.timeout.connect(self.animate_widgets_expand)
         self.animation_delay_timer.start(800)
-    
+
     def animate_widgets_expand(self):
+        if not self.widgets:
+            return
         for i, widget in enumerate(self.widgets):
             delay = abs(i - (len(self.widgets) // 2)) * 50  # 中间的先展开，两侧的依次展开
             QTimer.singleShot(delay, lambda w=widget: w.animate_to_final_position())
@@ -1588,19 +1585,23 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
         self.w = 100
 
-        self.position = parent.get_widget_pos(self.path) if position is None else position
-        self.target_position = target_position if target_position is not None else self.position
-        self.animation = None
-        self.opacity_animation = None
-        self.move_animation = None
-        self.final_animation = None
-        mgr.hide_status = None
-
+        self.target_position = target_position if target_position is not None else parent.get_widget_pos(self.path)
+        screen_geometry = app.primaryScreen().availableGeometry()
+        screen_width = screen_geometry.width()
         try:
             self.w = conf.load_theme_config(theme)['widget_width'][self.path]
         except KeyError:
             self.w = list_.widget_width[self.path]
         self.h = conf.load_theme_config(theme)['height']
+        initial_center_x = (screen_width - self.w) // 2
+        initial_y_offscreen = -self.h
+        self.position = [initial_center_x, initial_y_offscreen] # 初始位置
+        self.pause_position = [initial_center_x, self.target_position[1]]
+        self.animation = None
+        self.opacity_animation = None
+        self.move_animation = None # 下降动画
+        self.final_animation = None # 展开动画
+        mgr.hide_status = None
 
         init_config()
         self.init_ui(path)
@@ -1667,17 +1668,9 @@ class DesktopWidget(QWidget):  # 主要小组件
             opacity.setOpacity(0.65)
             img.setGraphicsEffect(opacity)
 
-        self.resize(self.w, self.height())
-
-        # 设置窗口位置
-        if first_start:
-            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
-            self.resize(self.w, self.height())
-        else:
-            self.setWindowOpacity(0)
-            self.animate_show_opacity()
-            self.move(self.position[0], self.position[1])
-            self.resize(self.w, self.height())
+        # 初始位置和大小
+        self.setGeometry(self.position[0], self.position[1], self.w, self.h)
+        self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
 
         self.update_data('')
 
@@ -1790,30 +1783,26 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.show()
         
     def animate_move_down(self):
-        # 下移动画
-        screen_geometry = app.primaryScreen().availableGeometry()
-        screen_width = screen_geometry.width()
         self.move_animation = QPropertyAnimation(self, b"geometry")
-        self.move_animation.setDuration(600)  # 600ms的动画时间
-        self.move_animation.setStartValue(QRect(self.position[0], self.position[1], self.w, self.h))
-        # 移动到目标Y位置
-        center_x = (screen_width - self.w) // 2
-        self.move_animation.setEndValue(QRect(center_x, self.target_position[1], self.w, self.h))
-        self.move_animation.setEasingCurve(QEasingCurve.Type.OutBack)
+        self.move_animation.setDuration(800)  # 下降动画时间
+        start_rect = QRect(self.position[0], self.position[1], self.w, self.h)
+        end_rect = QRect(self.pause_position[0], self.pause_position[1], self.w, self.h)
+        self.move_animation.setStartValue(start_rect)
+        self.move_animation.setEndValue(end_rect)
+        self.move_animation.setEasingCurve(QEasingCurve.Type.OutCubic) # 平滑下降
         self.move_animation.start()
     
     def animate_to_final_position(self):
         if self.move_animation and self.move_animation.state() == QPropertyAnimation.State.Running:
             self.move_animation.stop()
-        
-        current_geometry = self.geometry()
-        
+            self.setGeometry(self.pause_position[0], self.pause_position[1], self.w, self.h)
+        current_geometry = self.geometry() # 获取暂停位置(理论上是这样)
         self.final_animation = QPropertyAnimation(self, b"geometry")
-        self.final_animation.setDuration(400)
+        self.final_animation.setDuration(660)  # 展开动画时间
+        self.final_animation.setEasingCurve(QEasingCurve.Linear)
         self.final_animation.setStartValue(current_geometry)
         self.final_animation.setEndValue(QRect(self.target_position[0], self.target_position[1], self.w, self.h))
-        
-        self.final_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.final_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         self.final_animation.start()
 
     def init_tray_menu(self):
