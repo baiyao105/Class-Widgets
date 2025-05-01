@@ -1053,6 +1053,7 @@ class WidgetsManager:
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
         time = int(config_center.read_conf('Plugin', 'auto_delay'))
         self.action = action
 
@@ -1168,6 +1169,7 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.animation_rect = None
         self.animation = None
         self.m_Position = None
@@ -1185,7 +1187,8 @@ class FloatingWidget(QWidget):  # 浮窗
         self.activity_countdown = self.findChild(QLabel, 'activity_countdown')
         self.countdown_progress_bar = self.findChild(ProgressRing, 'progressBar')
 
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 检查焦点
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
 
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -1567,6 +1570,7 @@ class FloatingWidget(QWidget):  # 浮窗
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False, cnt=0, position=None, widget_cnt = None):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
 
         self.cnt = cnt
         self.widget_cnt = widget_cnt
@@ -1586,6 +1590,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.animation = None
         self.opacity_animation = None
         mgr.hide_status = None
+        self._is_topmost_callback_added = False # 添加一个标志来跟踪回调是否已添加
 
         try:
             self.w = conf.load_theme_config(theme)['widget_width'][self.path]
@@ -1727,6 +1732,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                 Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.WindowDoesNotAcceptFocus | Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
+            # 修改为使用定时器确保持续置顶
+            if os.name == 'nt':
+                if not self._is_topmost_callback_added:
+                    try:
+                        # 确保 utils.update_timer 存在且有效
+                        if hasattr(utils, 'update_timer') and utils.update_timer:
+                            utils.update_timer.add_callback(self._ensure_topmost)
+                            self._is_topmost_callback_added = True
+                            self._ensure_topmost() # 立即执行一次确保初始置顶
+                            logger.debug("已添加置顶定时回调。")
+                        else:
+                            logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
+                    except Exception as e:
+                        logger.error(f"添加置顶回调时出错: {e}")
 
         elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
             # 避免使用WindowStaysOnBottomHint,防止争夺底层
@@ -1735,7 +1754,6 @@ class DesktopWidget(QWidget):  # 主要小组件
                 Qt.WindowType.WindowDoesNotAcceptFocus
             )
             if os.name == 'nt':
-                import ctypes
                 def set_window_pos():
                     hwnd = self.winId().__int__()
                     # 稍高于最底层的值
@@ -1752,6 +1770,60 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.setWindowFlag(Qt.WindowType.Widget, True)
         else:
             self.setWindowFlag(Qt.WindowType.Tool, True)
+
+    def _ensure_topmost(self):
+        # 突然忘记写移除了,不写了,应该没事(
+        if os.name == 'nt':
+            try:
+                hwnd = self.winId().__int__()
+                if ctypes.windll.user32.IsWindow(hwnd):
+                    HWND_TOPMOST = -1
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_SHOWWINDOW = 0x0040
+                    SWP_NOACTIVATE = 0x0010
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW)
+                    self.raise_()
+                else:
+                    if self._is_topmost_callback_added:
+                        try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                        except ValueError:
+                            pass # 可能已经被移除了
+                        self._is_topmost_callback_added = False
+                        logger.debug(f"窗口句柄 {hwnd} 无效，已自动移除置顶回调。")
+            except RuntimeError as e:
+                 if 'Internal C++ object' in str(e) and 'already deleted' in str(e):
+                     logger.debug(f"尝试访问已删除的 DesktopWidget 时出错，移除回调: {e}")
+                     if self._is_topmost_callback_added:
+                         try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                         except ValueError:
+                             pass # 可能已经被移除了
+                         self._is_topmost_callback_added = False
+                 else:
+                     logger.error(f"检查或设置窗口置顶时发生运行时错误: {e}")
+            except Exception as e:
+                logger.error(f"检查或设置窗口置顶时出错: {e}")
+                if self._is_topmost_callback_added:
+                    try:
+                        utils.update_timer.remove_callback(self._ensure_topmost)
+                    except ValueError:
+                        pass
+                    self._is_topmost_callback_added = False
+                    logger.debug(f"因错误 {e} 移除置顶回调。")
+
+    def closeEvent(self, event):
+        if self._is_topmost_callback_added:
+            try:
+                utils.update_timer.remove_callback(self._ensure_topmost)
+                self._is_topmost_callback_added = False
+                logger.debug("窗口关闭，已移除置顶回调。")
+            except ValueError:
+                logger.debug("尝试移除不存在的置顶回调。")
+            except Exception as e:
+                logger.error(f"关闭窗口时移除置顶回调出错: {e}")
+        super().closeEvent(event)
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -1792,6 +1864,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             return
 
         utils.tray_icon = utils.TrayIcon(self)
+        utils.tray_icon.setToolTip(f"ClassWidgets - {config_center.schedule_name[:-5]}")
         self.tray_menu = SystemTrayMenu(title='Class Widgets', parent=self)
         self.tray_menu.addActions([
             Action(fIcon.HIDE, '完全隐藏/显示小组件', triggered=lambda: self.hide_show_widgets()),

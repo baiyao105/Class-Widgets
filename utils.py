@@ -174,7 +174,7 @@ class UnionUpdateTimer(QObject):
     def _schedule_next(self):
         now = dt.datetime.now()
         next_tick = now.replace(microsecond=0) + dt.timedelta(seconds=1)
-        delay = max(0, int((next_tick - now).total_seconds() * 1000))
+        delay = max(0, int((next_tick - now).total_seconds() * 100))
         self.timer.start(delay)
 
     def add_callback(self, callback):
