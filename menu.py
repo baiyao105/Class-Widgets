@@ -32,6 +32,7 @@ import weather_db
 import weather_db as wd
 from conf import base_directory
 from cses_mgr import CSES_Converter
+from generate_speech import get_tts_voices, get_voice_id_by_name
 from file import config_center, schedule_center
 from network_thread import VersionThread
 from plugin import p_loader
@@ -647,6 +648,39 @@ class SettingsMenu(FluentWindow):
         spin_prepare_time = self.findChild(SpinBox, 'spin_prepare_class')
         spin_prepare_time.setValue(int(config_center.read_conf('Toast', 'prepare_minutes')))
         spin_prepare_time.valueChanged.connect(self.save_prepare_time)  # 准备时间
+
+        # TTS
+        switch_enable_TTS = self.findChild(SwitchButton, 'switch_enable_TTS')
+        switch_enable_TTS.setChecked(int(config_center.read_conf('TTS', 'enable')))
+        switch_enable_TTS.checkedChanged.connect(lambda checked: switch_checked('TTS', 'enable', checked))
+        voice_selector = self.findChild(ComboBox, 'voice_selector')
+        try:
+            available_voices = get_tts_voices() # 获取可用语音列表
+            voice_names = [voice['name'] for voice in available_voices]
+            voice_selector.addItems(voice_names)
+            current_voice_id = config_center.read_conf('TTS', 'voice_id')
+            current_voice_name = ''
+            for voice in available_voices:
+                if voice['id'] == current_voice_id:
+                    current_voice_name = voice['name']
+                    break
+            if current_voice_name in voice_names:
+                voice_selector.setCurrentText(current_voice_name)
+            elif voice_names:
+                first_voice_name = voice_names[0]
+                voice_selector.setCurrentIndex(0)
+                first_voice_id = get_voice_id_by_name(first_voice_name)
+                if first_voice_id:
+                    config_center.write_conf('TTS', 'voice_id', first_voice_id)
+            else:
+                voice_selector.setEnabled(False)
+                switch_enable_TTS.setEnabled(False)
+                logger.warning("未找到可用的TTS语音引擎或语音包")
+            voice_selector.currentTextChanged.connect(lambda name: config_center.write_conf('TTS', 'voice_id', get_voice_id_by_name(name) or ''))
+        except Exception as e:
+            logger.error(f"加载TTS语音列表或设置时出错: {e}")
+            voice_selector.setEnabled(False)
+            switch_enable_TTS.setEnabled(False)
 
     def setup_configs_interface(self):  # 配置界面
         cf_import_schedule = self.findChild(PushButton, 'im_schedule')

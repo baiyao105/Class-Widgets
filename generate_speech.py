@@ -12,6 +12,46 @@ import pyttsx3
 from loguru import logger
 
 
+def get_tts_voices(engine: str = "edge"):
+    """
+    获取指定TTS引擎的可用语音列表
+    参数：engine (str): 'edge' 或 'pyttsx3'
+    返回：list[dict]，每个元素包含'id'和'name'
+    """
+    voices = []
+    if engine == "edge":
+        try:
+            voices = asyncio.get_event_loop().run_until_complete(edge_tts.list_voices())
+            return [{"id": v.get("ShortName"), "name": v.get("DisplayName", v.get("ShortName", "Unknown Voice"))} for v in voices if v.get("ShortName")]
+        except Exception as e:
+            logger.error(f"获取edge语音失败: {e}")
+            return []
+    elif engine == "pyttsx3":
+        try:
+            engine_ = pyttsx3.init()
+            for v in engine_.getProperty('voices'):
+                voices.append({"id": v.id, "name": v.name})
+            return voices
+        except Exception as e:
+            logger.error(f"获取pyttsx3语音失败: {e}")
+            return []
+    else:
+        logger.error(f"不支持的TTS引擎: {engine}")
+        return []
+
+def get_voice_id_by_name(name: str, engine: str = "edge"):
+    """
+    根据语音名称查找语音ID
+    参数：name (str): 语音显示名称
+    返回：str，语音ID
+    """
+    voices = get_tts_voices(engine)
+    for v in voices:
+        if v["name"] == name:
+            return v["id"]
+    return None
+
+
 class TTSEngine:
     """支持多平台和智能语音选择的多引擎TTS工具类"""
 

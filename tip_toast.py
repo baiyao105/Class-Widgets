@@ -12,7 +12,8 @@ import conf
 from conf import base_directory
 import list_
 from file import config_center
-from play_audio import PlayAudio
+from play_audio import PlayAudio, play_audio # Import play_audio directly
+from generate_speech import generate_speech_sync, get_voice_id_by_name
 import platform
 
 # 适配高DPI缩放
@@ -37,6 +38,26 @@ window_list = []  # 窗口列表
 active_windows = []
 
 
+class TTSAudioThread(QThread):
+    """TTS线程"""
+    def __init__(self, text, voice_id):
+        super().__init__()
+        self.text = text
+        self.voice_id = voice_id
+
+    def run(self):
+        try:
+            logger.info(f"开始生成TTS语音: '{self.text}'")
+            audio_path = generate_speech_sync(self.text, voice=self.voice_id, auto_fallback=True)
+            if audio_path and os.path.exists(audio_path):
+                logger.info(f"TTS语音生成成功: {audio_path}, 开始播放...")
+                play_audio(audio_path, tts_delete_after=True)
+            else:
+                logger.error("TTS语音生成失败或文件未找到")
+        except Exception as e:
+            logger.error(f"TTS处理失败: {e}")
+
+
 class tip_toast(QWidget):
     def __init__(self, pos, width, state=1, lesson_name=None, title=None, subtitle=None, content=None, icon=None, duration=2000):
         super().__init__()
@@ -44,6 +65,7 @@ class tip_toast(QWidget):
             w.close()
         active_windows.append(self)
         self.audio_thread = None
+        self.tts_audio_thread = None # 初始化TTS
         uic.loadUi(f"{base_directory}/view/widget-toast-bar.ui", self)
 
         try:
@@ -74,6 +96,15 @@ class tip_toast(QWidget):
         icon_label = self.findChild(QLabel, 'icon')
 
         sound_to_play = None
+        tts_text = None # 初始化TTS文本
+        tts_enabled = config_center.read_conf('TTS', 'enable')
+        if tts_enabled is None:
+            tts_enabled = ''
+        tts_enabled = tts_enabled == '1'
+        tts_voice_id = config_center.read_conf('TTS', 'voice_id')
+        if tts_voice_id is None:
+            tts_voice_id = ''
+
         if icon:
             pixmap = QPixmap(icon)
             icon_size = int(48 * dpr)
@@ -87,6 +118,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('当前课程')
             lesson.setText(lesson_name)  # 课程名
             sound_to_play = attend_class
+            tts_text = f"活动开始, {lesson_name}" if lesson_name else "活动开始"
             setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")  # 主题色
         elif state == 0:
             logger.info('下课铃声显示')
@@ -97,6 +129,7 @@ class tip_toast(QWidget):
                 subtitle_label.hide()
             lesson.setText(lesson_name)  # 课程名
             sound_to_play = finish_class
+            tts_text = f"活动结束, 下一节课 {lesson_name}" if lesson_name else "活动结束"
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 2:
             logger.info('放学铃声显示')
@@ -104,6 +137,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('当前课程已结束')
             lesson.setText('')  # 课程名
             sound_to_play = finish_class
+            tts_text = "活动全部结束"
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 3:
             logger.info('预备铃声显示')
@@ -111,6 +145,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('下一节')
             lesson.setText(lesson_name)
             sound_to_play = prepare_class
+            tts_text = f"活动即将开始, 下一节课 {lesson_name}" if lesson_name else "活动即将开始"
             setThemeColor(f"#{config_center.read_conf('Color', 'prepare_class')}")
         elif state == 4:
             logger.info(f'通知显示: {title}')
@@ -118,6 +153,17 @@ class tip_toast(QWidget):
             subtitle_label.setText(subtitle)
             lesson.setText(content)
             sound_to_play = prepare_class
+
+        if tts_enabled and tts_text and tts_voice_id:
+            logger.info(f"准备启动TTS线程，文本: '{tts_text}', 语音ID: {tts_voice_id}")
+            self.tts_audio_thread = TTSAudioThread(tts_text, tts_voice_id)
+            self.tts_audio_thread.start()
+        elif tts_enabled and tts_text and not tts_voice_id:
+             logger.warning(f"TTS已启用，但找不到名为 '{tts_voice_id}' 的语音ID，无法播放TTS。")
+        elif tts_enabled and not tts_text:
+             logger.debug("TTS已启用，但当前状态没有对应的TTS文本。")
+        else:
+            logger.debug(f"TTS未启用，tts_enabled={tts_enabled}，tts_text={tts_text}，tts_voice_id={tts_voice_id}")
 
         # 设置样式表
         if state == 1:  # 上课铃声
@@ -188,6 +234,22 @@ class tip_toast(QWidget):
         if sound_to_play:
             self.playsound(sound_to_play)
 
+        # 检查并播放TTS
+        if config_center.read_conf('TTS', 'enable') == '1' and tts_text:
+            voice_id = config_center.read_conf('TTS', 'voice_id')
+            if voice_id is None:
+                voice_id = ''
+            if self.tts_audio_thread and self.tts_audio_thread.isRunning():
+                try:
+                    self.tts_audio_thread.quit()
+                    self.tts_audio_thread.wait(1000) # 等待最多1秒
+                except Exception as e:
+                    logger.warning(f"停止旧TTS线程时出错: {e}")
+            self.tts_audio_thread = TTSAudioThread(tts_text, voice_id)
+            # 稍微延迟启动TTS，避免和提示音重叠太近
+            QTimer.singleShot(500, self.tts_audio_thread.start)
+            self.tts_audio_thread.setPriority(QThread.Priority.LowPriority) # TTS优先级可以低一些
+
         self.geometry_animation.start()
         self.opacity_animation.start()
         self.blur_animation.start()
@@ -226,6 +288,19 @@ class tip_toast(QWidget):
         self.opacity_animation_close.finished.connect(self.close)
 
     def closeEvent(self, event):
+        if self.audio_thread and self.audio_thread.isRunning():
+            try:
+                self.audio_thread.quit()
+                self.audio_thread.wait(500)
+            except Exception as e:
+                 logger.warning(f"关闭窗口时停止提示音线程出错: {e}")
+        if self.tts_audio_thread and self.tts_audio_thread.isRunning():
+            try:
+                self.tts_audio_thread.quit()
+                self.tts_audio_thread.wait(1000)
+            except Exception as e:
+                 logger.warning(f"关闭窗口时停止TTS线程出错: {e}")
+
         if self in active_windows:
             active_windows.remove(self)
         global window_list
