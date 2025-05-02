@@ -1,10 +1,12 @@
 import json
 import os
+import re
 import configparser as config
 from pathlib import Path
 
 from datetime import datetime
 import time
+from dateutil import parser
 from loguru import logger
 from file import base_directory, config_center
 
@@ -247,9 +249,11 @@ def get_custom_countdown():
         custom_countdown = li[countdown_cnt]
         if custom_countdown == '':
             return '未设置'
+        custom_countdown = re.sub(r'\s*星期[一二三四五六日天]\s*', '', custom_countdown).strip()
         try:
-            custom_countdown = datetime.strptime(custom_countdown, '%Y-%m-%d')
-        except:
+            custom_countdown = parser.parse(custom_countdown)
+        except Exception as e:
+            logger.error(f"解析日期时出错: {custom_countdown}, 错误: {e}")
             return '解析失败'
         if custom_countdown < datetime.now():
             return '0 天'
@@ -262,12 +266,15 @@ def get_custom_countdown():
 
 
 def get_week_type(): 
-    if (temp_schedule:=config_center.read_conf('Temp', 'set_schedule')) != '': # 获取单双周
-        if temp_schedule != None:
-            return int(temp_schedule)
-    if config_center.read_conf('Date', 'start_date') != '':
-        start_date = config_center.read_conf('Date', 'start_date')
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    if (temp_schedule := config_center.read_conf('Temp', 'set_schedule')) not in ('', None):  # 获取单双周
+        return int(temp_schedule)
+    start_date_str = config_center.read_conf('Date', 'start_date')
+    if start_date_str not in ('', None):
+        try:
+            start_date = parser.parse(start_date_str)
+        except (ValueError, TypeError):
+            logger.error(f"解析日期时出错: {start_date_str}")
+            return 0  # 解析失败默认单周
         today = datetime.now()
         week_num = (today - start_date).days // 7 + 1
         if week_num % 2 == 0:
