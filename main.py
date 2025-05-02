@@ -1176,6 +1176,7 @@ class FloatingWidget(QWidget):  # 浮窗
         self.p_Position = None
         self.m_flag = None
         self.r_Position = None
+        self._is_topmost_callback_added = False
         self.init_ui()
         self.init_font()
         self.position = None
@@ -1242,6 +1243,48 @@ class FloatingWidget(QWidget):  # 浮窗
             if visible_height < window_height / 2:
                 new_y = screen_bottom - window_height
         return QPoint(new_x, new_y)
+
+    def _ensure_topmost(self):
+        # 始终处于顶层
+        if os.name == 'nt':
+            try:
+                hwnd = self.winId().__int__()
+                if ctypes.windll.user32.IsWindow(hwnd):
+                    HWND_TOPMOST = -1
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_SHOWWINDOW = 0x0040
+                    SWP_NOACTIVATE = 0x0010
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW)
+                    self.raise_()
+                else:
+                    if self._is_topmost_callback_added:
+                        try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                        except ValueError:
+                            pass # 可能已经被移除了
+                        self._is_topmost_callback_added = False
+                        logger.debug(f"句柄 {hwnd} 无效，已移除置顶回调。")
+            except RuntimeError as e:
+                 if 'Internal C++ object' in str(e) and 'already deleted' in str(e):
+                     logger.debug(f"尝试访问已删除的 FloatingWidget 时出错，移除回调: {e}")
+                     if self._is_topmost_callback_added:
+                         try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                         except ValueError:
+                             pass # 可能已经被移除了
+                         self._is_topmost_callback_added = False
+                 else:
+                     logger.error(f"检查或设置浮窗置顶时发生运行时错误: {e}")
+            except Exception as e:
+                logger.error(f"检查或设置浮窗置顶时出错: {e}")
+                if self._is_topmost_callback_added:
+                    try:
+                        utils.update_timer.remove_callback(self._ensure_topmost)
+                    except ValueError:
+                        pass
+                    self._is_topmost_callback_added = False
+                    logger.debug(f"因错误 {e} 移除浮窗置顶回调。")
     
     def save_position(self):
         current_screen = QApplication.screenAt(self.pos())
@@ -1293,6 +1336,27 @@ class FloatingWidget(QWidget):  # 浮窗
 
         # 设置窗口无边框和透明背景
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        # 根据平台和设置应用窗口标志
+        if sys.platform == 'darwin':
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.X11BypassWindowManagerHint
+        else:
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.X11BypassWindowManagerHint
+
+        self.setWindowFlags(flags)
+
+        # 始终添加置顶回调逻辑
+        if os.name == 'nt':
+            if not self._is_topmost_callback_added:
+                try:
+                    if hasattr(utils, 'update_timer') and utils.update_timer:
+                        utils.update_timer.add_callback(self._ensure_topmost)
+                        self._is_topmost_callback_added = True
+                        self._ensure_topmost() # 立即执行一次确保初始置顶
+                    else:
+                        logger.warning("utils.update_timer 不可用，无法为浮窗添加置顶回调。")
+                except Exception as e:
+                    logger.error(f"为浮窗添加置顶回调时出错: {e}")
 
         if sys.platform == 'darwin':
             self.setWindowFlags(
@@ -1494,6 +1558,12 @@ class FloatingWidget(QWidget):  # 浮窗
             self.hide()
             self.save_position()
             self.animating = False
+            if self._is_topmost_callback_added:
+                try:
+                    utils.update_timer.remove_callback(self._ensure_topmost)
+                except ValueError:
+                    pass
+                self._is_topmost_callback_added = False
             
         self.animation_rect.finished.connect(cleanup)
 
@@ -1818,7 +1888,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             try:
                 utils.update_timer.remove_callback(self._ensure_topmost)
                 self._is_topmost_callback_added = False
-                logger.debug("窗口关闭，已移除置顶回调。")
+                # logger.debug("窗口关闭，已移除置顶回调。")
             except ValueError:
                 logger.debug("尝试移除不存在的置顶回调。")
             except Exception as e:
@@ -2283,7 +2353,7 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'ResidentSideBar', # 希沃侧边栏
         'Program Manager', # Windows桌面
         'Desktop', # Windows桌面
-        '', #空标题
+        '',
         'SnippingTool', # 系统截图工具
     }
     # 包含以下关键词排除
