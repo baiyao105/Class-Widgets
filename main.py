@@ -25,6 +25,46 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
     Dialog, ProgressRing, PlainTextEdit, ImageLabel, PushButton, InfoBarIcon, Flyout, FlyoutAnimationType, CheckBox, \
     PrimaryPushButton, IconWidget
 
+# patch: 由于 deregister 错误绑定造成的更改主题访问已删除元素
+import qfluentwidgets.common.style_sheet as qss
+
+class StyleSheetManager(qss.StyleSheetManager):
+
+    def register(self, source, widget: QWidget, reset=True):
+        from qfluentwidgets import StyleSheetFile, StyleSheetCompose, CustomStyleSheet
+        from qfluentwidgets.common.style_sheet import CustomStyleSheetWatcher, DirtyStyleSheetWatcher
+        """ register widget to manager
+
+        Parameters
+        ----------
+        source: str | StyleSheetBase
+            qss source, it could be:
+            * `str`: qss file path
+            * `StyleSheetBase`: style sheet instance
+
+        widget: QWidget
+            the widget to set style sheet
+
+        reset: bool
+            whether to reset the qss source
+        """
+        if isinstance(source, str):
+            source = StyleSheetFile(source)
+
+        if widget not in self.widgets:
+            widget.destroyed.connect(lambda: self.deregister(widget))
+            widget.installEventFilter(CustomStyleSheetWatcher(widget))
+            widget.installEventFilter(DirtyStyleSheetWatcher(widget))
+            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
+
+        if not reset:
+            self.source(widget).add(source)
+        else:
+            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
+
+qss.styleSheetManager = StyleSheetManager()
+# end of patch
+
 import conf
 import list_
 import tip_toast
@@ -44,10 +84,13 @@ if os.name == 'nt':
     import pygetwindow
 
 # 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+else:
+    logger.warning('不兼容的系统,跳过高DPI标识')
 
 today = dt.date.today()
 
@@ -122,6 +165,11 @@ sys.excepthook = global_exceptHook  # 设置全局异常捕获
 
 
 def setTheme_():  # 设置主题
+    if platform.system() == 'Windows' and platform.release() == '7':
+        setTheme(Theme.LIGHT)
+        logger.warning('不支持的系统,强制使用亮色主题')
+        return
+
     if config_center.read_conf('General', 'color_mode') == '2':  # 自动
         if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
             return
@@ -187,7 +235,29 @@ def get_start_time():
     if paired_sorted:
         parts_start_time, order = zip(*paired_sorted)
 
-    for item_name, item_time in timeline.items():
+    def sort_timeline_key(item):
+        item_name = item[0]
+        prefix = item_name[0]
+        if len(item_name) > 1:
+            try:
+                # 提取节点序数
+                part_num = int(item_name[1])
+                # 提取课程序数
+                class_num = 0
+                if len(item_name) > 2:
+                    class_num = int(item_name[2:])
+                if prefix == 'a':
+                    return part_num, class_num, 0
+                else:
+                    return part_num, class_num, 1
+            except ValueError:
+                # 如果转换失败，返回原始字符串
+                return item_name
+        return item_name
+    
+    # 对timeline排序后添加到timeline_data
+    sorted_timeline = sorted(timeline.items(), key=sort_timeline_key)
+    for item_name, item_time in sorted_timeline:
         try:
             timeline_data[item_name] = item_time
         except Exception as e:
@@ -274,7 +344,8 @@ def get_countdown(toast=False):  # 重构好累aaaa
         if parts_type[part] == 'break':  # 休息段
             notification.push_notification(0, current_lesson_name)  # 下课
         else:
-            notification.push_notification(2)  # 放学
+            if config_center.read_conf('Toast', 'after_school') == '1':
+                notification.push_notification(2)  # 放学
 
     current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
     return_text = []
@@ -335,6 +406,26 @@ def get_countdown(toast=False):  # 重构好累aaaa
             if not return_text:
                 return_text = ['目前课程已结束', f'00:00', 100]
         else:
+            prepare_minutes_str = config_center.read_conf('Toast', 'prepare_minutes')
+            if prepare_minutes_str != '0' and toast:
+                prepare_minutes = int(prepare_minutes_str)
+                if current_dt == c_time - dt.timedelta(minutes=prepare_minutes):
+                    next_lesson_name = None
+                    next_lesson_key = None
+                    if timeline_data:
+                        for key in sorted(timeline_data.keys()):
+                            if key.startswith(f'a{str(part)}'):
+                                next_lesson_key = key
+                                break
+                    if next_lesson_key and next_lesson_key in current_lessons:
+                        lesson_name = current_lessons[next_lesson_key]
+                        if lesson_name != '暂无课程':
+                            next_lesson_name = lesson_name
+                    if current_state == 0:
+                        now = dt.datetime.now()
+                        if not last_notify_time or (now - last_notify_time).seconds >= notify_cooldown:
+                            if next_lesson_name != None:
+                                    notification.push_notification(3, next_lesson_name)
             if f'a{part}1' in timeline_data:
                 time_diff = c_time - current_dt
                 minute, sec = divmod(time_diff.seconds, 60)
@@ -356,7 +447,7 @@ def get_next_lessons():
         c_time, part = get_part()
 
         def before_class():
-            if part == 0:
+            if part == 0 or part == 3:
                 return True
             else:
                 if current_dt >= parts_start_time[part] - dt.timedelta(minutes=60):
@@ -424,6 +515,20 @@ def get_current_lesson_name():
                             current_state = 0
                         return
 
+def get_hide_status_from_current_state():
+    # 1 -> hide, 0 -> show
+    # 满分啦（
+    # 祝所有用 Class Widgets 的、不用 Class Widgets 的学子体测满分啊（（
+    global current_state, current_lesson_name, excluded_lessons
+    # if current_state:
+    #     if not current_lesson_name in excluded_lessons:
+    #         return 0
+    #     else:
+    #         return 1
+    # else:
+    #     return 1
+    return current_state ^ (current_lesson_name in excluded_lessons)
+
 
 # 定义 RECT 结构体
 class RECT(ctypes.Structure):
@@ -454,6 +559,10 @@ def check_fullscreen():  # 检查是否全屏
     pid = ctypes.c_ulong()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     process_name = get_process_name(pid.value).lower()
+    current_pid = os.getpid()
+    # 排除自身(强调特效)
+    if pid.value == current_pid:
+        return False
     # 排除系统进程
     system_processes = {
         'explorer.exe',  # 桌面
@@ -483,8 +592,6 @@ def check_fullscreen():  # 检查是否全屏
         rect.right >= screen_rect.right and
         rect.bottom >= screen_rect.bottom
     )
-    if fw.focusing:
-        return False
     # 排除窗口大小必须占用屏幕95%,避免诈骗()
     if is_fullscreen:
         screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
@@ -590,12 +697,6 @@ class ErrorDialog(Dialog):  # 重大错误提示框
         if event.button() == Qt.LeftButton:
             self.is_dragging = False
 
-    def closeEvent(self, event):
-        global error_dialog
-        error_dialog = False
-        event.ignore()
-        self.hide()
-        self.deleteLater()
 
 
 class PluginManager:  # 插件管理器
@@ -615,18 +716,37 @@ class PluginManager:  # 插件管理器
             "State": current_state,  # 0：课间 1：上课（上下课状态）
             "Current_Part": get_part(),  # 返回开始时间、Part序号
             "Next_Lessons_text": get_next_lessons_text(),  # 下节课程
+            "Next_Lessons": next_lessons,  # 下节课程
+            "Current_Lessons": current_lessons,  # 当前课程
+            "Current_Week": current_week,  # 当前周次
+            "Excluded_Lessons": excluded_lessons,  # 排除的课程
+            
+            "Current_Time": current_time,  # 当前时间
+            "Timeline_Data": timeline_data,  # 时间线数据
+            "Parts_Start_Time": parts_start_time,  # 节点开始时间
+            "Parts_Type": parts_type,  # 节点类型
+            "Time_Offset": time_offset,  # 时差偏移
+
+            "Schedule_Name": config_center.schedule_name,  # 课程表名称
+            "Loaded_Data": loaded_data,  # 加载的课程表数据
+            "Order": order,  # 课程顺序
 
             "Weather": weather_name,  # 天气情况
             "Temp": temperature,  # 温度
             "Weather_Data": weather_data_temp,  # 天气数据
+            "Weather_Icon": weather_icon,  # 天气图标
             "Weather_API": config_center.read_conf('Weather', 'api'),  # 天气API
+            "City": city,  # 城市代码
+
             "Notification": notification.notification_contents,  # 检测到的通知内容
+            "Last_Notify_Time": last_notify_time,  # 上次通知时间
 
             "PLUGIN_PATH": os.path.normpath(os.path.join(conf.PLUGINS_DIR, path)) if path else conf.PLUGINS_DIR,  # 传递插件目录
             "Config_Center": config_center,  # 配置中心实例
             "Schedule_Center": schedule_center,  # 课程表中心实例
             "Base_Directory": base_directory,  # 资源目录
             "Widgets_Mgr": mgr,  # 组件管理器实例
+            "Theme": theme,  # 当前主题
         }
         return self.cw_contexts
 
@@ -740,7 +860,7 @@ class WidgetsManager:
         self.start_pos_x = 0  # 小组件起始位置
         self.start_pos_y = 0
 
-        self.hide_status = None
+        self.hide_status = None # [0] -> 在 current_state 设置的灵活隐藏， [1] -> 隐藏模式
 
     def sync_widget_animation(self, target_pos):
         for widget in self.widgets:
@@ -894,36 +1014,30 @@ class WidgetsManager:
             self.hide_windows()
 
     def cleanup_resources(self):
-        for widget in self.widgets:
+        self.hide_status = None # 重置hide_status
+        widgets_to_clean = list(self.widgets)
+        self.widgets.clear()
+        for widget in widgets_to_clean:
+            widget_path = getattr(widget, 'path', '未知组件')
             try:
-                widget.deleteLater()
-
                 if hasattr(widget, 'weather_timer') and widget.weather_timer:
                     try:
                         widget.weather_timer.stop()
                     except RuntimeError:
-                        logger.warning(f"组件: {widget.path} 的天气定时器已被销毁，跳过操作")
-
+                        pass
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
                         if widget.weather_thread.isRunning():
-                            widget.weather_thread.terminate()
                             widget.weather_thread.quit()
-                            widget.weather_thread.wait()
-                        else:
-                            logger.debug(f"组件: {widget.path} 的天气线程已完成任务并销毁，无需终止")
+                            if not widget.weather_thread.wait(500):
+                                logger.warning(f"组件 {widget_path} 的天气线程未正常退出，强制终止")
+                                widget.weather_thread.terminate()
+                                widget.weather_thread.wait()
                     except RuntimeError:
-                        logger.warning(f"组件: {widget.path} 的天气线程终止时发生异常，可能已被销毁")
+                        pass
+                widget.deleteLater()
             except Exception as ex:
-                widget_path = getattr(widget, 'path', 'unknown')
                 logger.error(f"清理组件 {widget_path} 时发生异常: {ex}")
-        self.widgets.clear()
-
-    def __del__(self):
-        self.cleanup_resources()
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-            del self.timer
 
     def stop(self):
         if mgr:
@@ -1214,7 +1328,10 @@ class FloatingWidget(QWidget):  # 浮窗
         self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
         if self.animating:  # 执行动画时跳过更新
             return
-        self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        if platform.system() == 'Windows' and platform.release() != '7':
+            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)  # 设置窗口透明度
+        else:
+            self.setWindowOpacity(1.0)
         cd_list = get_countdown()
         self.text_changed = False
         if self.current_lesson_name_text.text() != current_lesson_name:
@@ -1417,12 +1534,16 @@ class FloatingWidget(QWidget):  # 浮窗
         self.m_flag = False
         # 保存位置到配置文件
         self.save_position()
+        # 特定隐藏模式下不执行操作
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+             return # 阻止手动展开/收起
+
         if (
                 hasattr(self, "p_Position")
                 and self.r_Position == self.p_Position
                 and not self.animating
-
-        ):  # 开启自动隐藏忽略点击事件
+        ): # 非特定隐藏模式下执行点击事件
             mgr.show_windows()
             self.close()
 
@@ -1564,20 +1685,27 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
             img = self.findChild(QLabel, 'img')
-            opacity = QGraphicsOpacityEffect(self)
-            opacity.setOpacity(0.65)
-            img.setGraphicsEffect(opacity)
+            if platform.system() == 'Windows' and platform.release() != '7':
+                opacity = QGraphicsOpacityEffect(self)
+                opacity.setOpacity(0.65)
+                img.setGraphicsEffect(opacity)
 
         self.resize(self.w, self.height())
 
         # 设置窗口位置
         if first_start:
             self.animate_window(self.position)
-            self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(int(config_center.read_conf('General', 'opacity')) / 100)
+            else:
+                self.setWindowOpacity(1.0)
         else:
-            self.setWindowOpacity(0)
-            self.animate_show_opacity()
-            self.move(self.position[0], self.position[1])
+            if platform.system() == 'Windows' and platform.release() != '7':
+                self.setWindowOpacity(0)
+                self.animate_show_opacity()
+            else:
+                self.setWindowOpacity(1.0)
+                self.move(self.position[0], self.position[1])
             self.resize(self.w, self.height())
 
         self.update_data('')
@@ -1622,6 +1750,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         if config_center.read_conf('General', 'hide') == '2' or (not int(config_center.read_conf('General', 'enable_click'))):
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        else:
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         if config_center.read_conf('General', 'pin_on_top') == '1':  # 置顶
             self.setWindowFlags(
@@ -1630,10 +1760,20 @@ class DesktopWidget(QWidget):  # 主要小组件
             )
 
         elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
+            # 避免使用WindowStaysOnBottomHint,防止争夺底层
             self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
+                Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowDoesNotAcceptFocus
             )
+            if os.name == 'nt':
+                import ctypes
+                def set_window_pos():
+                    hwnd = self.winId().__int__()
+                    # 稍高于最底层的值
+                    ctypes.windll.user32.SetWindowPos(hwnd, 2, 0, 0, 0, 0, 0x0214)
+                QTimer.singleShot(100, set_window_pos)
+            else:
+                QTimer.singleShot(100, self.lower)
         else:
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
@@ -1714,10 +1854,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             if reason == QSystemTrayIcon.ActivationReason.Trigger:
                 if mgr.state:
                     mgr.decide_to_hide()
-                    mgr.hide_status = (True, 1)
+                    mgr.hide_status = (current_state, 1)
                 else:
                     mgr.show_windows()
-                    mgr.hide_status = (True, 0)
+                    mgr.hide_status = (current_state, 0)
                 
 
 
@@ -1738,13 +1878,11 @@ class DesktopWidget(QWidget):  # 主要小组件
         get_current_lesson_name()
         get_excluded_lessons()
         get_next_lessons()
+        hide_status = get_hide_status_from_current_state()
 
         if (hide_mode:=config_center.read_conf('General', 'hide')) == '1':  # 上课自动隐藏
-            if current_state:
-                if not current_lesson_name in excluded_lessons:
-                    mgr.decide_to_hide()
-                else:
-                    mgr.show_windows()
+            if hide_status:
+                mgr.decide_to_hide()
             else:
                 mgr.show_windows()
         elif hide_mode == '2': # 最大化/全屏自动隐藏
@@ -1754,16 +1892,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                 mgr.show_windows()
         elif hide_mode == '3': # 灵活隐藏
             if mgr.hide_status is None:
-                mgr.hide_status = (False, current_state)
-            elif mgr.hide_status[0] and mgr.hide_status[1] == current_state:
-                mgr.hide_status = (False, current_state)
-            elif not mgr.hide_status[0]:
-                mgr.hide_status = (False, current_state)
+                mgr.hide_status = (-1, hide_status)
+            elif mgr.hide_status[0] != current_state:
+                mgr.hide_status = (-1, hide_status)
             if mgr.hide_status[1]:
-                if not current_lesson_name in excluded_lessons:
-                    mgr.decide_to_hide()
-                else:
-                    mgr.show_windows()
+                mgr.decide_to_hide()
             else:
                 mgr.show_windows()
 
@@ -2088,18 +2221,61 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     @staticmethod
     def hide_show_widgets():  # 隐藏/显示主界面（全部隐藏）
-        if mgr.state:
-            mgr.full_hide_windows()
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+            hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
+            w = Dialog(
+                "暂时无法变更“状态”",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您稍后可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
+                None
+            )
+            w.yesButton.setText("确定")
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
+            w.cancelButton.setText("取消")
+            w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
+            if w.exec():
+                if mgr.state:
+                    mgr.full_hide_windows()
+                else:
+                    mgr.show_windows()
         else:
-            mgr.show_windows()
+            if mgr.state:
+                mgr.full_hide_windows()
+            else:
+                mgr.show_windows()
 
     @staticmethod
     def minimize_to_floating():  # 最小化到浮窗
-        if mgr.state:
-            fw.show()
-            mgr.full_hide_windows()
+        hide_mode = config_center.read_conf('General', 'hide')
+        if hide_mode == '1' or hide_mode == '2':
+            hide_mode_text = "上课时自动隐藏" if hide_mode == '1' else "窗口最大化时隐藏"
+            w = Dialog(
+                "暂时无法变更“状态”",
+                f"您正在使用 {hide_mode_text} 模式，无法变更隐藏状态\n"
+                "若变更状态，将修改隐藏模式“灵活隐藏” (您可以在“设置”中更改此选项)\n"
+                "您确定要隐藏组件吗?",
+                None
+            )
+            w.yesButton.setText("确定")
+            w.yesButton.clicked.connect(lambda: config_center.write_conf('General', 'hide', '3'))
+            w.cancelButton.setText("取消")
+            w.buttonLayout.insertStretch(1)
+            w.setFixedWidth(550)
+            if w.exec():
+                if mgr.state:
+                    fw.show()
+                    mgr.full_hide_windows()
+                else:
+                    mgr.show_windows()
         else:
-            mgr.show_windows()
+            if mgr.state:
+                fw.show()
+                mgr.full_hide_windows()
+            else:
+                mgr.show_windows()
 
     def clear_animation(self):  # 清除动画
         self.animation = None
@@ -2201,11 +2377,10 @@ class DesktopWidget(QWidget):  # 主要小组件
         elif config_center.read_conf('General', 'hide') == '3':  # 隐藏
             if mgr.state:
                 mgr.decide_to_hide()
-                mgr.hide_status = (True, 1)
+                mgr.hide_status = (current_state, 1)
             else:
                 mgr.show_windows()
-                mgr.hide_status = (True, 0)
-            
+                mgr.hide_status = (current_state, 0)
         else:
             event.ignore()
 
@@ -2220,36 +2395,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.opacity_animation.stop()
         self.close()
 
-def closeEvent(self, event):
-    if QApplication.instance().closingDown():
-        if hasattr(self, 'weather_thread') and self.weather_thread:
-            try:
-                if self.weather_thread.isRunning():
-                    self.weather_thread.terminate()  # 终止天气线程
-                    self.weather_thread.quit()      # 退出天气线程
-                    self.weather_thread.wait()      # 等待线程结束
-                else:
-                    logger.debug("天气线程已完成任务并销毁，无需终止")
-            except RuntimeError:
-                logger.warning("天气线程终止过程中发生异常，可能已被销毁")
-            finally:
-                del self.weather_thread  # 删除引用以避免重复操作
-
-        if hasattr(self, 'weather_timer') and self.weather_timer:
-            try:
-                self.weather_timer.stop()  # 停止定时器
-            except RuntimeError:
-                logger.warning("天气定时器已被销毁，跳过停止操作")
-            finally:
-                del self.weather_timer  # 删除引用以避免重复操作
-        event.accept()
-        stop(0)
-
-    for child in self.findChildren(QObject):
-        child.deleteLater()
-    super().closeEvent(event)
-    self.deleteLater()
-    self.destroy()
 
 def check_windows_maximize():  # 检查窗口是否最大化
     if os.name != 'nt':
@@ -2274,54 +2419,56 @@ def check_windows_maximize():  # 检查窗口是否最大化
         'startmenuexperiencehost'
     }
     max_windows = []
-    for window in pygetwindow.getAllWindows():
+    try:
+        all_windows = pygetwindow.getAllWindows()
+    except Exception as e:
+        logger.error(f"获取窗口列表异常: {str(e)}")
+        return False
+    for window in all_windows:
         try:
-            if window.isMaximized and window.visible:
-                title = window.title.strip()
-                pid = window._hWnd  # 获取窗口句柄
-                process_name = get_process_name(pid).lower()
-                title_lower = title.lower()
-                is_system_explorer = (
-                    process_name == "explorer.exe" 
-                    and (title in excluded_titles 
-                         or any(kw in title_lower for kw in excluded_keywords))
-                )
-                is_system_process = any(
-                    pattern in process_name 
-                    for pattern in excluded_process_patterns
-                )
-                # 标题匹配
-                has_excluded_keyword = any(
-                    kw in title_lower for kw in excluded_keywords
-                )
-                if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
-                    max_windows.append({
-                        'title': title,
-                        'process': process_name,
-                        'pid': pid,
-                        'rect': window.box
-                    })
+            # 检查窗口是否有效
+            if not window._hWnd:
+                continue
+            # 检查窗口是否可见且最大化
+            try:
+                is_valid = window.visible and window.isMaximized
+                # 获取窗口位置验证窗口存在性
+                window_rect = window.box
+                if not is_valid or not window_rect:
+                    continue
+            except Exception:
+                # 获取窗口属性失败，可能已关闭
+                continue
+            title = window.title.strip()
+            pid = window._hWnd
+            process_name = get_process_name(pid).lower()
+            title_lower = title.lower()
+            is_system_explorer = (
+                process_name == "explorer.exe" 
+                and (title in excluded_titles 
+                     or any(kw in title_lower for kw in excluded_keywords))
+            )
+            is_system_process = any(
+                pattern in process_name 
+                for pattern in excluded_process_patterns
+            )
+            has_excluded_keyword = any(
+                kw in title_lower for kw in excluded_keywords
+            )
+            if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
+                max_windows.append({
+                    'title': title,
+                    'process': process_name,
+                    'pid': pid,
+                    'rect': window.box
+                })
         except Exception as e:
-            logger.error(f"窗口异常: {str(e)}")
-    return max_windows
+            logger.error(f"窗口处理异常: {str(e)}")
+            continue
+    # 如果有最大化窗口则返回True
+    return len(max_windows) > 0
 
 
-def setup_signal_handlers():
-    def shutdown(signum, frame):
-        if hasattr(shutdown, '_called'):  # 防止重复处理
-            return
-        shutdown._called = True
-        logger.debug(f"收到终止信号: {signum}, 执行清理")
-        if mgr:
-            mgr.cleanup_resources()  # 清理所有小资源
-        stop(0)
-    
-    signal.signal(signal.SIGTERM, shutdown)  # taskkill
-    signal.signal(signal.SIGINT, shutdown)   # Ctrl+C
-    signal.signal(signal.SIGABRT, shutdown)  # 异常中止
-    if os.name == 'posix':
-        signal.signal(signal.SIGQUIT, shutdown)  # POSIX退出
-        signal.signal(signal.SIGHUP, shutdown)   # 终端断开
 
 def init_config():  # 重设配置文件
     config_center.write_conf('Temp', 'set_week', '')
@@ -2330,6 +2477,7 @@ def init_config():  # 重设配置文件
         copy(f'{base_directory}/config/schedule/backup.json',
              f'{base_directory}/config/schedule/{config_center.schedule_name}')
         config_center.write_conf('Temp', 'temp_schedule', '')
+        schedule_center.update_schedule()
 
 
 def init():
@@ -2366,8 +2514,39 @@ def init():
     first_start = False
 
 
+def setup_signal_handlers_optimized(app):
+    """退出信号处理器"""
+    def signal_handler(signum, frame):
+        logger.debug(f'收到信号 {signal.Signals(signum).name},退出...')
+        # utils.stop 处理退出
+        utils.stop(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)  # taskkill
+    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+    if os.name == 'posix':
+        signal.signal(signal.SIGQUIT, signal_handler) # 终端退出
+        signal.signal(signal.SIGHUP, signal_handler)  # 终端挂起
+
 if __name__ == '__main__':
-    setup_signal_handlers()
+    if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
+        logger.debug('不允许多开实例')
+        from qfluentwidgets import Dialog
+        app = QApplication.instance() or QApplication(sys.argv)
+        dlg = Dialog(
+            'Class Widgets 正在运行',
+            'Class Widgets 正在运行！请勿打开多个实例，否则将会出现不可预知的问题。'
+            '\n(若您需要打开多个实例，请在“设置”->“高级选项”中启用“允许程序多开”)'
+        )
+        dlg.yesButton.setText('好')
+        dlg.cancelButton.hide()
+        dlg.buttonLayout.insertStretch(0, 1)
+        dlg.setFixedWidth(550)
+        dlg.exec()
+        sys.exit(0)
+    if not share.create(1):
+        print(f'无法创建共享内存: {share.errorString()}') # logger 可能还没准备好
+        sys.exit(1)
+
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
@@ -2419,6 +2598,8 @@ if __name__ == '__main__':
         stop(-1)
     else:
         mgr = WidgetsManager()
+        app.aboutToQuit.connect(mgr.cleanup_resources)
+        setup_signal_handlers_optimized(app)
 
         if config_center.read_conf('Other', 'initialstartup') == '1':  # 首次启动
             try:
@@ -2457,8 +2638,6 @@ if __name__ == '__main__':
         if config_center.read_conf('Other', 'auto_check_update') == '1':
             check_update()
 
-    if __name__ == '__main__':
-        try:
-            sys.exit(app.exec())
-        finally:
-            stop(0)
+    status = app.exec()
+
+    utils.stop(status)

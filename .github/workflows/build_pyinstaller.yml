@@ -1,0 +1,65 @@
+name: 临时构建(pyinstaller)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  builder_matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x86, x64 ]
+        os: [ windows-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: '3.8.10'
+          architecture: ${{ matrix.arch }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Prepare output directory
+        run: |
+          if (Test-Path zip) { Remove-Item zip -Recurse -Force }
+          mkdir zip
+
+      - name: Run Windows build & package
+        run: |
+          curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
+          uv venv
+          .venv\Scripts\activate
+          uv pip install -r requirements.txt pyinstaller
+          pyinstaller main.py `
+            -w `
+            -i ./img/favicon.ico `
+            -n ClassWidgets `
+            --contents-directory . `
+            --add-data config:config `
+            --add-data audio:audio `
+            --add-data img:img `
+            --add-data ui:ui `
+            --add-data font:font `
+            --add-data view:view `
+            --add-data LICENSE:. `
+            --add-data plugins:plugins `
+            --hidden-import darkdetect
+          ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip dist/ClassWidgets/*
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4.4.2
+        with:
+          name: windows-latest-${{ matrix.arch }}
+          path: zip

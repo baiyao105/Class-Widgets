@@ -17,12 +17,17 @@ from conf import base_directory
 import list_
 from file import config_center, schedule_center
 from menu import SettingsMenu
+import platform
+from loguru import logger
 
 # 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+else:
+    logger.warning('不兼容的系统,跳过高DPI标识')
 
 settings = None
 
@@ -118,6 +123,7 @@ class ExtraMenu(FluentWindow):
                     logger.info(f'备份课表配置成功：已将 {config_center.schedule_name} -备份至-> backup.json')
                     config_center.write_conf('Temp', 'temp_schedule', config_center.schedule_name)
                 file.save_data_to_json(temp_schedule, config_center.schedule_name)
+            schedule_center.update_schedule()
             config_center.write_conf('Temp', 'set_week', str(temp_week.currentIndex()))
             config_center.write_conf('Temp', 'set_schedule',str(temp_schedule_set.currentIndex()))
             Flyout.create(
@@ -205,6 +211,10 @@ class ExtraMenu(FluentWindow):
         self.setWindowIcon(QIcon(f'{base_directory}/img/logo/favicon-exmenu.ico'))
 
         self.addSubInterface(self.interface, fIcon.INFO, '更多设置')
+
+    def closeEvent(self, e):
+        self.deleteLater()
+        return super().closeEvent(e)
 
 
 if __name__ == '__main__':
