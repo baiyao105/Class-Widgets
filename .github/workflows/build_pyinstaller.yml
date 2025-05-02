@@ -14,12 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [ x86, x64, arm64 ]
+        arch: [ x86, x64 ]
         os: [ windows-latest ]
-        exclude:
-          - os: windows-latest
-            arch: arm64
     runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -33,17 +31,17 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Init zip folder
-        run: mkdir zip
+      - name: Prepare output directory
+        run: |
+          rm -rf zip
+          mkdir zip
 
-      - name: Run Windows build
-        if: ${{ matrix.os == 'windows-latest' }}
+      - name: Run Windows build & package
         run: |
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           uv venv
           .venv\Scripts\activate
-          uv pip install -r requirements.txt
-          uv pip install pyinstaller
+          uv pip install -r requirements.txt pyinstaller
           pyinstaller main.py `
             -w `
             -i ./img/favicon.ico `
@@ -58,37 +56,10 @@ jobs:
             --add-data LICENSE:. `
             --add-data plugins:plugins `
             --hidden-import darkdetect
-          ./zip -r -q "zip/ClassWidgets-Windows-${{ matrix.arch }} (Unsigned).zip" dist/ClassWidgets/*
-
-      - name: Upload unsigned application
-        if: ${{ ( matrix.os != 'windows-latest' && github.event_name != 'pull_request' ) || github.event_name == 'pull_request' }}
-        uses: actions/upload-artifact@v4.4.2
-        with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}
-          path: ./zip
-
-      - name: Upload unsigned single file (only for x64)
-        if: ${{ matrix.os == 'windows-latest' && matrix.arch == 'x64' && github.event_name != 'pull_request' }}
-        id: upload-unsigned-artifact
-        uses: actions/upload-artifact@v4.4.2
-        with:
-          name: windows-${{ matrix.arch }} (Unsigned single)
-          path: ./dist/ClassWidgets/ClassWidgets.exe
-
-      - name: Compress app zip (no sign)
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
-        run: |
-          del "zip/ClassWidgets-Windows-${{ matrix.arch }} (Unsigned).zip"
           ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
-      - name: Upload signed application
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-latest-${{ matrix.arch }}
-          path: ./zip
-
-      - name: Upload zip fallback
-        uses: actions/upload-artifact@v4.4.2
-        with:
-          path: ./zip
+          path: zip
