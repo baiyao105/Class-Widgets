@@ -2025,14 +2025,22 @@ class DesktopWidget(QWidget):  # 主要小组件
             except TypeError: pass
 
             def _start_alert_fade_in():
-                self.weather_icon.hide()
-                self.temperature.hide()
-                self.weather_alert_opacity.setOpacity(0.0)
-                self.alert_icon_opacity.setOpacity(0.0)
-                self.weather_alert_text.show()
-                self.alert_icon.show()
-                self.fade_in_group.start()
-                self.weather_info_timer.start(3000)
+                if hasattr(self, 'alert_icon') and self.alert_icon and hasattr(self.alert_icon, 'icon') and not self.alert_icon.icon().isNull():
+                    self.weather_icon.hide()
+                    self.temperature.hide()
+                    self.weather_alert_opacity.setOpacity(0.0)
+                    self.alert_icon_opacity.setOpacity(0.0)
+                    self.weather_alert_text.show()
+                    self.alert_icon.show()
+                    self.fade_in_group.start()
+                    self.weather_info_timer.start(3000)
+                else:
+                    # 如果没有图标，直接显示天气信息
+                    self.weather_icon.show()
+                    self.temperature.show()
+                    if hasattr(self, 'weather_opacity'): self.weather_opacity.setOpacity(1.0)
+                    if hasattr(self, 'temperature_opacity'): self.temperature_opacity.setOpacity(1.0)
+                    self.showing_temperature = True # 确保状态正确
 
             self.fade_out_group.finished.connect(_start_alert_fade_in)
 
