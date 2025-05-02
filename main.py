@@ -184,6 +184,7 @@ def setTheme_():  # 设置主题
     global theme
     color_mode = config_center.read_conf('General', 'color_mode')
     if color_mode == '2':  # 自动
+        logger.info(f'颜色模式: 自动({color_mode})')
         if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
             return
         if platform.system() == 'Windows':
@@ -204,7 +205,7 @@ def setTheme_():  # 设置主题
         if dark_mode_watcher:
             is_dark = dark_mode_watcher.isDark()
             if is_dark is not None:
-                logger.info(f"系统颜色模式: {'深色' if is_dark else '浅色'}")
+                logger.info(f"当前颜色模式: {'深色' if is_dark else '浅色'}")
                 setTheme(Theme.DARK if is_dark else Theme.LIGHT)
             else:
                 logger.warning("无法获取系统颜色模式，暂时使用浅色主题")
@@ -213,10 +214,10 @@ def setTheme_():  # 设置主题
             logger.warning("DarkModeWatcher 未被初始化，使用浅色主题")
             setTheme(Theme.LIGHT)
     elif color_mode == '1':
-        logger.info(f'颜色模式:深色({color_mode})')
+        logger.info(f'颜色模式: 深色({color_mode})')
         setTheme(Theme.DARK)
     else:
-        logger.info(f'颜色模式:浅色({color_mode})')
+        logger.info(f'颜色模式: 浅色({color_mode})')
         setTheme(Theme.LIGHT)
 
 
