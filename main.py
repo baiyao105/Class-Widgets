@@ -183,8 +183,6 @@ def handle_dark_mode_change(is_dark):
 def setTheme_():  # 设置主题
     global theme
     color_mode = config_center.read_conf('General', 'color_mode')
-    logger.info(f"颜色模式: {color_mode}")
-    
     if color_mode == '2':  # 自动
         if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
             return
@@ -203,17 +201,22 @@ def setTheme_():  # 设置主题
                 return
         if platform.system() == 'Linux':
             return
-        if dark_mode_watcher and dark_mode_watcher.isDark() is not None:
-            # 初始主题由 darkModeChanged 信号在 _initial_check 后触发
-            pass # 等待 watcher 信号
-        elif dark_mode_watcher is None:
-            logger.warning("DarkModeWatcher 未被初始化")
-            setTheme(Theme.LIGHT)
+        if dark_mode_watcher:
+            is_dark = dark_mode_watcher.isDark()
+            if is_dark is not None:
+                logger.info(f"系统颜色模式: {'深色' if is_dark else '浅色'}")
+                setTheme(Theme.DARK if is_dark else Theme.LIGHT)
+            else:
+                logger.warning("无法获取系统颜色模式，暂时使用浅色主题")
+                setTheme(Theme.LIGHT)
         else:
-             setTheme(Theme.LIGHT)
+            logger.warning("DarkModeWatcher 未被初始化，使用浅色主题")
+            setTheme(Theme.LIGHT)
     elif color_mode == '1':
+        logger.info(f'颜色模式:深色({color_mode})')
         setTheme(Theme.DARK)
     else:
+        logger.info(f'颜色模式:浅色({color_mode})')
         setTheme(Theme.LIGHT)
 
 
