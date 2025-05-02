@@ -33,7 +33,7 @@ jobs:
 
       - name: Prepare output directory
         run: |
-          rm -rf zip
+          if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
       - name: Run Windows build & package
