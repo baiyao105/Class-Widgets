@@ -8,7 +8,7 @@ on:
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
- 
+
 jobs:
   builder_matrix:
     strategy:
@@ -17,33 +17,25 @@ jobs:
         arch: [ x86, x64, arm64 ]
         os: [ windows-latest ]
         exclude:
-          - os: ubuntu-20.04
-            arch: x86
-          - os: ubuntu-20.04
-            arch: arm64
-          - os: macos-13
-            arch: x86
-          - os: macos-13
-            arch: arm64
           - os: windows-latest
             arch: arm64
-          - os: macos-14
-            arch: x86
-          - os: macos-14
-            arch: x64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
+
       - name: Setup Python
         uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.8.10'
           architecture: ${{ matrix.arch }}
+
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
+
       - name: Init zip folder
         run: mkdir zip
+
       - name: Run Windows build
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
@@ -74,15 +66,17 @@ jobs:
         with:
           name: ${{ matrix.os }}-${{ matrix.arch }}
           path: ./zip
-      - name: Upload unsigned single file
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
+
+      - name: Upload unsigned single file (only for x64)
+        if: ${{ matrix.os == 'windows-latest' && matrix.arch == 'x64' && github.event_name != 'pull_request' }}
         id: upload-unsigned-artifact
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-${{ matrix.arch }} (Unsigned single)
           path: ./dist/ClassWidgets/ClassWidgets.exe
+
       - name: Sign application (Test)
-        if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
+        if: ${{ matrix.os == 'windows-latest' && matrix.arch == 'x64' && github.event_name != 'pull_request' }}
         uses: signpath/github-action-submit-signing-request@v1.1
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
@@ -92,8 +86,9 @@ jobs:
           github-artifact-id: '${{ steps.upload-unsigned-artifact.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './dist/ClassWidgets'
+
       - name: Sign application (Release)
-        if: ${{ matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ matrix.os == 'windows-latest' && matrix.arch == 'x64' && startsWith(github.ref, 'refs/tags/') }}
         uses: signpath/github-action-submit-signing-request@v1.1
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
@@ -103,11 +98,13 @@ jobs:
           github-artifact-id: '${{ steps.upload-unsigned-artifact.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: './dist/ClassWidgets'
-      - name: Recompress
+
+      - name: Recompress signed app
         if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
         run: |
           del "zip/ClassWidgets-Windows-${{ matrix.arch }} (Unsigned).zip"
           ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip dist/ClassWidgets/*
+
       - name: Upload signed application
         if: ${{ matrix.os == 'windows-latest' && github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4.4.2
@@ -115,7 +112,7 @@ jobs:
           name: windows-latest-${{ matrix.arch }}
           path: ./zip
 
-      - name: Upload
+      - name: Upload zip fallback
         uses: actions/upload-artifact@v4.4.2
         with:
           path: ./zip
