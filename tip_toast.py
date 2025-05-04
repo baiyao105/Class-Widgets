@@ -49,16 +49,16 @@ class TTSAudioThread(QThread):
     def run(self):
         global tts_is_playing
         if tts_is_playing:
-            logger.debug("TTS 已经在播放，跳过本次请求。")
+            logger.warning("TTS 已经播放")
             return
         try:
             tts_is_playing = True
             audio_path = generate_speech_sync(self.text, voice=self.voice_id, auto_fallback=True)
             if audio_path and os.path.exists(audio_path):
-                logger.info(f"TTS语音生成成功,开始播放...")
+                logger.info(f"TTS生成成功")
                 play_audio(audio_path, tts_delete_after=True)
             else:
-                logger.error("TTS语音生成失败或文件未找到")
+                logger.error("TTS生成失败或文件未找到")
         except Exception as e:
             logger.error(f"TTS处理失败: {e}")
         finally:
@@ -73,11 +73,11 @@ class tip_toast(QWidget):
         active_windows.append(self)
         self.audio_thread = None
         if hasattr(tip_toast, 'active_tts_thread') and tip_toast.active_tts_thread and tip_toast.active_tts_thread.isRunning():
-            logger.debug("已有TTS线程正在运行，跳过")
+            logger.debug("已有TTS线程正在运行")
             self.tts_audio_thread = None
         else:
-            self.tts_audio_thread = None # 初始化TTS
-            tip_toast.active_tts_thread = None # 确保类变量存在
+            self.tts_audio_thread = None 
+            tip_toast.active_tts_thread = None
 
         uic.loadUi(f"{base_directory}/view/widget-toast-bar.ui", self)
 
@@ -109,7 +109,7 @@ class tip_toast(QWidget):
         icon_label = self.findChild(QLabel, 'icon')
 
         sound_to_play = None
-        tts_text = None # 初始化TTS文本
+        tts_text = None # TTS文本
         tts_enabled = config_center.read_conf('TTS', 'enable')
         if tts_enabled is None:
             tts_enabled = ''
@@ -169,7 +169,7 @@ class tip_toast(QWidget):
 
         global tts_is_playing
         if tts_enabled and tts_text and tts_voice_id:
-            logger.info(f"TTS文本: '{tts_text}',语音ID: {tts_voice_id}")
+            logger.info(f"生成TTS: '{tts_text}',语音ID: {tts_voice_id}")
             if tts_is_playing:
                  logger.warning("TTS已经在播放")
             else:
@@ -178,7 +178,7 @@ class tip_toast(QWidget):
         elif tts_enabled and tts_text and not tts_voice_id:
              logger.warning(f"TTS已启用,但未能根据 '{tts_voice_id}' 找到有效的语音ID")
         elif tts_enabled and not tts_text:
-             logger.warning("TTS已启用,但当前没有对应的TTS文本")
+             logger.warning("TTS已启用,但当前没有文本供生成")
 
         # 设置样式表
         if state == 1:  # 上课铃声

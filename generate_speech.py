@@ -282,12 +282,9 @@ class TTSEngine:
         _filename = filename or self._generate_filename(text, engine)
         _file_path = os.path.join(self.cache_dir, _filename)
 
-        # 检查基于初始请求的文件是否已存在
         if os.path.exists(_file_path):
             logger.info(f"语音文件已存在于缓存中，直接返回: {_file_path}")
             return _file_path
-
-        # 如果未指定 voice，则进行自动选择 (基于初始请求的引擎)
         if not voice:
             lang = self._detect_language(text)
             if engine == 'pyttsx3':
@@ -295,14 +292,11 @@ class TTSEngine:
                 voice = self._validate_pyttsx3_voice(selected_voice, lang)
             elif engine in self.voice_mapping:
                 voice = self.voice_mapping[engine].get(lang)
-            # 如果映射中没有找到或引擎不支持映射，voice 保持 None 或之前的状态
             if not voice:
-                 logger.warning(f"无法为语言 '{lang}' 和引擎 '{engine}' 自动选择语音，将尝试使用引擎默认语音")
+                 logger.warning(f"无法为语言 '{lang}' 和引擎 '{engine}' 自动选择语音")
 
-        # 确定要尝试的引擎列表
-        engines_to_try = [engine] # 默认只尝试指定的引擎
+        engines_to_try = [engine] # 只尝试指定的引擎
         if auto_fallback:
-            # 如果启用回退，则添加优先级列表中的其他引擎
             for e in self.engine_priority:
                 if e != engine and e not in engines_to_try:
                     engines_to_try.append(e)
@@ -327,7 +321,7 @@ class TTSEngine:
                 logger.info(f"目标语音文件 '{final_filename}' 在执行前已存在，直接返回.")
                 return final_file_path
 
-            logger.debug(f"尝试使用引擎 '{current_engine}' 和语音 '{voice}' 生成 '{final_filename}'")
+            logger.debug(f"尝试使用 {current_engine} 生成 {final_filename}")
 
             try:
                 await self._execute_engine(
@@ -342,15 +336,15 @@ class TTSEngine:
                 if not os.path.exists(final_file_path):
                     raise RuntimeError(f"语音文件生成后未找到: {final_file_path}")
 
-                logger.info(f"成功生成语音 | 引擎: {current_engine} | 文件: {final_filename}")
+                logger.success(f"成功生成语音 | 引擎: {current_engine} | 文件: {final_filename}")
                 return final_file_path
 
             except ValueError as ve:
-                 logger.debug(f"跳过引擎 '{current_engine}',语音ID不匹配: {ve}")
+                 logger.debug(f"跳过引擎 '{current_engine}")
             except Exception as e:
                 error_msg = f"{current_engine}: {str(e)}" # 其他错误
                 errors.append(error_msg)
-                logger.warning(f"引擎 '{current_engine}' 生成失败: {e}")
+                # logger.error(f"引擎 {current_engine} 生成失败: {e}")
                 if os.path.exists(final_file_path):
                     try:
                         os.remove(final_file_path)
@@ -363,7 +357,7 @@ class TTSEngine:
                 continue
 
         raise RuntimeError(
-            f"所有引擎尝试失败\n" +
+            f"引擎尝试失败\n" +
             "\n".join(errors)
         )
 
@@ -381,34 +375,34 @@ class TTSEngine:
             retries: 重试次数
             delay: 重试间隔(秒)
         """
+        relative_path = os.path.relpath(file_path, os.path.join(os.getcwd(), "cache", "audio"))
         for attempt in range(retries):
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logger.debug(f"成功删除音频文件: {file_path}")
+                    logger.success(f"成功删除音频: {relative_path}")
                     return True
                 else:
-                    logger.debug(f"删除时文件已不存在: {file_path}")
+                    logger.debug(f"删除时文件已不存在: {relative_path}")
                     return True
             except PermissionError as pe:
                 if attempt < retries - 1:
-                    logger.warning(f"删除失败(权限错误),重试: ({attempt + 1}/{retries}): {file_path} | 错误: {pe}")
+                    logger.warning(f"删除失败(权限错误),重试: ({attempt + 1}/{retries}): {relative_path} | 错误: {pe}")
                     time.sleep(delay)
                 else:
-                    logger.error(f"最终删除失败(权限错误): {file_path} | 错误: {pe}")
+                    logger.error(f"最终删除失败(权限错误): {relative_path} | 错误: {pe}")
             except OSError as oe:
                 if attempt < retries - 1:
-                    logger.warning(f"删除失败(OS错误),重试 ({attempt + 1}/{retries}): {file_path} | 错误: {oe}")
+                    logger.warning(f"删除失败(OS错误),重试 ({attempt + 1}/{retries}): {relative_path} | 错误: {oe}")
                     time.sleep(delay)
                 else:
-                    logger.error(f"最终删除失败(OS错误): {file_path} | 错误: {oe}")
+                    logger.error(f"最终删除失败(OS错误): {relative_path} | 错误: {oe}")
             except Exception as e:
-                # 捕获其他未知异常
                 if attempt < retries - 1:
-                    logger.warning(f"删除时发生未知错误,重试({attempt + 1}/{retries}): {file_path} | 错误: {e}")
+                    logger.warning(f"删除时发生未知错误,重试({attempt + 1}/{retries}): {relative_path} | 错误: {e}")
                     time.sleep(delay)
                 else:
-                    logger.error(f"删除失败: {file_path} | 错误: {e}")
+                    logger.error(f"删除失败: {relative_path} | 错误: {e}")
         return False
 
 
