@@ -13,14 +13,14 @@ from loguru import logger
 
 
 def get_tts_voices():
-    """获取可用的TTS语音列表(中文)，包括Edge TTS和Pyttsx3."""
+    """获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3."""
     voices = []
     try:
         edge_voices = asyncio.run(edge_tts.list_voices())
         for voice in edge_voices:
             if 'zh' in voice['Locale'].lower(): # 筛选中文语音
-                voices.append({'name': f"{voice['FriendlyName']} (Edge)", 'id': voice['Name']})
-        logger.debug(f"成功筛选了 {len(voices)} 个 Edge TTS 语音")
+                voices.append({'name': f"{voice['FriendlyName']} (Edge)", 'id': f"edge:{voice['Name']}"})
+        logger.debug(f"筛选了 {len(voices)} 个 Edge 语音")
     except Exception as e:
         logger.error(f"获取 Edge TTS 语音列表失败: {e}")
     # 获取 Pyttsx3 语音
@@ -38,8 +38,8 @@ def get_tts_voices():
             elif 'chinese' in name.lower() or 'mandarin' in name.lower(): # 备用
                  lang_check_passed = True
             if not hasattr(voice, 'languages') or not voice.languages or lang_check_passed:
-                 voices.append({'name': f"{name} (System)", 'id': voice.id})
-        logger.debug(f"成功筛选了 {len(pyttsx3_voices)} 个 Pyttsx3 语音")
+                 voices.append({'name': f"{name} (System)", 'id': f"pyttsx3:{voice.id}"})
+        logger.debug(f"筛选了 {len(pyttsx3_voices)} 个 Pyttsx3 语音")
     except Exception as e:
         logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
 
@@ -238,13 +238,18 @@ class TTSEngine:
         str: 生成的音频文件绝对路径
 
         异常：
+        ValueError: 如果提供的语音ID与指定的引擎不匹配
         RuntimeError: 所有尝试的引擎均失败时抛出
         """
+        if voice and not voice.startswith(f"{engine}:"):
+            raise ValueError(f"语音ID '{voice}' 与引擎 '{engine}' 不匹配")
+
+        actual_voice_id = voice.split(':', 1)[1] if voice and ':' in voice else voice
         try:
             if engine == "edge":
-                task = self._edge_tts(text, voice, file_path)
+                task = self._edge_tts(text, actual_voice_id, file_path)
             elif engine == "pyttsx3":
-                task = self._pyttsx3_tts(text, voice, file_path)
+                task = self._pyttsx3_tts(text, actual_voice_id, file_path)
             else:
                 raise ValueError(f"不支持的引擎：{engine}")
 
@@ -340,18 +345,20 @@ class TTSEngine:
                 logger.info(f"成功生成语音 | 引擎: {current_engine} | 文件: {final_filename}")
                 return final_file_path
 
+            except ValueError as ve:
+                 logger.debug(f"跳过引擎 '{current_engine}',语音ID不匹配: {ve}")
             except Exception as e:
-                error_msg = f"{current_engine}: {str(e)}"
+                error_msg = f"{current_engine}: {str(e)}" # 其他错误
                 errors.append(error_msg)
                 logger.warning(f"引擎 '{current_engine}' 生成失败: {e}")
                 if os.path.exists(final_file_path):
                     try:
                         os.remove(final_file_path)
-                        logger.debug(f"清理因错误生成的部分文件: {final_file_path}")
+                        logger.debug(f"清理错误生成的文件: {final_file_path}")
                     except OSError as rm_err:
                         logger.warning(f"清理失败文件时出错: {rm_err}")
                 if not auto_fallback:
-                    logger.info(f"未启用自动回退，引擎 '{current_engine}' 失败后停止尝试。")
+                    logger.info(f"引擎 '{current_engine}' 失败后停止尝试。")
                     break
                 continue
 

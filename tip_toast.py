@@ -36,6 +36,7 @@ normal_color = '#56CFD8'
 
 window_list = []  # 窗口列表
 active_windows = []
+tts_is_playing = False  # TTS播放状态标志
 
 
 class TTSAudioThread(QThread):
@@ -46,7 +47,12 @@ class TTSAudioThread(QThread):
         self.voice_id = voice_id
 
     def run(self):
+        global tts_is_playing
+        if tts_is_playing:
+            logger.debug("TTS 已经在播放，跳过本次请求。")
+            return
         try:
+            tts_is_playing = True
             audio_path = generate_speech_sync(self.text, voice=self.voice_id, auto_fallback=True)
             if audio_path and os.path.exists(audio_path):
                 logger.info(f"TTS语音生成成功,开始播放...")
@@ -55,6 +61,8 @@ class TTSAudioThread(QThread):
                 logger.error("TTS语音生成失败或文件未找到")
         except Exception as e:
             logger.error(f"TTS处理失败: {e}")
+        finally:
+            tts_is_playing = False
 
 
 class tip_toast(QWidget):
@@ -159,22 +167,18 @@ class tip_toast(QWidget):
             lesson.setText(content)
             sound_to_play = prepare_class
 
+        global tts_is_playing
         if tts_enabled and tts_text and tts_voice_id:
-            logger.info(f"TTS文本: '{tts_text}', 语音ID: {tts_voice_id}")
-            if hasattr(tip_toast, 'active_tts_thread') and tip_toast.active_tts_thread and tip_toast.active_tts_thread.isRunning():
-                logger.debug("已有TTS线程正在运行，本次请求被跳过。")
+            logger.info(f"TTS文本: '{tts_text}',语音ID: {tts_voice_id}")
+            if tts_is_playing:
+                 logger.warning("TTS已经在播放")
             else:
                 self.tts_audio_thread = TTSAudioThread(tts_text, tts_voice_id)
-                tip_toast.active_tts_thread = self.tts_audio_thread
-                self.tts_audio_thread.finished.connect(lambda: setattr(tip_toast, 'active_tts_thread', None))
                 self.tts_audio_thread.start()
-                logger.debug("启动新的TTS线程。")
         elif tts_enabled and tts_text and not tts_voice_id:
-             # 这里的警告现在意味着配置的名称无效或列表加载失败
-             logger.warning(f"TTS已启用，但未能根据配置的名称 '{tts_voice_name}' 找到有效的语音ID，无法播放TTS。")
+             logger.warning(f"TTS已启用,但未能根据 '{tts_voice_id}' 找到有效的语音ID")
         elif tts_enabled and not tts_text:
-             logger.debug("TTS已启用，但当前状态没有对应的TTS文本。")
-        # 不再需要 else 分支记录未启用的情况，因为上面已有检查逻辑
+             logger.warning("TTS已启用,但当前没有对应的TTS文本")
 
         # 设置样式表
         if state == 1:  # 上课铃声
