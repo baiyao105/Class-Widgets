@@ -428,7 +428,7 @@ class PluginCard(CardWidget):  # 插件卡片
                     content=f'插件 “{self.title}” 已卸载。请重启 Class Widgets 以完全移除。',
                     orient=Qt.Horizontal,
                     isClosable=True,
-                    position=InfoBarPosition.TOP_RIGHT,
+                    position=InfoBarPosition.BOTTOM_RIGHT,
                     duration=5000,
                     parent=self.window()
                 )
@@ -439,7 +439,7 @@ class PluginCard(CardWidget):  # 插件卡片
                     content=f'卸载插件 “{self.title}” 时出错，请查看日志获取详细信息。',
                     orient=Qt.Horizontal,
                     isClosable=True,
-                    position=InfoBarPosition.TOP_RIGHT,
+                    position=InfoBarPosition.BOTTOM_RIGHT,
                     duration=5000,
                     parent=self.window()
                 )
