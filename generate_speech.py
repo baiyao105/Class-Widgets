@@ -60,6 +60,25 @@ def get_voice_id_by_name(name: str, engine: str = "edge"):
             return v["id"]
     return None
 
+def get_voice_name_by_id(voice_id: str, available_voices: list = None) -> Optional[str]:
+    """
+    根据语音ID查找语音名称.
+    参数：
+        voice_id (str): 语音ID
+        available_voices (list, optional): 预先获取的语音列表,默认None(重新获取)
+    返回：
+        str or None: 语音名称,如果未找到则返回None
+    """
+    if available_voices is None:
+        voices = get_tts_voices()
+    else:
+        voices = available_voices
+
+    for v in voices:
+        if v["id"] == voice_id:
+            return v["name"]
+    return None
+
 
 class TTSEngine:
     """支持多平台和智能语音选择的多引擎TTS工具类"""
