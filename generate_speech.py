@@ -314,6 +314,9 @@ class TTSEngine:
                  continue
             attempted_engines.add(current_engine)
 
+            if voice and ':' in voice and not voice.startswith(current_engine + ':'):
+                logger.debug(f"跳过引擎 '{current_engine}'")
+                continue
             final_filename = filename if filename else self._generate_filename(text, current_engine)
             final_file_path = os.path.join(self.cache_dir, final_filename)
 
@@ -340,7 +343,7 @@ class TTSEngine:
                 return final_file_path
 
             except ValueError as ve:
-                 logger.debug(f"跳过引擎 '{current_engine}")
+                 logger.debug(f"跳过引擎 '{current_engine}") # 通常是语音ID不匹配，由 _execute_engine 内部抛出
             except Exception as e:
                 error_msg = f"{current_engine}: {str(e)}" # 其他错误
                 errors.append(error_msg)

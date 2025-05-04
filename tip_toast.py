@@ -47,6 +47,7 @@ class TTSAudioThread(QThread):
         self.voice_id = voice_id
 
     def run(self):
+        self.setPriority(QThread.Priority.LowPriority) # TTS优先级可以低一些
         global tts_is_playing
         if tts_is_playing:
             logger.warning("TTS 已经播放")
@@ -263,7 +264,6 @@ class tip_toast(QWidget):
             self.tts_audio_thread = TTSAudioThread(tts_text, voice_id)
             # 稍微延迟启动TTS，避免和提示音重叠太近
             QTimer.singleShot(500, self.tts_audio_thread.start)
-            self.tts_audio_thread.setPriority(QThread.Priority.LowPriority) # TTS优先级可以低一些
 
         self.geometry_animation.start()
         self.opacity_animation.start()
