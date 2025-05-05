@@ -665,8 +665,15 @@ class SettingsMenu(FluentWindow):
 
         # TTS
         switch_enable_TTS = self.findChild(SwitchButton, 'switch_enable_TTS')
-        switch_enable_TTS.setChecked(int(config_center.read_conf('TTS', 'enable')))
-        switch_enable_TTS.checkedChanged.connect(lambda checked: switch_checked('TTS', 'enable', checked))
+        card_tts_speed = self.findChild(CardWidget, 'CardWidget_11') # 获取语速设置卡片
+        slider_speed_tts = self.findChild(Slider, 'slider_speed_tts') # 获取语速滑块
+        tts_enabled = int(config_center.read_conf('TTS', 'enable'))
+        switch_enable_TTS.setChecked(tts_enabled)
+        card_tts_speed.setVisible(tts_enabled)
+        slider_speed_tts.setValue(int(config_center.read_conf('TTS', 'speed')))
+
+        switch_enable_TTS.checkedChanged.connect(self.toggle_tts_settings)
+        slider_speed_tts.valueChanged.connect(self.save_tts_speed)
 
         voice_selector = self.findChild(ComboBox, 'voice_selector')
         voice_selector.clear()
@@ -680,17 +687,34 @@ class SettingsMenu(FluentWindow):
         self.tts_voice_loader_thread.finished.connect(self.tts_voice_loader_thread.deleteLater)
         self.tts_voice_loader_thread.start()
 
+    def toggle_tts_settings(self, checked):
+        switch_checked('TTS', 'enable', checked)
+        card_tts_speed = self.findChild(CardWidget, 'CardWidget_11')
+        voice_selector = self.findChild(ComboBox, 'voice_selector')
+        if card_tts_speed:
+            card_tts_speed.setVisible(checked) # 鬼知道为什么藏不住(不管了)
+        if voice_selector:
+            if voice_selector.count() > 0 and voice_selector.itemText(0) != "无可用语音" and voice_selector.itemText(0) != "加载中..." and voice_selector.itemText(0) != "加载失败":
+                voice_selector.setEnabled(checked)
+            else:
+                voice_selector.setEnabled(False)
+
+    def save_tts_speed(self, value):
+        config_center.write_conf('TTS', 'speed', str(value))
+
     def update_tts_voices(self, available_voices):
         voice_selector = self.findChild(ComboBox, 'voice_selector')
         switch_enable_TTS = self.findChild(SwitchButton, 'switch_enable_TTS')
-
-        voice_selector.clear() # 清除“加载中...”
+        voice_selector.clear()
 
         if not available_voices:
             logger.warning("未找到可用的TTS语音引擎或语音包")
             voice_selector.addItem("无可用语音", userData=None)
             voice_selector.setEnabled(False)
             switch_enable_TTS.setEnabled(False)
+            card_tts_speed = self.findChild(CardWidget, 'CardWidget_11')
+            if card_tts_speed:
+                card_tts_speed.setVisible(False)
             return
 
         for voice in available_voices:

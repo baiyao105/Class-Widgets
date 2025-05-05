@@ -29,7 +29,8 @@
     "after_school": 1
   },
   "TTS": {
-    "enable": 0
+    "enable": 0,
+    "speed": 50
   },
   "Weather": {
     "city": 0,

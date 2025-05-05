@@ -10,6 +10,8 @@ from typing import Optional
 import edge_tts
 import pyttsx3
 from loguru import logger
+from file import config_center
+
 
 
 def get_tts_voices():
@@ -123,19 +125,19 @@ class TTSEngine:
         if current_os == 'Windows':
             return {
                 'zh-CN': 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_ZH-CN_HUIHUI_11.0',
-                'en-US': 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_DAVID_11.0'
+                #'en-US': 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_DAVID_11.0'
             }
         # macOS默认配置
         elif current_os == 'Darwin':
             return {
                 'zh-CN': 'com.apple.speech.synthesis.voice.ting-ting.premium',
-                'en-US': 'com.apple.speech.synthesis.voice.Alex'
+                #'en-US': 'com.apple.speech.synthesis.voice.Alex'
             }
         # Linux默认配置 (espeak)
         else:
             return {
                 'zh-CN': 'chinese',
-                'en-US': 'english-us'
+                #'en-US': 'english-us'
             }
 
     def _ensure_cache_dir(self):
@@ -149,7 +151,12 @@ class TTSEngine:
 
     @staticmethod
     async def _edge_tts(text: str, voice: str, file_path: str) -> str:
-        communicate = edge_tts.Communicate(text, voice)
+        # 语速范围 0-100
+        speed_value = int(config_center.read_conf('TTS', 'speed'))
+        rate_percentage = (speed_value - 50) * 2
+        rate_str = f"{rate_percentage:+}%"
+        logger.debug(f"Edge TTS Rate: {rate_str} (Slider: {speed_value})")
+        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
         await communicate.save(file_path)
         return file_path
 
@@ -173,8 +180,30 @@ class TTSEngine:
                 voices = engine.getProperty('voices')
                 found_voice = next((v for v in voices if v.id == voice), None)
                 if not found_voice:
-                    raise ValueError(f"无效语音ID：{voice}")
-                engine.setProperty('voice', found_voice.id)
+                    # 尝试忽略引擎前缀查找 (例如，如果传入的是 edge:xxx)
+                    voice_id_only = voice.split(':', 1)[-1]
+                    found_voice = next((v for v in voices if v.id == voice_id_only), None)
+                    if not found_voice:
+                        logger.warning(f"pyttsx3: 无效或不匹配的语音ID '{voice}'，将使用默认语音")
+                    else:
+                         engine.setProperty('voice', found_voice.id)
+                else:
+                    engine.setProperty('voice', found_voice.id)
+
+            # 应用语速设置
+            speed_value = int(config_center.read_conf('TTS', 'speed'))
+            default_rate = engine.getProperty('rate')
+            # 50 -> default_rate, 0 -> default_rate/2, 100 -> default_rate*1.5
+            if speed_value == 50:
+                pyttsx3_rate = default_rate
+            elif speed_value < 50:
+                pyttsx3_rate = int(default_rate / 2 + (default_rate / 2) * (speed_value / 50))
+            else:
+                pyttsx3_rate = int(default_rate + (default_rate * 0.5) * ((speed_value - 50) / 50))
+            # 速率50到400内，防止超出范围
+            pyttsx3_rate = max(50, min(pyttsx3_rate, 400))
+            logger.debug(f"pyttsx3 Rate: {pyttsx3_rate} (Slider: {speed_value}, Default: {default_rate})")
+            engine.setProperty('rate', pyttsx3_rate)
 
             engine.save_to_file(text, file_path)
             start_time = time.time()
