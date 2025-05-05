@@ -232,6 +232,3 @@ jobs:
         with:
           name: debian10-x64
           path: ./zip
-
-    with:
-      run_id: ${{ github.run_id }}
