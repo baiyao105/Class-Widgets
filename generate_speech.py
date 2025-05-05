@@ -25,7 +25,7 @@ def get_tts_voices():
         logger.debug(f"筛选了 {len(voices)} 个 Edge 语音")
     except Exception as e:
         logger.error(f"获取 Edge TTS 语音列表失败: {e}")
-    # 获取 Pyttsx3 语音
+    pyttsx3_voices_count = 0
     try:
         engine = pyttsx3.init()
         pyttsx3_voices = engine.getProperty('voices')
@@ -41,9 +41,16 @@ def get_tts_voices():
                  lang_check_passed = True
             if not hasattr(voice, 'languages') or not voice.languages or lang_check_passed:
                  voices.append({'name': f"{name} (System)", 'id': f"pyttsx3:{voice.id}"})
-        logger.debug(f"筛选了 {len(pyttsx3_voices)} 个 Pyttsx3 语音")
+        pyttsx3_voices_count = len(pyttsx3_voices)
+    except OSError as oe:
+        if oe.winerror == -2147221005:
+            logger.warning("系统语音引擎(pyttsx3/SAPI5)初始化失败，可能是组件未正确注册或损坏。将跳过加载系统语音。")
+        else:
+            logger.error(f"获取 Pyttsx3 语音列表时发生OS错误: {oe}")
     except Exception as e:
         logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
+    if pyttsx3_voices_count > 0:
+        logger.debug(f"筛选了 {pyttsx3_voices_count} 个 Pyttsx3 语音")
 
     if not voices:
         logger.warning("未能获取到任何 TTS 语音")
@@ -171,7 +178,19 @@ class TTSEngine:
     def _sync_pyttsx3(text: str, voice: str, file_path: str):
         engine = None
         try:
-            engine = pyttsx3.init()
+            try:
+                engine = pyttsx3.init()
+            except OSError as oe:
+                if oe.winerror == -2147221005:
+                    logger.error("系统语音引擎(pyttsx3/SAPI5)初始化失败，无法使用此引擎生成语音。请检查系统语音组件。")
+                    raise RuntimeError("pyttsx3/SAPI5 初始化失败") from oe
+                else:
+                    logger.error(f"pyttsx3 初始化时发生OS错误: {oe}")
+                    raise RuntimeError("pyttsx3 初始化OS错误") from oe
+            except Exception as init_e:
+                logger.error(f"pyttsx3 初始化失败: {init_e}")
+                raise RuntimeError("pyttsx3 初始化异常") from init_e
+
             engine.connect('started-utterance', lambda name: None)
             engine.connect('finished-utterance', lambda name, completed: engine.stop())
 
@@ -229,7 +248,19 @@ class TTSEngine:
     def _validate_pyttsx3_voice(voice_id: str, lang: str) -> str:
         """验证语音有效性，自动回退"""
         try:
-            engine = pyttsx3.init()
+            try:
+                engine = pyttsx3.init()
+            except OSError as oe:
+                if oe.winerror == -2147221005:
+                    logger.warning("系统语音引擎(pyttsx3/SAPI5)初始化失败，无法验证或选择系统语音。")
+                    return '' # 返回空表示无法使用pyttsx3
+                else:
+                    logger.error(f"验证语音时 pyttsx3 初始化发生OS错误: {oe}")
+                    return ''
+            except Exception as init_e:
+                logger.error(f"验证语音时 pyttsx3 初始化失败: {init_e}")
+                return ''
+
             voices = engine.getProperty('voices')
 
             if any(v.id == voice_id for v in voices):
@@ -461,7 +492,19 @@ def generate_speech_sync(
 def list_pyttsx3_voices():
     """列出所有可用的 Pyttsx3 语音."""
     try:
-        engine = pyttsx3.init()
+        try:
+            engine = pyttsx3.init()
+        except OSError as oe:
+            if oe.winerror == -2147221005:
+                logger.warning("系统语音引擎(pyttsx3/SAPI5)初始化失败，无法列出系统语音。")
+                return []
+            else:
+                logger.error(f"列出语音时 pyttsx3 初始化发生OS错误: {oe}")
+                return []
+        except Exception as init_e:
+            logger.error(f"列出语音时 pyttsx3 初始化失败: {init_e}")
+            return []
+
         voices = engine.getProperty('voices')
         engine.stop()
         voice_list = []
