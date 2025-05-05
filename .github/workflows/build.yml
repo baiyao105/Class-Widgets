@@ -67,7 +67,9 @@ jobs:
         run: mkdir zip
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade setuptools
+          pip install -r requirements.txt
 
       - name: Build (Windows)
         if: ${{ startsWith(matrix.os, 'windows') }}
