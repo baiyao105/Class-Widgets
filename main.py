@@ -68,6 +68,7 @@ qss.styleSheetManager = StyleSheetManager()
 import conf
 import list_
 import tip_toast
+from tip_toast import active_windows
 import utils
 import weather_db as db
 from conf import base_directory
@@ -1276,6 +1277,8 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def _ensure_topmost(self):
         # 始终处于顶层
+        if active_windows:
+            return
         if os.name == 'nt':
             try:
                 hwnd = self.winId().__int__()
@@ -1904,6 +1907,8 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def _ensure_topmost(self):
         # 突然忘记写移除了,不写了,应该没事(
+        if active_windows:
+            return
         if os.name == 'nt':
             try:
                 hwnd = self.winId().__int__()
