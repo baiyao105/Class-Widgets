@@ -4,6 +4,8 @@ import os
 import platform
 import re
 import time
+import ctypes
+import traceback
 from pathlib import Path
 from typing import Optional
 
@@ -304,14 +306,54 @@ def generate_speech_sync(
 
 def list_pyttsx3_voices():
     """跨平台语音列表显示"""
-    engine = pyttsx3.init()
-    voices = engine.getProperty('voices')
-    current_os = platform.system()
+    try:
+        # 一个note:
+        # 如果驱动程序或驱动名称有问题，init() 可能会返回 None或丢异常
+        engine = pyttsx3.init()
+        
+        if engine is None:
+            logger.error(f"[{platform.system()} 平台Pyttsx3] 语音引擎初始化失败，返回 None。")
+            logger.warning("这可能表示没有可用的语音驱动程序，或者所选驱动程序存在问题。")
+            return
 
-    for idx, voice in enumerate(voices):
-        logger.info(f"\n[{current_os} 平台Pyttsx3可用语音包]"
-                    f"\n{idx + 1}. ID: {voice.id}"
-                    f"\n   名称: {voice.name}"
-                    f"\n   语言: {voice.languages[0] if voice.languages else '未知'}"
-                    f"\n   性别: {voice.gender}"
-                    f"\n" + "-" * 60)
+        voices = engine.getProperty('voices')
+        current_os = platform.system()
+
+        if not voices:
+            logger.info(f"[{current_os} 平台Pyttsx3] 未找到可用的语音包。")
+            return
+        
+        logger.info(f"[{current_os} 平台Pyttsx3] 发现 {len(voices)} 个可用语音包:")
+        for idx, voice in enumerate(voices):
+            lang_info = '未知'
+            if voice.languages:
+                try:
+                    lang_info = ', '.join(voice.languages)
+                except Exception:
+                    pass 
+            
+            gender_info = '未知'
+            if hasattr(voice, 'gender') and voice.gender:
+                gender_info = voice.gender
+            
+            age_info = ''
+            if hasattr(voice, 'age') and voice.age:
+                age_info = f"\n     年龄: {voice.age}"
+
+            logger.info(f"\n  {idx + 1}. ID: {voice.id}"
+                        f"\n     名称: {voice.name}"
+                        f"\n     语言: {lang_info}"
+                        f"\n     性别: {gender_info}{age_info}"
+                        f"\n" + "-" * 40)
+                        
+    except OSError as e:
+        logger.error(f"[{platform.system()} 平台Pyttsx3] 初始化SAPI5语音引擎时发生COM错误: {e}")
+        logger.error("Windows SAPI5组件未正确注册、已损坏或被禁用 tip:检查系统语音设置")
+        logger.debug(f"COMError信息: {traceback.format_exc()}")
+    except RuntimeError as e:
+        logger.error(f"[{platform.system()} 平台Pyttsx3] 初始化语音引擎时发生运行时错误: {e}")
+        logger.error("可能是因为: SAPI5 on Windows, NSSpeechSynthesizer on macOS, eSpeak on Linux 它们工作不正常导致的")
+        logger.debug(f"RuntimeError信息: {traceback.format_exc()}")
+    except Exception as e:
+        logger.error(f"[{platform.system()} 平台Pyttsx3] 在初始化时发生预料之外的错误: {e}")
+        logger.debug(f"未知错误信息: {traceback.format_exc()}")
