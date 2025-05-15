@@ -1019,18 +1019,8 @@ class WidgetsManager:
             was_floating_mode = False
         for widget in self.widgets:
             widget.animate_hide_opacity()
-        widgets_to_clean = list(self.widgets)
-        self.widgets.clear()
-        for widget in widgets_to_clean:
-            try:
-                widget.deleteLater()
-            except Exception as e:
-                logger.error(f"删除组件时出错: {e}")
-        self.widgets_list = []
-        self.widgets_width = 0
-        self.hide_status = None
-        global update_timer
-        update_timer.remove_all_callbacks()
+        for widget in self.widgets:
+            self.widgets.remove(widget)
         init()
 
     def update_widgets(self):
@@ -2016,7 +2006,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             return
 
         utils.tray_icon = utils.TrayIcon(self)
-        utils.tray_icon.setToolTip(f"ClassWidgets - {config_center.schedule_name[:-5]}")
+        utils.tray_icon.setToolTip(f"Class Widgets - {config_center.schedule_name[:-5]}")
         self.tray_menu = SystemTrayMenu(title='Class Widgets', parent=self)
         self.tray_menu.addActions([
             Action(fIcon.HIDE, '完全隐藏/显示小组件', triggered=lambda: self.hide_show_widgets()),
@@ -2800,7 +2790,7 @@ if __name__ == '__main__':
 
     logger.info(f"操作系统：{system}，版本：{osRelease}/{osVersion}")
 
-    list_pyttsx3_voices()
+    # list_pyttsx3_voices()
 
     if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
         msg_box = Dialog(
