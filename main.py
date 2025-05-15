@@ -131,6 +131,7 @@ last_error_time = dt.datetime.now() - error_cooldown  # 上一次错误
 
 ex_menu = None
 dark_mode_watcher = None
+was_floating_mode = False  # 浮窗状态
 
 if config_center.read_conf('Other', 'do_not_log') != '1':
     logger.add(f"{base_directory}/log/ClassWidgets_main_{{time}}.log", rotation="1 MB", encoding="utf-8",
@@ -1010,8 +1011,12 @@ class WidgetsManager:
             widget.animate_show()
 
     def clear_widgets(self):
-        if fw.isVisible():
+        global fw, was_floating_mode
+        if fw and fw.isVisible():
             fw.close()
+            was_floating_mode = True
+        else:
+            was_floating_mode = False
         for widget in self.widgets:
             widget.animate_hide_opacity()
         widgets_to_clean = list(self.widgets)
@@ -2683,7 +2688,7 @@ def init_config():  # 重设配置文件
 
 
 def init():
-    global theme, radius, mgr, screen_width, first_start, fw
+    global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode
     update_timer.remove_all_callbacks()
 
     theme = config_center.read_conf('General', 'theme')  # 主题
@@ -2706,11 +2711,15 @@ def init():
             widgets.remove(widget)  # 移除不存在的组件(确保移除插件后不会出错)
 
     mgr.init_widgets()
+    if not first_start and was_floating_mode:
+        if fw:
+            fw.show()
+            mgr.full_hide_windows()
 
     update_timer.add_callback(mgr.update_widgets)
     update_timer.start()
 
-    logger.info(f'Class Widgets 启动。版本: {config_center.read_conf("Other", "version")}')
+    logger.info(f'Class Widgets 初始化完成。版本: {config_center.read_conf("Other", "version")}')
     p_loader.run_plugins()  # 运行插件
 
     first_start = False
