@@ -1014,8 +1014,18 @@ class WidgetsManager:
             fw.close()
         for widget in self.widgets:
             widget.animate_hide_opacity()
-        for widget in self.widgets:
-            self.widgets.remove(widget)
+        widgets_to_clean = list(self.widgets)
+        self.widgets.clear()
+        for widget in widgets_to_clean:
+            try:
+                widget.deleteLater()
+            except Exception as e:
+                logger.error(f"删除组件时出错: {e}")
+        self.widgets_list = []
+        self.widgets_width = 0
+        self.hide_status = None
+        global update_timer
+        update_timer.remove_all_callbacks()
         init()
 
     def update_widgets(self):
