@@ -618,7 +618,7 @@ def check_fullscreen():  # 检查是否全屏
         "startmenuexperiencehost"   # 开始菜单
     }
     if window_title_lower in excluded_system_window_titles:
-        logger.debug(f"  前景窗口标题 '{window_title_lower}' 在排除列表 (系统窗口), 排除.")
+        # logger.debug(f"前景窗口标题 '{window_title_lower}' 在排除列表 (系统窗口), 排除.")
         return False
     rect = RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(rect))
