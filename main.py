@@ -1818,13 +1818,14 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 self.setWindowOpacity(1.0)
         else:
+            self.move(self.position[0], self.position[1])
+            self.resize(self.w, self.height())
             if platform.system() == 'Windows' and platform.release() != '7':
                 self.setWindowOpacity(0)
                 self.animate_show_opacity()
             else:
                 self.setWindowOpacity(1.0)
-                self.move(self.position[0], self.position[1])
-            self.resize(self.w, self.height())
+                self.show()
 
         self.update_data('')
 
