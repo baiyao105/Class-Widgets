@@ -13,7 +13,7 @@ from shutil import copy
 from typing import Optional
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject, QParallelAnimationGroup
 from PyQt5.QtGui import QColor, QIcon, QPixmap, QPainter, QDesktopServices
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtSvg import QSvgRenderer
@@ -68,6 +68,7 @@ qss.styleSheetManager = StyleSheetManager()
 import conf
 import list_
 import tip_toast
+from tip_toast import active_windows
 import utils
 import weather_db as db
 from conf import base_directory
@@ -77,7 +78,7 @@ from menu import open_plaza
 from network_thread import check_update, weatherReportThread
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, stop, share, update_timer
+from utils import restart, stop, share, update_timer, DarkModeWatcher
 from file import config_center, schedule_center
 
 if os.name == 'nt':
@@ -129,6 +130,8 @@ ignore_errors = []
 last_error_time = dt.datetime.now() - error_cooldown  # 上一次错误
 
 ex_menu = None
+dark_mode_watcher = None
+was_floating_mode = False  # 浮窗状态
 
 if config_center.read_conf('Other', 'do_not_log') != '1':
     logger.add(f"{base_directory}/log/ClassWidgets_main_{{time}}.log", rotation="1 MB", encoding="utf-8",
@@ -163,31 +166,60 @@ def global_exceptHook(exc_type, exc_value, exc_tb):  # 全局异常捕获
 
 sys.excepthook = global_exceptHook  # 设置全局异常捕获
 
+def handle_dark_mode_change(is_dark):
+    """处理DarkModeWatcher触发的UI更新"""
+    if config_center.read_conf('General', 'color_mode') == '2':
+        logger.info(f"系统颜色模式更新: {'深色' if is_dark else '浅色'}")
+        current_theme = Theme.DARK if is_dark else Theme.LIGHT
+        setTheme(current_theme)
+        if mgr: 
+            mgr.clear_widgets()
+        else:
+            logger.warning("主题更改时,mgr还未初始化")
+        # if current_state == 1:
+        #      setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")
+        # else:
+        #      setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
+
 
 def setTheme_():  # 设置主题
-    if platform.system() == 'Windows' and platform.release() == '7':
-        setTheme(Theme.LIGHT)
-        logger.warning('不支持的系统,强制使用亮色主题')
-        return
-
-    if config_center.read_conf('General', 'color_mode') == '2':  # 自动
+    global theme
+    color_mode = config_center.read_conf('General', 'color_mode')
+    if color_mode == '2':  # 自动
+        logger.info(f'颜色模式: 自动({color_mode})')
         if platform.system() == 'Darwin' and Version(platform.mac_ver()[0]) < Version('10.14'):
             return
         if platform.system() == 'Windows':
+            # Windows 7特殊处理
+            if sys.getwindowsversion().major == 6 and sys.getwindowsversion().minor == 1:
+                setTheme(Theme.LIGHT)
+                return
             # 检查Windows版本是否支持深色模式（Windows 10 build 14393及以上）
             try:
-                win_build = sys.getwindowsversion().build
-                if win_build < 14393:  # 不支持深色模式的最低版本
-                    return
+                win_build = sys.getwindowsversion().build 
+                if win_build < 14393:  # 不支持深色模式的最低版本 
+                    return 
             except AttributeError:
-                # 无法获取版本信息，保守返回
+                # 无法获取版本信息，保守返回 
                 return
         if platform.system() == 'Linux':
             return
-        setTheme(Theme.AUTO)
-    elif config_center.read_conf('General', 'color_mode') == '1':
+        if dark_mode_watcher:
+            is_dark = dark_mode_watcher.isDark()
+            if is_dark is not None:
+                logger.info(f"当前颜色模式: {'深色' if is_dark else '浅色'}")
+                setTheme(Theme.DARK if is_dark else Theme.LIGHT)
+            else:
+                logger.warning("无法获取系统颜色模式，暂时使用浅色主题")
+                setTheme(Theme.LIGHT)
+        else:
+            logger.warning("DarkModeWatcher 未被初始化，使用浅色主题")
+            setTheme(Theme.LIGHT)
+    elif color_mode == '1':
+        logger.info(f'颜色模式: 深色({color_mode})')
         setTheme(Theme.DARK)
     else:
+        logger.info(f'颜色模式: 浅色({color_mode})')
         setTheme(Theme.LIGHT)
 
 
@@ -550,54 +582,64 @@ def check_fullscreen():  # 检查是否全屏
         return False
     user32 = ctypes.windll.user32
     hwnd = user32.GetForegroundWindow()
-    if hwnd == 0 or hwnd == user32.GetDesktopWindow() or hwnd == user32.GetShellWindow():
+    if not hwnd:
         return False
-    # 获取窗口标题
-    title_buffer = ctypes.create_unicode_buffer(256)
-    user32.GetWindowTextW(hwnd, title_buffer, 256)
-    window_title = title_buffer.value.strip()
+    if hwnd == user32.GetDesktopWindow():
+        return False
+    if hwnd == user32.GetShellWindow():
+        return False
     pid = ctypes.c_ulong()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    process_name = get_process_name(pid.value).lower()
+    process_name = get_process_name(pid.value)
     current_pid = os.getpid()
-    # 排除自身(强调特效)
+    # logger.debug(f"前景窗口句柄: {hwnd}, PID: {pid.value}, 进程名: {process_name}")
     if pid.value == current_pid:
         return False
-    # 排除系统进程
-    system_processes = {
-        'explorer.exe',  # 桌面
-        'shellexperiencehost.exe',
-        'searchui.exe',  # 搜索
-        'applicationframehost.exe'  # UWP组件
+    # 排除特定系统进程
+    excluded_system_processes = {
+        'explorer.exe',             # 文件资源管理器/桌面
+        'shellexperiencehost.exe',  # Shell体验主机 (开始菜单、操作中心)
+        'searchui.exe',             # Cortana/搜索界面
+        'applicationframehost.exe', # UWP应用框架
+        'systemsettings.exe',       # 设置
+        'taskmgr.exe'               # 任务管理器
     }
-    if process_name in system_processes:
+    if process_name in excluded_system_processes:
+        # logger.debug(f"前景窗口进程 '{process_name}' 在排除列表 (系统进程), 排除.")
         return False
-    # 排除系统窗口
-    system_windows = {
-        "",  # 无标题窗口
-        "program manager",  # 桌面窗口
-        "windows input experience",  # 输入面板
-        "msctfmonitor window",
-        "startmenuexperiencehost"  # 开始菜单
+    title_buffer = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(hwnd, title_buffer, 256)
+    window_title_lower = title_buffer.value.strip().lower()
+    # logger.debug(f"前景窗口标题: '{title_buffer.value}' (小写: '{window_title_lower}')")
+    # 排除特定窗口标题
+    excluded_system_window_titles = {
+        "program manager",            # 桌面窗口
+        "windows input experience",   # 输入法相关
+        "msctfmonitor window",        # 输入法相关
+        "startmenuexperiencehost"   # 开始菜单
     }
-    if window_title.lower() in system_windows:
+    if window_title_lower in excluded_system_window_titles:
+        # logger.debug(f"前景窗口标题 '{window_title_lower}' 在排除列表 (系统窗口), 排除.")
         return False
     rect = RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(rect))
-    screen_rect = RECT()
-    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(screen_rect))
-    is_fullscreen = (
-        rect.left <= screen_rect.left and
-        rect.top <= screen_rect.top and
-        rect.right >= screen_rect.right and
-        rect.bottom >= screen_rect.bottom
+    # 使用桌面窗口作为屏幕尺寸参考
+    screen_rect_desktop = RECT()
+    user32.GetWindowRect(user32.GetDesktopWindow(), ctypes.byref(screen_rect_desktop))
+    # logger.debug(f"窗口矩形: 左={rect.left}, 上={rect.top}, 右={rect.right}, 下={rect.bottom}")
+    # logger.debug(f"桌面矩形: 左={screen_rect_desktop.left}, 上={screen_rect_desktop.top}, 右={screen_rect_desktop.right}, 下={screen_rect_desktop.bottom}")
+    is_covering_screen = (
+        rect.left <= screen_rect_desktop.left and
+        rect.top <= screen_rect_desktop.top and
+        rect.right >= screen_rect_desktop.right and
+        rect.bottom >= screen_rect_desktop.bottom
     )
-    # 排除窗口大小必须占用屏幕95%,避免诈骗()
-    if is_fullscreen:
-        screen_area = (screen_rect.right - screen_rect.left) * (screen_rect.bottom - screen_rect.top)
+    if is_covering_screen:
+        screen_area = (screen_rect_desktop.right - screen_rect_desktop.left) * (screen_rect_desktop.bottom - screen_rect_desktop.top)
         window_area = (rect.right - rect.left) * (rect.bottom - rect.top)
-        return window_area >= screen_area * 0.95
-
+        is_fullscreen = window_area >= screen_area * 0.95
+        # logger.debug(f"覆盖屏幕: {is_covering_screen}, 窗口面积: {window_area}, 屏幕面积: {screen_area}, 是否全屏判断: {is_fullscreen}")
+        return is_fullscreen
     return False
 
 
@@ -979,8 +1021,12 @@ class WidgetsManager:
             widget.animate_show()
 
     def clear_widgets(self):
-        if fw.isVisible():
+        global fw, was_floating_mode
+        if fw and fw.isVisible():
             fw.close()
+            was_floating_mode = True
+        else:
+            was_floating_mode = False
         for widget in self.widgets:
             widget.animate_hide_opacity()
         for widget in self.widgets:
@@ -1053,6 +1099,7 @@ class WidgetsManager:
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
         time = int(config_center.read_conf('Plugin', 'auto_delay'))
         self.action = action
 
@@ -1168,12 +1215,14 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.animation_rect = None
         self.animation = None
         self.m_Position = None
         self.p_Position = None
         self.m_flag = None
         self.r_Position = None
+        self._is_topmost_callback_added = False
         self.init_ui()
         self.init_font()
         self.position = None
@@ -1185,7 +1234,8 @@ class FloatingWidget(QWidget):  # 浮窗
         self.activity_countdown = self.findChild(QLabel, 'activity_countdown')
         self.countdown_progress_bar = self.findChild(ProgressRing, 'progressBar')
 
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 检查焦点
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
 
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -1239,6 +1289,50 @@ class FloatingWidget(QWidget):  # 浮窗
             if visible_height < window_height / 2:
                 new_y = screen_bottom - window_height
         return QPoint(new_x, new_y)
+
+    def _ensure_topmost(self):
+        # 始终处于顶层
+        if active_windows:
+            return
+        if os.name == 'nt':
+            try:
+                hwnd = self.winId().__int__()
+                if ctypes.windll.user32.IsWindow(hwnd):
+                    HWND_TOPMOST = -1
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_SHOWWINDOW = 0x0040
+                    SWP_NOACTIVATE = 0x0010
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW)
+                    self.raise_()
+                else:
+                    if self._is_topmost_callback_added:
+                        try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                        except ValueError:
+                            pass # 可能已经被移除了
+                        self._is_topmost_callback_added = False
+                        logger.debug(f"句柄 {hwnd} 无效，已移除置顶回调。")
+            except RuntimeError as e:
+                 if 'Internal C++ object' in str(e) and 'already deleted' in str(e):
+                     logger.debug(f"尝试访问已删除的 FloatingWidget 时出错，移除回调: {e}")
+                     if self._is_topmost_callback_added:
+                         try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                         except ValueError:
+                             pass # 可能已经被移除了
+                         self._is_topmost_callback_added = False
+                 else:
+                     logger.error(f"检查或设置浮窗置顶时发生运行时错误: {e}")
+            except Exception as e:
+                logger.error(f"检查或设置浮窗置顶时出错: {e}")
+                if self._is_topmost_callback_added:
+                    try:
+                        utils.update_timer.remove_callback(self._ensure_topmost)
+                    except ValueError:
+                        pass
+                    self._is_topmost_callback_added = False
+                    logger.debug(f"因错误 {e} 移除浮窗置顶回调。")
     
     def save_position(self):
         current_screen = QApplication.screenAt(self.pos())
@@ -1290,6 +1384,27 @@ class FloatingWidget(QWidget):  # 浮窗
 
         # 设置窗口无边框和透明背景
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        # 根据平台和设置应用窗口标志
+        if sys.platform == 'darwin':
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.X11BypassWindowManagerHint
+        else:
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.X11BypassWindowManagerHint
+
+        self.setWindowFlags(flags)
+
+        # 始终添加置顶回调逻辑
+        if os.name == 'nt':
+            if not self._is_topmost_callback_added:
+                try:
+                    if hasattr(utils, 'update_timer') and utils.update_timer:
+                        utils.update_timer.add_callback(self._ensure_topmost)
+                        self._is_topmost_callback_added = True
+                        self._ensure_topmost() # 立即执行一次确保初始置顶
+                    else:
+                        logger.warning("utils.update_timer 不可用，无法为浮窗添加置顶回调。")
+                except Exception as e:
+                    logger.error(f"为浮窗添加置顶回调时出错: {e}")
 
         if sys.platform == 'darwin':
             self.setWindowFlags(
@@ -1491,6 +1606,12 @@ class FloatingWidget(QWidget):  # 浮窗
             self.hide()
             self.save_position()
             self.animating = False
+            if self._is_topmost_callback_added:
+                try:
+                    utils.update_timer.remove_callback(self._ensure_topmost)
+                except ValueError:
+                    pass
+                self._is_topmost_callback_added = False
             
         self.animation_rect.finished.connect(cleanup)
 
@@ -1538,13 +1659,20 @@ class FloatingWidget(QWidget):  # 浮窗
         hide_mode = config_center.read_conf('General', 'hide')
         if hide_mode == '1' or hide_mode == '2':
              return # 阻止手动展开/收起
-
         if (
                 hasattr(self, "p_Position")
                 and self.r_Position == self.p_Position
                 and not self.animating
         ): # 非特定隐藏模式下执行点击事件
-            mgr.show_windows()
+            if hide_mode == '3':
+                if mgr.state:
+                    mgr.decide_to_hide()
+                    mgr.hide_status = (current_state, 1)
+                else:
+                    mgr.show_windows()
+                    mgr.hide_status = (current_state, 0)
+            elif hide_mode == '1': 
+                mgr.show_windows()
             self.close()
 
     def focusInEvent(self, event):
@@ -1567,6 +1695,7 @@ class FloatingWidget(QWidget):  # 浮窗
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent=WidgetsManager, path='widget-time.ui', enable_tray=False, cnt=0, position=None, widget_cnt = None):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
 
         self.cnt = cnt
         self.widget_cnt = widget_cnt
@@ -1582,10 +1711,17 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
         self.w = 100
 
+        # 天气预警动画相关
+        self.weather_alert_timer = None
+        self.weather_alert_animation = None
+        self.weather_alert_text = None
+        self.alert_showing = False
+
         self.position = parent.get_widget_pos(self.path) if position is None else position
         self.animation = None
         self.opacity_animation = None
         mgr.hide_status = None
+        self._is_topmost_callback_added = False # 添加一个标志来跟踪回调是否已添加
 
         try:
             self.w = conf.load_theme_config(theme)['widget_width'][self.path]
@@ -1638,12 +1774,37 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         elif path == 'widget-weather.ui':  # 天气组件
             content_layout = self.findChild(QHBoxLayout, 'horizontalLayout_2')
-            content_layout.setSpacing(16)
+            content_layout.setSpacing(1)
             self.temperature = self.findChild(QLabel, 'temperature')
             self.weather_icon = self.findChild(QLabel, 'weather_icon')
-            self.alert_icon = IconWidget()
-            self.alert_icon.setFixedSize(24, 24)
-            content_layout.insertWidget(0, self.alert_icon)
+            self.alert_icon = IconWidget(self)
+            self.alert_icon.setFixedSize(22,22)
+            self.alert_icon.hide()
+
+            # 预警标签
+            self.weather_alert_text = QLabel(self)
+            self.weather_alert_text.setAlignment(Qt.AlignCenter)
+            self.weather_alert_text.setStyleSheet(self.temperature.styleSheet())
+            self.weather_alert_text.setFont(self.temperature.font())
+            self.weather_alert_text.hide()
+            content_layout.addWidget(self.alert_icon)
+            content_layout.addWidget(self.weather_alert_text)
+
+            self.weather_alert_timer = None
+            self.weather_alert_opacity = QGraphicsOpacityEffect(self)
+            self.weather_alert_opacity.setOpacity(1.0)
+            self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            self.weather_alert_animation = QPropertyAnimation(self.weather_alert_opacity, b"opacity")
+            self.weather_alert_animation.setDuration(700)
+            self.weather_alert_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.alert_icon_opacity = QGraphicsOpacityEffect(self)
+            self.alert_icon_opacity.setOpacity(1.0)
+            self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+            self.alert_icon_animation = QPropertyAnimation(self.alert_icon_opacity, b"opacity")
+            self.alert_icon_animation.setDuration(700)
+            self.alert_icon_animation.setEasingCurve(QEasingCurve.OutCubic)
+            
+            self.showing_temperature = True  # 跟踪状态(预警/气温)
 
             self.get_weather_data()
             self.weather_timer = QTimer(self)
@@ -1669,13 +1830,14 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 self.setWindowOpacity(1.0)
         else:
+            self.move(self.position[0], self.position[1])
+            self.resize(self.w, self.height())
             if platform.system() == 'Windows' and platform.release() != '7':
                 self.setWindowOpacity(0)
                 self.animate_show_opacity()
             else:
                 self.setWindowOpacity(1.0)
-                self.move(self.position[0], self.position[1])
-            self.resize(self.w, self.height())
+                self.show()
 
         self.update_data('')
 
@@ -1727,6 +1889,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                 Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.WindowDoesNotAcceptFocus | Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
+            # 修改为使用定时器确保持续置顶
+            if os.name == 'nt':
+                if not self._is_topmost_callback_added:
+                    try:
+                        # 确保 utils.update_timer 存在且有效
+                        if hasattr(utils, 'update_timer') and utils.update_timer:
+                            utils.update_timer.add_callback(self._ensure_topmost)
+                            self._is_topmost_callback_added = True
+                            self._ensure_topmost() # 立即执行一次确保初始置顶
+                            # logger.debug("已添加置顶定时回调。")
+                        else:
+                            logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
+                    except Exception as e:
+                        logger.error(f"添加置顶回调时出错: {e}")
 
         elif config_center.read_conf('General', 'pin_on_top') == '2':  # 置底
             # 避免使用WindowStaysOnBottomHint,防止争夺底层
@@ -1735,7 +1911,6 @@ class DesktopWidget(QWidget):  # 主要小组件
                 Qt.WindowType.WindowDoesNotAcceptFocus
             )
             if os.name == 'nt':
-                import ctypes
                 def set_window_pos():
                     hwnd = self.winId().__int__()
                     # 稍高于最底层的值
@@ -1752,6 +1927,62 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.setWindowFlag(Qt.WindowType.Widget, True)
         else:
             self.setWindowFlag(Qt.WindowType.Tool, True)
+
+    def _ensure_topmost(self):
+        # 突然忘记写移除了,不写了,应该没事(
+        if active_windows:
+            return
+        if os.name == 'nt':
+            try:
+                hwnd = self.winId().__int__()
+                if ctypes.windll.user32.IsWindow(hwnd):
+                    HWND_TOPMOST = -1
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_SHOWWINDOW = 0x0040
+                    SWP_NOACTIVATE = 0x0010
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW)
+                    self.raise_()
+                else:
+                    if self._is_topmost_callback_added:
+                        try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                        except ValueError:
+                            pass # 可能已经被移除了
+                        self._is_topmost_callback_added = False
+                        logger.debug(f"窗口句柄 {hwnd} 无效，已自动移除置顶回调。")
+            except RuntimeError as e:
+                 if 'Internal C++ object' in str(e) and 'already deleted' in str(e):
+                     logger.debug(f"尝试访问已删除的 DesktopWidget 时出错，移除回调: {e}")
+                     if self._is_topmost_callback_added:
+                         try:
+                            utils.update_timer.remove_callback(self._ensure_topmost)
+                         except ValueError:
+                             pass # 可能已经被移除了
+                         self._is_topmost_callback_added = False
+                 else:
+                     logger.error(f"检查或设置窗口置顶时发生运行时错误: {e}")
+            except Exception as e:
+                logger.error(f"检查或设置窗口置顶时出错: {e}")
+                if self._is_topmost_callback_added:
+                    try:
+                        utils.update_timer.remove_callback(self._ensure_topmost)
+                    except ValueError:
+                        pass
+                    self._is_topmost_callback_added = False
+                    logger.debug(f"因错误 {e} 移除置顶回调。")
+
+    def closeEvent(self, event):
+        if self._is_topmost_callback_added:
+            try:
+                utils.update_timer.remove_callback(self._ensure_topmost)
+                self._is_topmost_callback_added = False
+                # logger.debug("窗口关闭，已移除置顶回调。")
+            except ValueError:
+                logger.debug("尝试移除不存在的置顶回调。")
+            except Exception as e:
+                logger.error(f"关闭窗口时移除置顶回调出错: {e}")
+        super().closeEvent(event)
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -1792,6 +2023,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             return
 
         utils.tray_icon = utils.TrayIcon(self)
+        utils.tray_icon.setToolTip(f"Class Widgets - {config_center.schedule_name[:-5]}")
         self.tray_menu = SystemTrayMenu(title='Class Widgets', parent=self)
         self.tray_menu.addActions([
             Action(fIcon.HIDE, '完全隐藏/显示小组件', triggered=lambda: self.hide_show_widgets()),
@@ -1943,6 +2175,147 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.last_code = current_code
             self.get_weather_data()
 
+    def toggle_weather_alert(self):
+        if not hasattr(self, 'weather_alert_level') or not self.weather_alert_level:
+            # logger.warning("未获取到天气预警等级")
+            return
+        if not hasattr(self, 'weather_alert_text') or not self.weather_alert_text.text():
+            # logger.warning("未获取到天气预警文本")
+            return
+        if self.showing_temperature:
+            # 切换预警
+            self.weather_alert_animation.setStartValue(0.0)
+            self.weather_alert_animation.setEndValue(1.0)
+            self.alert_icon_animation.setStartValue(0.0)
+            self.alert_icon_animation.setEndValue(1.0)
+            # 渐隐
+            self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+            self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+            self.weather_icon.setGraphicsEffect(self.weather_opacity)
+            self.temperature.setGraphicsEffect(self.temperature_opacity)
+            weather_fade_out = QPropertyAnimation(self.weather_opacity, b'opacity')
+            temp_fade_out = QPropertyAnimation(self.temperature_opacity, b'opacity')
+            weather_fade_out.setDuration(700)
+            temp_fade_out.setDuration(700)
+            weather_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            temp_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            weather_fade_out.setStartValue(1.0)
+            weather_fade_out.setEndValue(0.0)
+            temp_fade_out.setStartValue(1.0)
+            temp_fade_out.setEndValue(0.0)
+            # 重置不透明度
+            self.fade_out_group = QParallelAnimationGroup(self)
+            self.fade_out_group.addAnimation(weather_fade_out)
+            self.fade_out_group.addAnimation(temp_fade_out)
+            if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+                self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+                self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+                self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+                self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+
+            alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+            alert_icon_fade_in = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+            alert_text_fade_in.setDuration(700)
+            alert_icon_fade_in.setDuration(700)
+            alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_icon_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_text_fade_in.setStartValue(0.0)
+            alert_text_fade_in.setEndValue(1.0)
+            alert_icon_fade_in.setStartValue(0.0)
+            alert_icon_fade_in.setEndValue(1.0)
+
+            self.fade_in_group = QParallelAnimationGroup(self)
+            self.fade_in_group.addAnimation(alert_text_fade_in)
+            self.fade_in_group.addAnimation(alert_icon_fade_in)
+            try: self.fade_out_group.finished.disconnect()
+            except TypeError: pass
+
+            def _start_alert_fade_in():
+                if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon() is not None and not self.alert_icon.icon().isNull():
+                    self.weather_icon.hide()
+                    self.temperature.hide()
+                    self.weather_alert_opacity.setOpacity(0.0)
+                    self.alert_icon_opacity.setOpacity(0.0)
+                    self.weather_alert_text.show()
+                    self.alert_icon.show()
+                    self.fade_in_group.start()
+                    self.weather_info_timer.start(3000)
+                else:
+                    self.weather_icon.show()
+                    self.temperature.show()
+                    if hasattr(self, 'weather_opacity'): self.weather_opacity.setOpacity(1.0)
+                    if hasattr(self, 'temperature_opacity'): self.temperature_opacity.setOpacity(1.0)
+                    self.showing_temperature = True
+
+            self.fade_out_group.finished.connect(_start_alert_fade_in)
+
+            self.fade_out_group.start()
+        else:
+            # 切换到气温
+            self.weather_alert_animation.setStartValue(1.0)
+            self.weather_alert_animation.setEndValue(0.0)
+            self.alert_icon_animation.setStartValue(1.0)
+            self.alert_icon_animation.setEndValue(0.0)
+            if not hasattr(self, 'weather_alert_opacity') or not self.weather_alert_opacity:
+                self.weather_alert_opacity = QGraphicsOpacityEffect(self.weather_alert_text)
+                self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+            if not hasattr(self, 'alert_icon_opacity') or not self.alert_icon_opacity:
+                self.alert_icon_opacity = QGraphicsOpacityEffect(self.alert_icon)
+                self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
+
+            alert_text_fade_out = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+            alert_icon_fade_out = QPropertyAnimation(self.alert_icon_opacity, b'opacity')
+            alert_text_fade_out.setDuration(500)
+            alert_icon_fade_out.setDuration(500)
+            alert_text_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_icon_fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            alert_text_fade_out.setStartValue(1.0)
+            alert_text_fade_out.setEndValue(0.0)
+            alert_icon_fade_out.setStartValue(1.0)
+            alert_icon_fade_out.setEndValue(0.0)
+
+            self.fade_out_group = QParallelAnimationGroup(self)
+            self.fade_out_group.addAnimation(alert_text_fade_out)
+            self.fade_out_group.addAnimation(alert_icon_fade_out)
+            if not hasattr(self, 'weather_opacity') or not self.weather_opacity:
+                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+                self.weather_icon.setGraphicsEffect(self.weather_opacity)
+            if not hasattr(self, 'temperature_opacity') or not self.temperature_opacity:
+                self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
+                self.temperature.setGraphicsEffect(self.temperature_opacity)
+                
+            weather_fade_in = QPropertyAnimation(self.weather_opacity, b'opacity')
+            temp_fade_in = QPropertyAnimation(self.temperature_opacity, b'opacity')
+            weather_fade_in.setDuration(500)
+            temp_fade_in.setDuration(500)
+            weather_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            temp_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            weather_fade_in.setStartValue(0.0)
+            weather_fade_in.setEndValue(1.0)
+            temp_fade_in.setStartValue(0.0)
+            temp_fade_in.setEndValue(1.0)
+
+            self.fade_in_group = QParallelAnimationGroup(self)
+            self.fade_in_group.addAnimation(weather_fade_in)
+            self.fade_in_group.addAnimation(temp_fade_in)
+            try: self.fade_out_group.finished.disconnect()
+            except TypeError: pass
+
+            def _start_temperature_fade_in():
+                self.weather_alert_text.hide()
+                self.alert_icon.hide()
+                self.weather_opacity.setOpacity(0.0)
+                self.temperature_opacity.setOpacity(0.0)
+                self.weather_icon.show()
+                self.temperature.show()
+                self.fade_in_group.start()
+            # 连接淡出组完成信号
+            self.fade_out_group.finished.connect(_start_temperature_fade_in)
+            self.fade_out_group.start()
+        
+        self.showing_temperature = not self.showing_temperature
+
     def detect_theme_changed(self):
         theme_ = config_center.read_conf('General', 'theme')
         color_mode = config_center.read_conf('General', 'color_mode')
@@ -1970,13 +2343,47 @@ class DesktopWidget(QWidget):  # 主要小组件
                 )
                 self.alert_icon.hide()
                 if db.is_supported_alert():
-                    # print(alert_data if alert_data else weather_data)
                     alert_type = db.get_weather_data('alert', alert_data if alert_data else weather_data)
                     if alert_type:
                         self.alert_icon.setIcon(
                             db.get_alert_image(alert_type)
                         )
-                        self.alert_icon.show()
+                        self.alert_icon.hide()
+                        try:
+                            alert_title = db.get_weather_data('alert_title', alert_data if alert_data else weather_data)
+                            if alert_title:
+                                alert_type_match = re.search(r'发布(\w+)(蓝|黄|橙|红)色预警', alert_title)
+                                if alert_type_match:
+                                    alert_type = alert_type_match.group(1)  # 类型
+                                    logger.success(f'天气预警: {alert_title} --> {alert_type}预警')
+                                    alert_text = alert_type + '预警'
+                                else:
+                                    logger.success(f'天气预警: {alert_title} --> {alert_title}')
+                                    alert_text = alert_title
+                                self.weather_alert_text.setFixedWidth(80)
+                                self.weather_alert_text.setFixedHeight(40)
+                                # 调整字体大小
+                                font = self.weather_alert_text.font()
+                                if len(alert_text) <= 4:
+                                    font.setPointSize(14)
+                                elif len(alert_text) <= 6:
+                                    font.setPointSize(12)
+                                else:
+                                    font.setPointSize(10)
+                                
+                                self.weather_alert_text.setFont(font)
+                                self.weather_alert_text.setText(alert_text)
+                                self.weather_alert_text.setAlignment(Qt.AlignCenter)
+                                if not self.weather_alert_timer:
+                                    self.weather_alert_timer = QTimer(self)
+                                    self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
+                                    self.weather_alert_timer.start(6000)
+                                    self.weather_info_timer = QTimer(self)
+                                    self.weather_info_timer.timeout.connect(self.toggle_weather_alert)
+                                    self.weather_info_timer.setSingleShot(True)
+                        except Exception as e:
+                            logger.warning(f'获取天气预警标题失败：{e}')
+                            self.weather_alert_text.setText('暂无预警信息')
 
                 self.temperature.setText(f"{db.get_weather_data('temp', weather_data)}")
                 current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · "
@@ -1995,6 +2402,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                 if hasattr(self, 'weather_icon'):
                     self.weather_icon.setPixmap(QPixmap(f'{base_directory}/img/weather/99.svg'))
                     self.alert_icon.hide()
+                    self.weather_alert_text.hide()
                     self.temperature.setText('--°')
                     current_city = self.findChild(QLabel, 'current_city')
                     if current_city:
@@ -2203,76 +2611,111 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 
 def check_windows_maximize():  # 检查窗口是否最大化
-    if os.name != 'nt':
+    if os.name != 'nt' or not pygetwindow:
+        # logger.debug("非Windows NT系统或pygetwindow未加载, 无法检查最大化.")
         return False
-    # 全字匹配以下关键词排除
-    excluded_titles = {
-        'ResidentSideBar', # 希沃侧边栏
-        'Program Manager', # Windows桌面
-        'Desktop', # Windows桌面
-        '', #空标题
-        'SnippingTool', # 系统截图工具
+    # 需要排除的特定窗口标题 (全字匹配, 大小写不敏感)
+    excluded_titles_exact_lower = {
+        'residentsidebar',  # 希沃侧边栏
+        'program manager',  # Windows桌面
+        'desktop',          # Windows桌面 (备用)
+        'snippingtool',     # 系统截图工具
+        # '' 空标题不再默认排除
     }
-    # 包含以下关键词排除
-    excluded_keywords = {
-        'Overlay',
-        'Snipping',
-        'SideBar'
+    # 需要排除的标题中包含的关键词 (大小写不敏感)
+    excluded_keywords_in_title_lower = {
+        'overlay',
+        'snipping',
+        'sidebar',
+        'flyout' # qfluentwidgets的浮出控件
     }
-    excluded_process_patterns = {
-        'shellexperiencehost', 
-        'searchui', 
-        'startmenuexperiencehost'
+    # 需要排除的进程名 (全字或部分匹配, 大小写不敏感)
+    excluded_process_names_lower = {
+        'shellexperiencehost.exe',
+        'searchui.exe',
+        'startmenuexperiencehost.exe',
+        'applicationframehost.exe',
+        'systemsettings.exe',
+        'taskmgr.exe'
     }
-    max_windows = []
+    # 用户自定义的忽略进程列表 (全字匹配, 大小写不敏感)
+    # 例：easinote.exe 每行一个，用逗号分隔
+    ignored_process_names_for_maximize_lower = {
+        'easinote.exe'
+    }
+    
+    current_pid = os.getpid()
+
     try:
         all_windows = pygetwindow.getAllWindows()
     except Exception as e:
-        logger.error(f"获取窗口列表异常: {str(e)}")
+        logger.warning(f"获取窗口列表时发生错误 (pygetwindow): {str(e)}")
+        # logger.debug("获取窗口列表失败.")
         return False
+
     for window in all_windows:
         try:
-            # 检查窗口是否有效
             if not window._hWnd:
+                # logger.debug(f"窗口 '{getattr(window, 'title', 'N/A')}' 无效句柄, 跳过.")
                 continue
-            # 检查窗口是否可见且最大化
+            if not window.visible:
+                # logger.debug(f"窗口 '{window.title}' 不可见, 跳过.")
+                continue
+            if not window.isMaximized:
+                # logger.debug(f"窗口 '{window.title}' 未最大化, 跳过.")
+                continue
+            # logger.debug(f"发现可见且已最大化的窗口: '{window.title}' (句柄: {window._hWnd})")
             try:
-                is_valid = window.visible and window.isMaximized
-                # 获取窗口位置验证窗口存在性
-                window_rect = window.box
-                if not is_valid or not window_rect:
-                    continue
-            except Exception:
-                # 获取窗口属性失败，可能已关闭
+                hwnd_int = window._hWnd
+                pid_val = ctypes.c_ulong()
+                ctypes.windll.user32.GetWindowThreadProcessId(hwnd_int, ctypes.byref(pid_val))
+                win_pid = pid_val.value
+                if win_pid == 0:
+                    continue # 无效PID
+                process_name = psutil.Process(win_pid).name().lower()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError, ValueError, OSError) :
+                # logger.debug(f"无法获取窗口 '{title}' 的进程信息,跳过.")
                 continue
+            
+            if win_pid == current_pid:
+                # logger.debug(f"窗口 '{title}' (PID: {win_pid}, 进程: {process_name}) 是自身进程, 排除.")
+                continue
+
             title = window.title.strip()
-            pid = window._hWnd
-            process_name = get_process_name(pid).lower()
             title_lower = title.lower()
-            is_system_explorer = (
-                process_name == "explorer.exe" 
-                and (title in excluded_titles 
-                     or any(kw in title_lower for kw in excluded_keywords))
-            )
-            is_system_process = any(
-                pattern in process_name 
-                for pattern in excluded_process_patterns
-            )
-            has_excluded_keyword = any(
-                kw in title_lower for kw in excluded_keywords
-            )
-            if not (title in excluded_titles or is_system_explorer or is_system_process or has_excluded_keyword):
-                max_windows.append({
-                    'title': title,
-                    'process': process_name,
-                    'pid': pid,
-                    'rect': window.box
-                })
+
+            if process_name in ignored_process_names_for_maximize_lower:
+                # logger.debug(f"窗口 '{title}' (进程: {process_name}) 在忽略列表, 排除.")
+                continue
+
+            if process_name in excluded_process_names_lower:
+                # logger.debug(f"窗口 '{title}' (进程: {process_name}) 在排除的进程名列表, 排除.")
+                continue
+            
+            if title_lower in excluded_titles_exact_lower:
+                # logger.debug(f"窗口标题 '{title_lower}' 在排除列表, 排除.")
+                continue
+
+            if any(keyword in title_lower for keyword in excluded_keywords_in_title_lower):
+                # logger.debug(f"窗口标题 '{title_lower}' 包含排除的关键词, 排除.")
+                continue
+            
+            # 如果进程是 explorer.exe,但不是“资源管理器”则认为是特殊explorer(应该是桌面)
+            if process_name == 'explorer.exe':
+                if title_lower in excluded_titles_exact_lower or \
+                   any(keyword in title_lower for keyword in excluded_keywords_in_title_lower):
+                    # logger.debug(f"explorer.exe 窗口 '{title_lower}' 命中标题排除规则, 排除.")
+                    continue
+            # logger.debug(f"找到有效最大化窗口: '{title}' (PID: {win_pid}, 进程: {process_name}). 返回 True.")
+            return True
+
         except Exception as e:
-            logger.error(f"窗口处理异常: {str(e)}")
+            if window and hasattr(window, 'title'):
+                logger.debug(f"处理窗口 '{getattr(window, 'title', 'N/A')}' 时发生错误: {str(e)}")
+            else:
+                logger.debug(f"处理一个未知窗口时发生错误: {str(e)}")
             continue
-    # 如果有最大化窗口则返回True
-    return len(max_windows) > 0
+    return False
 
 
 
@@ -2287,7 +2730,7 @@ def init_config():  # 重设配置文件
 
 
 def init():
-    global theme, radius, mgr, screen_width, first_start, fw
+    global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode
     update_timer.remove_all_callbacks()
 
     theme = config_center.read_conf('General', 'theme')  # 主题
@@ -2310,11 +2753,15 @@ def init():
             widgets.remove(widget)  # 移除不存在的组件(确保移除插件后不会出错)
 
     mgr.init_widgets()
+    if not first_start and was_floating_mode:
+        if fw:
+            fw.show()
+            mgr.full_hide_windows()
 
     update_timer.add_callback(mgr.update_widgets)
     update_timer.start()
 
-    logger.info(f'Class Widgets 启动。版本: {config_center.read_conf("Other", "version")}')
+    logger.info(f'Class Widgets 初始化完成。版本: {config_center.read_conf("Other", "version")}')
     p_loader.run_plugins()  # 运行插件
 
     first_start = False
@@ -2362,6 +2809,13 @@ if __name__ == '__main__':
     share.create(1)  # 创建共享内存
     logger.info(
         f"共享内存：{share.isAttached()} 是否允许多开实例：{config_center.read_conf('Other', 'multiple_programs')}")
+    try:
+        dark_mode_watcher = DarkModeWatcher(parent=app)
+        dark_mode_watcher.darkModeChanged.connect(handle_dark_mode_change) # 连接信号
+        # 初始主题设置依赖于 darkModeChanged 信号
+    except Exception as e:
+        logger.error(f"初始化颜色模式监测器时出错: {e}")
+        dark_mode_watcher = None
 
     if scale_factor > 1.8 or scale_factor < 1.0:
         logger.warning("当前缩放系数可能导致显示异常，建议使缩放系数在 100% 到 180% 之间")
@@ -2388,7 +2842,7 @@ if __name__ == '__main__':
 
     logger.info(f"操作系统：{system}，版本：{osRelease}/{osVersion}")
 
-    # list_pyttsx3_voices() # debug
+    # list_pyttsx3_voices()
 
     if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
         msg_box = Dialog(

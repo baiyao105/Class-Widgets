@@ -16,7 +16,7 @@ from packaging.version import Version
 from loguru import logger
 from qfluentwidgets import (
     Theme, setTheme, FluentWindow, FluentIcon as fIcon, ToolButton, ListWidget, ComboBox, CaptionLabel,
-    SpinBox, LineEdit, PrimaryPushButton, TableWidget, Flyout, InfoBarIcon,
+    SpinBox, LineEdit, PrimaryPushButton, TableWidget, Flyout, InfoBarIcon, InfoBar, InfoBarPosition,
     FlyoutAnimationType, NavigationItemPosition, MessageBox, SubtitleLabel, PushButton, SwitchButton,
     CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
     SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
@@ -28,6 +28,7 @@ import conf
 import list_ as list_
 import tip_toast
 import utils
+from utils import update_tray_tooltip
 import weather_db
 import weather_db as wd
 from conf import base_directory
@@ -412,24 +413,38 @@ class PluginCard(CardWidget):  # 插件卡片
             """)
         alert.cancelButton.setText('我再想想……')
         if alert.exec():
-            global enabled_plugins
-            if self.plugin_dir in enabled_plugins:  # 移除启动项
-                enabled_plugins['enabled_plugins'].remove(self.plugin_dir)
-                conf.save_plugin_config(enabled_plugins)
-            try:
-                with open(f"{base_directory}/plugins/plugins_from_pp.json", 'r', encoding='utf-8') as f:  # 移除插件广场安装记录
-                    installed_plugins = json.load(f).get('plugins')
-                    installed_plugins.remove(self.plugin_dir)
-                with open(f"{base_directory}/plugins/plugins_from_pp.json", 'w', encoding='utf-8') as f2:  # 移除插件广场安装记录
-                    json.dump({"plugins": installed_plugins}, f2, ensure_ascii=False, indent=4)
-            except Exception as e:
-                logger.error(f"保存已安装插件失败：{e}")
-            try:
-                rmtree(os.path.join(base_directory, conf.PLUGINS_DIR, self.plugin_dir))  # 删除插件
-                self.setParent(None)
+            success = p_loader.delete_plugin(self.plugin_dir)
+            if success:
+                try:
+                    with open(f'{base_directory}/plugins/plugins_from_pp.json', 'r', encoding='utf-8') as f:
+                        installed_data = json.load(f)
+                    installed_plugins = installed_data.get('plugins', [])
+                    if self.plugin_dir in installed_plugins:
+                        installed_plugins.remove(self.plugin_dir)
+                        conf.save_installed_plugin(installed_plugins)
+                except Exception as e:
+                    logger.error(f"更新已安装插件列表失败: {e}")
+
+                InfoBar.success(
+                    title='卸载成功',
+                    content=f'插件 “{self.title}” 已卸载。请重启 Class Widgets 以完全移除。',
+                    orient=Qt.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.BOTTOM_RIGHT,
+                    duration=5000,
+                    parent=self.window()
+                )
                 self.deleteLater()  # 删除卡片
-            except Exception as e:
-                logger.error(f'删除插件“{self.title}”时发生错误：{e}')
+            else:
+                InfoBar.error(
+                    title='卸载失败',
+                    content=f'卸载插件 “{self.title}” 时出错，请查看日志获取详细信息。',
+                    orient=Qt.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.BOTTOM_RIGHT,
+                    duration=5000,
+                    parent=self.window()
+                )
 
 
 class TextFieldMessageBox(MessageBoxBase):
@@ -798,19 +813,6 @@ class SettingsMenu(FluentWindow):
 
         save_config_button = self.findChild(PrimaryPushButton, 'save_config')
         save_config_button.clicked.connect(self.ct_save_widget_config)
-
-        # set_wcc_title = self.findChild(LineEdit, 'set_wcc_title')  # 倒计时标题
-        # set_wcc_title.setText(config_center.read_conf('Date', 'cd_text_custom'))
-        # set_wcc_title.textChanged.connect(
-        #     lambda: config_center.write_conf('Date', 'cd_text_custom', set_wcc_title.text()))
-
-        # set_countdown_date = self.findChild(CalendarPicker, 'set_countdown_date')  # 倒计时日期
-        # if config_center.read_conf('Date', 'countdown_date') != '':
-        #     set_countdown_date.setDate(QDate.fromString(config_center.read_conf('Date', 'countdown_date'), 'yyyy-M-d'))
-        # set_countdown_date.dateChanged.connect(
-        #     lambda: config_center.write_conf(
-        #         'Date', 'countdown_date', set_countdown_date.date.toString('yyyy-M-d'))
-        # )
 
         set_ac_color = self.findChild(PushButton, 'set_ac_color')  # 主题色
         set_ac_color.clicked.connect(self.ct_set_ac_color)
@@ -1545,11 +1547,13 @@ class SettingsMenu(FluentWindow):
                 self.conf_combo.setCurrentIndex(
                     list_.get_schedule_config().index(config_center.read_conf('General', 'schedule')))
                 conf_name.setText(new_name)
+                update_tray_tooltip()
 
             elif self.conf_combo.currentText().endswith('.json'):
                 new_name = self.conf_combo.currentText()
                 config_center.write_conf('General', 'schedule', new_name)
                 conf_name.setText(new_name[:-5])
+                update_tray_tooltip()
 
             else:
                 logger.error(f'切换课程文件时列表选择异常：{self.conf_combo.currentText()}')
@@ -2089,7 +2093,7 @@ class SettingsMenu(FluentWindow):
         if selected_items:
             selected_item = selected_items[0]
             selected_item.setText(
-                f"{cd_set_countdown_date.text().replace('/', '-')} - {cd_text_cd.text()}"
+                f"{cd_set_countdown_date.date.toString('yyyy-M-d')} - {cd_text_cd.text()}"
             )
 
     def cd_delete_item(self):
@@ -2104,7 +2108,7 @@ class SettingsMenu(FluentWindow):
         cd_text_cd = self.findChild(LineEdit, 'text_cd')
         cd_set_countdown_date = self.findChild(CalendarPicker, 'set_countdown_date')
         cd_countdown_list.addItem(
-            f'{cd_set_countdown_date.text().replace("/", "-")} - {cd_text_cd.text()}'
+            f"{cd_set_countdown_date.date.toString('yyyy-M-d')} - {cd_text_cd.text()}"
         )
 
     def cd_save_item(self):
