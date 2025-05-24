@@ -13,6 +13,9 @@
   <property name="windowTitle">
    <string>TTS 高级设置</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">background: transparent; border: none</string>
+  </property>
   <layout class="QVBoxLayout" name="verticalLayout_Main">
    <item>
     <widget class="SmoothScrollArea" name="scrollArea">
