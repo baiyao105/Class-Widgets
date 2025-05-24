@@ -734,6 +734,27 @@ class SettingsMenu(FluentWindow):
 
             parent.update_tts_voices(parent.available_voices)
 
+            text_attend_class = self.widget.findChild(LineEdit, 'text_attend_class')
+            text_attend_class.setText(config_center.read_conf('TTS', 'attend_class'))
+            text_attend_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'attend_class', text_attend_class.text()))
+
+            text_prepare_class = self.widget.findChild(LineEdit, 'text_prepare_class')
+            text_prepare_class.setText(config_center.read_conf('TTS', 'prepare_class'))
+            text_prepare_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'prepare_class', text_prepare_class.text()))
+
+            text_finish_class = self.widget.findChild(LineEdit, 'text_finish_class')
+            text_finish_class.setText(config_center.read_conf('TTS', 'finish_class'))
+            text_finish_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'finish_class', text_finish_class.text()))
+
+            text_after_school = self.widget.findChild(LineEdit, 'text_after_school')
+            text_after_school.setText(config_center.read_conf('TTS', 'after_school'))
+            text_after_school.textChanged.connect(lambda: config_center.write_conf('TTS', 'after_school', text_after_school.text()))
+
+            text_notification = self.widget.findChild(LineEdit, 'text_notification')
+            text_notification.setText(config_center.read_conf('TTS', 'otherwise'))
+            text_notification.textChanged.connect(lambda: config_center.write_conf('TTS', 'otherwise', text_notification.text()))
+
+
     def open_tts_settings(self):
         self.TTSSettings(self).exec()
 
