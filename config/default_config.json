@@ -30,7 +30,12 @@
   },
   "TTS": {
     "enable": 0,
-    "speed": 50
+    "speed": 50,
+    "attend_class": "活动开始, {lesson_name}",
+    "finish_class": "活动结束, 下一节课 {lesson_name}",
+    "prepare_class": "活动即将开始, 下一节课 {lesson_name}",
+    "after_school": "活动全部结束",
+    "otherwise": ""
   },
   "Weather": {
     "city": 0,
