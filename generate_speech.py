@@ -12,8 +12,6 @@ import pyttsx3
 from loguru import logger
 from file import config_center
 
-
-
 def get_tts_voices():
     """获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3."""
     voices = []
@@ -69,7 +67,7 @@ def get_voice_id_by_name(name: str, engine: str = "edge"):
             return v["id"]
     return None
 
-def get_voice_name_by_id(voice_id: str, available_voices: list = None) -> Optional[str]:
+def get_voice_name_by_id(voice_id: str, available_voices: Optional[list] = None) -> Optional[str]:
     """
     根据语音ID查找语音名称.
     参数：
