@@ -725,6 +725,13 @@ class SettingsMenu(FluentWindow):
             parent.voice_selector = self.widget.findChild(ComboBox, 'voice_selector')
             parent.switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
 
+            about_placeholder = self.widget.findChild(HyperlinkLabel, 'about_placeholder')
+            def about_placeholder_clicked():
+                w = MessageBox('目前可用占位符', '{lesson_name}: 开始&结束&下节的课程名', self)
+                w.cancelButton.hide()
+                w.exec()
+            about_placeholder.clicked.connect(about_placeholder_clicked)
+
             parent.update_tts_voices(parent.available_voices)
 
     def open_tts_settings(self):
