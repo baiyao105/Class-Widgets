@@ -132,7 +132,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('当前课程')
             lesson.setText(lesson_name)  # 课程名
             sound_to_play = attend_class
-            tts_text = f"活动开始, {lesson_name}" if lesson_name else "活动开始"
+            tts_text = config_center.read_conf('TTS', 'attend_class').replace('{lesson_name}', lesson_name)
             setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")  # 主题色
         elif state == 0:
             logger.info('下课铃声显示')
@@ -143,7 +143,7 @@ class tip_toast(QWidget):
                 subtitle_label.hide()
             lesson.setText(lesson_name)  # 课程名
             sound_to_play = finish_class
-            tts_text = f"活动结束, 下一节课 {lesson_name}" if lesson_name else "活动结束"
+            tts_text = config_center.read_conf('TTS', 'finish_class').replace('{lesson_name}', lesson_name)
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 2:
             logger.info('放学铃声显示')
@@ -151,7 +151,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('当前课程已结束')
             lesson.setText('')  # 课程名
             sound_to_play = finish_class
-            tts_text = "活动全部结束"
+            tts_text = config_center.read_conf('TTS', 'after_school').replace('{lesson_name}', lesson_name)
             setThemeColor(f"#{config_center.read_conf('Color', 'finish_class')}")
         elif state == 3:
             logger.info('预备铃声显示')
@@ -159,7 +159,7 @@ class tip_toast(QWidget):
             subtitle_label.setText('下一节')
             lesson.setText(lesson_name)
             sound_to_play = prepare_class
-            tts_text = f"活动即将开始, 下一节课 {lesson_name}" if lesson_name else "活动即将开始"
+            tts_text = config_center.read_conf('TTS', 'prepare_class').replace('{lesson_name}', lesson_name)
             setThemeColor(f"#{config_center.read_conf('Color', 'prepare_class')}")
         elif state == 4:
             logger.info(f'通知显示: {title}')
@@ -167,6 +167,7 @@ class tip_toast(QWidget):
             subtitle_label.setText(subtitle)
             lesson.setText(content)
             sound_to_play = prepare_class
+            tts_text = config_center.read_conf('TTS', 'otherwise').replace('{lesson_name}', lesson_name)
 
         global tts_is_playing
         if tts_enabled and tts_text and tts_voice_id:
