@@ -687,13 +687,14 @@ class SettingsMenu(FluentWindow):
         self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
         self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
         self.tts_voice_loader_thread.finished.connect(self.tts_voice_loader_thread.deleteLater)
-        self.tts_voice_loader_thread.start()
 
         self.voice_selector = None
         self.switch_enable_TTS = None
 
-    def available_voices_cnt(self, cnt):
-        self.available_voices = cnt
+    def available_voices_cnt(self, voices):
+        self.available_voices = voices
+        if hasattr(self, 'voice_selector') and self.voice_selector and hasattr(self, 'update_tts_voices'):
+            self.update_tts_voices(self.available_voices)
 
     class TTSSettings(MessageBoxBase): 
         def __init__(self, parent=None):
@@ -732,7 +733,13 @@ class SettingsMenu(FluentWindow):
                 w.exec()
             about_placeholder.clicked.connect(about_placeholder_clicked)
 
-            parent.update_tts_voices(parent.available_voices)
+            if parent.available_voices is not None:
+                parent.update_tts_voices(parent.available_voices)
+            else:
+                voice_selector.clear()
+                voice_selector.addItem("加载中...", userData=None)
+                voice_selector.setEnabled(False)
+                switch_enable_TTS.setEnabled(False)
 
             text_attend_class = self.widget.findChild(LineEdit, 'text_attend_class')
             text_attend_class.setText(config_center.read_conf('TTS', 'attend_class'))
@@ -756,6 +763,24 @@ class SettingsMenu(FluentWindow):
 
 
     def open_tts_settings(self):
+        if self.available_voices is None:
+            if hasattr(self, 'tts_voice_loader_thread') and self.tts_voice_loader_thread:
+                if not self.tts_voice_loader_thread.isRunning():
+                    try:
+                        self.tts_voice_loader_thread.start()
+                    except RuntimeError:
+                        self.tts_voice_loader_thread = TTSVoiceLoaderThread()
+                        self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
+                        self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
+                        self.tts_voice_loader_thread.finished.connect(self.tts_voice_loader_thread.deleteLater)
+                        self.tts_voice_loader_thread.start()
+            else:
+                self.tts_voice_loader_thread = TTSVoiceLoaderThread()
+                self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
+                self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
+                self.tts_voice_loader_thread.finished.connect(self.tts_voice_loader_thread.deleteLater)
+                self.tts_voice_loader_thread.start()
+
         self.TTSSettings(self).exec()
 
     def toggle_tts_settings(self, checked):
