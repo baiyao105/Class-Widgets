@@ -9,6 +9,7 @@ from typing import Optional
 
 import edge_tts
 import pyttsx3
+import pythoncom
 from loguru import logger
 from file import config_center
 
@@ -27,31 +28,34 @@ def get_tts_voices(engine_filter: Optional[str] = None):
                 if 'zh' in voice['Locale'].lower(): # 筛选中文语音
                     # voices.append({'name': f"{voice['FriendlyName']} (Edge)", 'id': f"edge:{voice['Name']}"})
                     voices.append({'name': f"{voice['FriendlyName']}", 'id': f"edge:{voice['Name']}"})
-            logger.debug(f"筛选了 {len([v for v in voices if v['id'].startswith('edge:')])} 个 Edge 语音")
+            logger.info(f"筛选了 {len([v for v in voices if v['id'].startswith('edge:')])} 个 Edge 语音")
     except Exception as e:
         logger.error(f"获取 Edge TTS 语音列表失败: {e}")
 
     pyttsx3_voices_count = 0
     try:
         if engine_filter is None or engine_filter == "pyttsx3":
-            engine = pyttsx3.init()
-            pyttsx3_voices_available = engine.getProperty('voices')
-            engine.stop() # 释放引擎资源
-            current_pyttsx3_voices = []
-            for voice in pyttsx3_voices_available:
-                name = voice.name
-                # Tip：pyttsx3语言信息不标准
-                lang_check_passed = False
-                if hasattr(voice, 'languages') and voice.languages:
-                    if any('zh' in lang.lower() for lang in voice.languages):
+            pythoncom.CoInitialize()
+            try:
+                engine = pyttsx3.init()
+                pyttsx3_voices_available = engine.getProperty('voices')
+                engine.stop()
+                current_pyttsx3_voices = []
+                for voice in pyttsx3_voices_available:
+                    name = voice.name
+                    # Note：pyttsx3语言信息不标准
+                    lang_check_passed = False
+                    if hasattr(voice, 'languages') and voice.languages:
+                        if any('zh' in lang.lower() for lang in voice.languages):
+                            lang_check_passed = True
+                    elif 'chinese' in name.lower() or 'mandarin' in name.lower():
                         lang_check_passed = True
-                elif 'chinese' in name.lower() or 'mandarin' in name.lower(): # 备用
-                    lang_check_passed = True
-                if not hasattr(voice, 'languages') or not voice.languages or lang_check_passed:
-                    # current_pyttsx3_voices.append({'name': f"{name} (System)", 'id': f"pyttsx3:{voice.id}"})
-                    current_pyttsx3_voices.append({'name': f"{name}", 'id': f"pyttsx3:{voice.id}"}) # 去除引擎标识
-            voices.extend(current_pyttsx3_voices)
-            pyttsx3_voices_count = len(current_pyttsx3_voices)
+                    if not hasattr(voice, 'languages') or not voice.languages or lang_check_passed:
+                        current_pyttsx3_voices.append({'name': f"{name}", 'id': f"pyttsx3:{voice.id}"})
+                voices.extend(current_pyttsx3_voices)
+                pyttsx3_voices_count = len(current_pyttsx3_voices)
+            finally:
+                pythoncom.CoUninitialize()
     except OSError as oe:
         if oe.winerror == -2147221005:
             logger.warning("系统语音引擎(pyttsx3/SAPI5)初始化失败，可能是组件未正确注册或损坏。将跳过加载系统语音。")
@@ -60,7 +64,7 @@ def get_tts_voices(engine_filter: Optional[str] = None):
     except Exception as e:
         logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
     if pyttsx3_voices_count > 0:
-        logger.debug(f"筛选了 {pyttsx3_voices_count} 个 Pyttsx3 语音")
+        logger.info(f"筛选了 {pyttsx3_voices_count} 个 Pyttsx3 语音")
 
     if not voices:
         logger.warning("未能获取到任何 TTS 语音")
@@ -75,7 +79,7 @@ def get_voice_id_by_name(name: str, engine: str = "edge"):
     """
     voices = get_tts_voices()
     for v in voices:
-        if v["name"] == name: # 注意：这里可能因为去除了引擎标识而需要调整匹配逻辑，但get_voice_name_by_id通常是根据ID找名称，影响不大
+        if v["name"] == name:
             return v["id"]
     return None
 

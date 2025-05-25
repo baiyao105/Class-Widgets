@@ -702,7 +702,7 @@ class SettingsMenu(FluentWindow):
         if self.voice_selector:
             self.voice_selector.setEnabled(True if voices else False)
 
-    class TTSSettings(MessageBoxBase):
+    class TTSSettings(MessageBoxBase): # TTS设置页
         def __init__(self, parent=None):
             super().__init__(parent)
             self.parent_menu = parent # 保存父菜单的引用
@@ -804,7 +804,7 @@ class SettingsMenu(FluentWindow):
             current_selected_engine_in_selector = self.engine_selector.currentData()
 
         if self.available_voices is None or self.current_loaded_engine != current_selected_engine_in_selector:
-            logger.info(f"需要加载语音。当前加载引擎: {self.current_loaded_engine}, 选择器引擎: {current_selected_engine_in_selector}")
+            logger.debug(f"加载语音: 加载引擎: {self.current_loaded_engine},{current_selected_engine_in_selector}(选择器)")
             self.load_tts_voices_for_engine(current_selected_engine_in_selector)
         else:
             if hasattr(self, 'voice_selector') and self.voice_selector:
@@ -816,7 +816,7 @@ class SettingsMenu(FluentWindow):
     def on_engine_selected(self, engine_text):
         selected_engine_key = self.engine_selector.currentData()
         if selected_engine_key and selected_engine_key != self.current_loaded_engine:
-            logger.info(f"TTS引擎已被更改,尝试更新列表: {selected_engine_key}")
+            logger.debug(f"TTS引擎已被更改,尝试更新列表: {selected_engine_key}")
             config_center.write_conf('TTS', 'engine', selected_engine_key)
             self.current_loaded_engine = selected_engine_key # 更新当前加载的引擎
             self.load_tts_voices_for_engine(selected_engine_key)
@@ -829,20 +829,20 @@ class SettingsMenu(FluentWindow):
             self.voice_selector.addItem("加载中...", userData=None)
             self.voice_selector.setEnabled(False)
         if self.switch_enable_TTS:
-            self.switch_enable_TTS.setEnabled(False) # 加载时禁用TTS开关
+            self.switch_enable_TTS.setEnabled(False) # 临时禁用TTS开关
 
         if hasattr(self, 'tts_voice_loader_thread') and self.tts_voice_loader_thread:
             if self.tts_voice_loader_thread.isRunning():
                 logger.info("停止旧的TTS语音加载线程...")
-                self.tts_voice_loader_thread.quit() # 请求退出
+                self.tts_voice_loader_thread.quit()
                 if not self.tts_voice_loader_thread.wait(1000):
                     logger.warning("旧TTS加载线程未正常退出,强制终止")
                     self.tts_voice_loader_thread.terminate()
-                    self.tts_voice_loader_thread.wait() # 等待终止完成
+                    self.tts_voice_loader_thread.wait()
             self.tts_voice_loader_thread = None
 
-        self.current_loaded_engine = engine_key # 更新当前尝试加载的引擎
-        self.available_voices = None # 清空旧的语音列表
+        self.current_loaded_engine = engine_key
+        self.available_voices = None
         self.tts_voice_loader_thread = TTSVoiceLoaderThread(engine_filter=engine_key)
         self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
         self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
@@ -934,13 +934,9 @@ class SettingsMenu(FluentWindow):
         voice_selector.clear()
         voice_selector.addItem("加载失败", userData=None)
         voice_selector.setEnabled(False)
-        # TTS总开关不应该因为语音加载失败而被禁用，用户可能想关闭TTS或切换引擎
-        # switch_enable_TTS.setEnabled(False) # 移除这一行，TTS总开关的启用状态由用户控制
         logger.error(f"处理TTS语音加载错误: {error_message}")
-        # 提示用户检查网络或配置
-        if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
-            # 可以在TTS设置对话框中显示更详细的错误信息
-            pass
+        if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():\
+            MessageBox(self.TTSSettingsDialog, "TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}")
 
     def setup_configs_interface(self):  # 配置界面
         cf_import_schedule = self.findChild(PushButton, 'im_schedule')
