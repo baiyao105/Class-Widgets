@@ -30,6 +30,7 @@
   },
   "TTS": {
     "enable": 0,
+    "engine": "edge",
     "speed": 50,
     "attend_class": "活动开始, {lesson_name}",
     "finish_class": "活动结束, 下一节课 {lesson_name}",

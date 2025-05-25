@@ -42,8 +42,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>758</width>
-        <height>1033</height>
+        <width>778</width>
+        <height>1053</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_Scroll">
@@ -63,13 +63,6 @@
         <number>24</number>
        </property>
        <item>
-        <widget class="TitleLabel" name="TitleLabel">
-         <property name="text">
-          <string>TTS语音设置</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="SmoothScrollArea" name="sd_scroll">
          <property name="styleSheet">
           <string notr="true">background: transparent; border: none</string>
@@ -82,11 +75,18 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>740</width>
-            <height>972</height>
+            <width>730</width>
+            <height>1005</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_9">
+           <item>
+            <widget class="TitleLabel" name="TitleLabel">
+             <property name="text">
+              <string>TTS语音设置</string>
+             </property>
+            </widget>
+           </item>
            <item>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <property name="spacing">
@@ -174,6 +174,68 @@
               </widget>
              </item>
              <item>
+              <widget class="CardWidget" name="CardWidget_9">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>70</height>
+                </size>
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_9">
+                <property name="leftMargin">
+                 <number>16</number>
+                </property>
+                <property name="topMargin">
+                 <number>16</number>
+                </property>
+                <property name="rightMargin">
+                 <number>16</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>16</number>
+                </property>
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_13">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="StrongBodyLabel" name="StrongBodyLabel_9">
+                    <property name="text">
+                     <string>TTS生成引擎</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="CaptionLabel" name="CaptionLabel_8">
+                    <property name="text">
+                     <string>选择用于生成TTS语音的引擎</string>
+                    </property>
+                    <property name="lightColor" stdset="0">
+                     <color alpha="150">
+                      <red>0</red>
+                      <green>0</green>
+                      <blue>0</blue>
+                     </color>
+                    </property>
+                    <property name="darkColor" stdset="0">
+                     <color alpha="200">
+                      <red>255</red>
+                      <green>255</green>
+                      <blue>255</blue>
+                     </color>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="ComboBox" name="engine_selector"/>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
               <widget class="CardWidget" name="CardWidget_8">
                <property name="minimumSize">
                 <size>
@@ -209,7 +271,7 @@
                   <item>
                    <widget class="CaptionLabel" name="CaptionLabel_7">
                     <property name="text">
-                     <string>用于生成TTS语音</string>
+                     <string>用于生成TTS语音所用的语音id</string>
                     </property>
                     <property name="lightColor" stdset="0">
                      <color alpha="150">
@@ -575,7 +637,7 @@
                </layout>
               </widget>
              </item>
-             <item>
+             <item alignment="Qt::AlignVCenter">
               <widget class="CardWidget" name="CardWidget_18">
                <property name="minimumSize">
                 <size>
@@ -583,32 +645,13 @@
                  <height>70</height>
                 </size>
                </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_20">
-                <property name="leftMargin">
-                 <number>16</number>
-                </property>
-                <property name="topMargin">
-                 <number>16</number>
-                </property>
-                <property name="rightMargin">
-                 <number>16</number>
-                </property>
-                <property name="bottomMargin">
-                 <number>16</number>
-                </property>
+               <layout class="QVBoxLayout" name="verticalLayout">
                 <item>
-                 <layout class="QVBoxLayout" name="verticalLayout_24">
-                  <property name="spacing">
-                   <number>0</number>
+                 <widget class="HyperlinkLabel" name="about_placeholder">
+                  <property name="text">
+                   <string>占位符说明</string>
                   </property>
-                  <item>
-                   <widget class="HyperlinkLabel" name="about_placeholder">
-                    <property name="text">
-                     <string>占位符说明</string>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
+                 </widget>
                 </item>
                </layout>
               </widget>
