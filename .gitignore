@@ -8,6 +8,7 @@ __pycache__/
 
 # Software Config
 config.ini
+cache/
 config/plugin.json
 config/widget.json
 config/schedule/

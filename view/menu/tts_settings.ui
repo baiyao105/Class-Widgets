@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>778</width>
-    <height>1053</height>
+    <height>1047</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -43,7 +43,7 @@
         <x>0</x>
         <y>0</y>
         <width>778</width>
-        <height>1053</height>
+        <height>1047</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_Scroll">
@@ -76,7 +76,7 @@
             <x>0</x>
             <y>0</y>
             <width>730</width>
-            <height>1005</height>
+            <height>999</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_9">
@@ -178,10 +178,10 @@
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>70</height>
+                 <height>80</height>
                 </size>
                </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_9">
+               <layout class="QGridLayout" name="gridLayout">
                 <property name="leftMargin">
                  <number>16</number>
                 </property>
@@ -194,7 +194,10 @@
                 <property name="bottomMargin">
                  <number>16</number>
                 </property>
-                <item>
+                <item row="0" column="2">
+                 <widget class="ComboBox" name="engine_selector"/>
+                </item>
+                <item row="0" column="0">
                  <layout class="QVBoxLayout" name="verticalLayout_13">
                   <property name="spacing">
                    <number>0</number>
@@ -227,10 +230,30 @@
                     </property>
                    </widget>
                   </item>
+                  <item>
+                   <spacer name="verticalSpacer_for_note">
+                    <property name="orientation">
+                     <enum>Qt::Vertical</enum>
+                    </property>
+                    <property name="sizeType">
+                     <enum>QSizePolicy::Fixed</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>20</width>
+                      <height>5</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                  <item>
+                   <widget class="HyperlinkLabel" name="engine_note">
+                    <property name="text">
+                     <string>温馨提示</string>
+                    </property>
+                   </widget>
+                  </item>
                  </layout>
-                </item>
-                <item>
-                 <widget class="ComboBox" name="engine_selector"/>
                 </item>
                </layout>
               </widget>
@@ -637,7 +660,7 @@
                </layout>
               </widget>
              </item>
-             <item alignment="Qt::AlignVCenter">
+             <item>
               <widget class="CardWidget" name="CardWidget_18">
                <property name="minimumSize">
                 <size>
@@ -645,13 +668,52 @@
                  <height>70</height>
                 </size>
                </property>
-               <layout class="QVBoxLayout" name="verticalLayout">
+               <layout class="QHBoxLayout" name="horizontalLayout">
                 <item>
-                 <widget class="HyperlinkLabel" name="about_placeholder">
+                 <spacer name="horizontalSpacer_2">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="PushButton" name="tts_vocab_button">
                   <property name="text">
-                   <string>占位符说明</string>
+                   <string>可用占位符</string>
                   </property>
                  </widget>
+                </item>
+                <item>
+                 <widget class="PrimaryDropDownPushButton" name="preview">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="text">
+                   <string>预览</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                </layout>
               </widget>
@@ -685,6 +747,21 @@
   <customwidget>
    <class>ComboBox</class>
    <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PushButton</class>
+   <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PrimaryPushButton</class>
+   <extends>PushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PrimaryDropDownPushButton</class>
+   <extends>PrimaryPushButton</extends>
    <header>qfluentwidgets</header>
   </customwidget>
   <customwidget>

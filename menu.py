@@ -21,7 +21,7 @@ from qfluentwidgets import (
     CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
     SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
     PrimaryDropDownPushButton, Action, RoundMenu, CardWidget, ImageLabel, StrongBodyLabel,
-    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton
+    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton, HyperlinkLabel
 )
 
 import conf
@@ -508,11 +508,74 @@ class TTSVoiceLoaderThread(QThread):
 
     def run(self):
         try:
+            if self.isInterruptionRequested():
+                logger.info("TTS语音加载线程收到中断请求，正在退出...")
+                return
             available_voices = get_tts_voices(engine_filter=self.engine_filter)
+            if self.isInterruptionRequested():
+                logger.info("TTS语音加载线程收到中断请求，正在退出...")
+                return
+
             self.voicesLoaded.emit(available_voices)
         except Exception as e:
             logger.error(f"加载TTS语音列表时出错: {e}")
             self.errorOccurred.emit(str(e))
+
+
+class TTSPreviewThread(QThread):
+    previewFinished = pyqtSignal(bool)
+    previewError = pyqtSignal(str)
+
+    def __init__(self, text, engine, voice, parent=None):
+        super().__init__(parent)
+        self.text = text
+        self.engine = engine
+        self.voice = voice
+
+    def run(self):
+        try:
+            # 检查是否有中断请求
+            if self.isInterruptionRequested():
+                logger.info("TTS预览线程收到中断请求，正在退出...")
+                return
+                
+            from generate_speech import generate_speech_sync, TTSEngine
+            from play_audio import play_audio
+            import os
+            
+            logger.info(f"使用引擎 {self.engine} 生成预览语音")
+            audio_file = generate_speech_sync(
+                text=self.text,
+                engine=self.engine,
+                voice=self.voice,
+                auto_fallback=True,
+                timeout=10.0
+            )
+            
+            # 再次检查是否有中断请求
+            if self.isInterruptionRequested():
+                logger.info("TTS预览线程收到中断请求，正在退出...")
+                # 删除已生成的音频文件
+                TTSEngine.delete_audio_file(audio_file)
+                return
+            
+            # 检查文件是否存在且有效
+            if not os.path.exists(audio_file):
+                raise FileNotFoundError(f"生成的音频文件不存在: {audio_file}")
+                
+            # 检查文件大小是否正常（小于10字节的文件可能是损坏的）
+            file_size = os.path.getsize(audio_file)
+            if file_size < 10:
+                logger.warning(f"生成的音频文件可能无效，大小仅为 {file_size} 字节: {audio_file}")
+                # 删除可能损坏的文件
+                TTSEngine.delete_audio_file(audio_file)
+                raise ValueError(f"生成的音频文件可能无效，大小仅为 {file_size} 字节")
+                
+            play_audio(audio_file, tts_delete_after=True)
+            self.previewFinished.emit(True)
+        except Exception as e:
+            logger.error(f"TTS预览生成失败: {str(e)}")
+            self.previewError.emit(str(e))
 
 
 class SettingsMenu(FluentWindow):
@@ -755,16 +818,17 @@ class SettingsMenu(FluentWindow):
                     config_center.write_conf('TTS', 'engine', parent.current_loaded_engine)
 
                 parent.engine_selector.currentTextChanged.connect(parent.on_engine_selected)
+                parent.engine_note_label = self.widget.findChild(HyperlinkLabel, 'engine_note')
+                parent.engine_note_label.clicked.connect(parent.show_engine_note)
 
             parent.voice_selector = self.widget.findChild(ComboBox, 'voice_selector')
             parent.switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
-
-            about_placeholder = self.widget.findChild(HyperlinkLabel, 'about_placeholder')
-            def about_placeholder_clicked():
-                w = MessageBox('目前可用占位符', '{lesson_name}: 开始&结束&下节的课程名', self)
+            self.tts_vocab_button = self.widget.findChild(PushButton, 'tts_vocab_button')
+            def show_vocab_note():
+                w = MessageBox('小语法?', '{lesson_name}: 开始&结束&下节的课程名', self)
                 w.cancelButton.hide()
                 w.exec()
-            about_placeholder.clicked.connect(about_placeholder_clicked)
+            self.tts_vocab_button.clicked.connect(show_vocab_note)
 
             if parent.available_voices is not None and parent.current_loaded_engine == parent.engine_selector.currentData():
                 parent.update_tts_voices(parent.available_voices)
@@ -793,6 +857,87 @@ class SettingsMenu(FluentWindow):
             text_notification = self.widget.findChild(LineEdit, 'text_notification')
             text_notification.setText(config_center.read_conf('TTS', 'otherwise'))
             text_notification.textChanged.connect(lambda: config_center.write_conf('TTS', 'otherwise', text_notification.text()))
+
+            # 预览按钮
+            preview_tts_button = self.widget.findChild(PrimaryDropDownPushButton, 'preview')
+            if preview_tts_button:
+                preview_tts_menu = RoundMenu(parent=preview_tts_button)
+                preview_tts_menu.addActions([
+                    Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
+                    Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
+                    Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
+                    Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
+                ])
+                preview_tts_button.setMenu(preview_tts_menu)
+            else:
+                logger.warning("未找到 preview 按钮。")
+
+        def play_tts_preview(self, text_type):
+            # 获取当前配置的文本
+            text_template = config_center.read_conf('TTS', text_type)
+            # 替换占位符，这里只是简单示例，实际可能需要更复杂的逻辑
+            # 假设 lesson_name 为 '信息技术', minutes 为 '5'
+            if text_type == 'attend_class':
+                text_to_speak = text_template.format(lesson_name='信息技术')
+            elif text_type == 'finish_class':
+                text_to_speak = text_template.format(lesson_name='信息技术')
+            elif text_type == 'prepare_class':
+                text_to_speak = text_template.format(lesson_name='信息技术', minutes='5')
+            elif text_type == 'otherwise':
+                text_to_speak = text_template.format(title='通知', content='这是一条测试通知ヾ(≧▽≦*)o')
+            else:
+                text_to_speak = text_template
+
+            # 调用TTS引擎播放
+            logger.info(f"生成TTS文本: {text_to_speak}")
+            
+            try:
+                # 获取当前选择的TTS引擎和语音
+                current_engine = self.parent_menu.engine_selector.currentData()
+                current_voice = None
+                if self.parent_menu.voice_selector and self.parent_menu.voice_selector.currentData():
+                    current_voice = self.parent_menu.voice_selector.currentData()
+                
+                # 使用异步线程生成和播放TTS预览
+                if hasattr(self, 'tts_preview_thread') and self.tts_preview_thread and self.tts_preview_thread.isRunning():
+                    logger.info("停止旧的TTS预览线程...")
+                    self.tts_preview_thread.requestInterruption()
+                    self.tts_preview_thread.quit()
+                    if not self.tts_preview_thread.wait(1000):
+                        logger.warning("旧TTS预览线程未能在超时时间内退出，将在后台继续运行")
+                
+                # 创建新的预览线程
+                self.tts_preview_thread = TTSPreviewThread(
+                    text=text_to_speak,
+                    engine=current_engine,
+                    voice=current_voice,
+                    parent=self
+                )
+                
+                # 连接信号
+                self.tts_preview_thread.previewError.connect(self.handle_tts_preview_error)
+                
+                # 启动线程
+                logger.info(f"启动TTS预览线程，使用引擎 {current_engine}")
+                self.tts_preview_thread.start()
+                
+            except Exception as e:
+                logger.error(f"启动TTS预览线程失败: {str(e)}")
+                from qfluentwidgets import MessageBox
+                MessageBox(
+                    "TTS预览失败",
+                    f"启动TTS预览时出错: {str(e)}",
+                    self
+                ).exec()
+                
+        def handle_tts_preview_error(self, error_message):
+            logger.error(f"TTS预览生成失败: {error_message}")
+            from qfluentwidgets import MessageBox
+            MessageBox(
+                "TTS生成失败",
+                f"生成或播放语音时出错: {error_message}",
+                self
+            ).exec()
 
 
     def open_tts_settings(self):
@@ -834,11 +979,10 @@ class SettingsMenu(FluentWindow):
         if hasattr(self, 'tts_voice_loader_thread') and self.tts_voice_loader_thread:
             if self.tts_voice_loader_thread.isRunning():
                 logger.info("停止旧的TTS语音加载线程...")
+                self.tts_voice_loader_thread.requestInterruption()
                 self.tts_voice_loader_thread.quit()
-                if not self.tts_voice_loader_thread.wait(1000):
-                    logger.warning("旧TTS加载线程未正常退出,强制终止")
-                    self.tts_voice_loader_thread.terminate()
-                    self.tts_voice_loader_thread.wait()
+                if not self.tts_voice_loader_thread.wait(2000):
+                    logger.warning("旧TTS加载线程未能在超时时间内退出，将在后台继续运行")
             self.tts_voice_loader_thread = None
 
         self.current_loaded_engine = engine_key
@@ -847,6 +991,50 @@ class SettingsMenu(FluentWindow):
         self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
         self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
         self.tts_voice_loader_thread.start()
+
+    def show_engine_note(self):
+        if not hasattr(self, 'engine_selector') or not self.engine_selector:
+            logger.warning("引擎选择器未初始化")
+            return
+
+        current_engine_key = self.engine_selector.currentData()
+        title = "引擎小提示"
+        message = ""
+
+        if current_engine_key == "edge":
+            message = ("Edge TTS 需要联网才能正常发声哦~\n"
+                       "请确保网络连接,不然会说不出话来(>﹏<)\n"
+                       "* 可能会有一定的延迟,耐心等待一下~")
+            w = MessageBox(title, message, self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.yesButton.setText('知道啦~')
+            w.cancelButton.hide()
+            w.show()
+        elif current_engine_key == "pyttsx3":
+            class CustomMessageBox(MessageBoxBase):
+                def __init__(self, parent=None):
+                    super().__init__(parent)
+                    self.titleLabel = StrongBodyLabel(title, self)
+                    self.contentLabel = BodyLabel(
+                        "系统 TTS（pyttsx3）用的是系统自带的语音服务噢~\n"
+                        "您可以在系统设置里添加更多语音(*≧▽≦)", 
+                        self)
+                    self.hyperlinkLabel = HyperlinkLabel("打开Windows语音设置", self)
+                    self.hyperlinkLabel.clicked.connect(self._open_settings)
+                    self.viewLayout.addWidget(self.titleLabel)
+                    self.viewLayout.addWidget(self.contentLabel)
+                    self.viewLayout.addWidget(self.hyperlinkLabel)
+                    self.yesButton.setText('知道啦~')
+                    self.cancelButton.hide()
+                def _open_settings(self):
+                    QDesktopServices.openUrl(QUrl("ms-settings:speech"))
+            w = CustomMessageBox(self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.exec()
+        else:
+            message = "这个语音引擎还没有提示信息呢~(・ω<)"
+            w = MessageBox(title, message, self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.yesButton.setText('知道啦~')
+            w.cancelButton.hide()
+            w.show()
 
 
     def toggle_tts_settings(self, checked):

@@ -32,6 +32,7 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
     channel = None
     relative_path = os.path.relpath(file_path, conf.base_directory)
     try:
+        # 检查文件是否存在
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"音频文件不存在: {relative_path}")
 
@@ -56,6 +57,15 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
                 time.sleep(0.1)
             else:
                 raise IOError("音频文件写入超时")
+                
+        # 检查文件大小是否正常（小于10字节的文件可能是损坏的）
+        file_size = os.path.getsize(file_path)
+        if file_size < 10:
+            logger.warning(f"音频文件可能无效，大小仅为 {file_size} 字节: {relative_path}")
+            if tts_delete_after:
+                tts = TTSEngine()
+                tts.delete_audio_file(file_path)
+            return
 
         try:
             is_in_cache_dir = 'cache' in pathlib.Path(file_path).parts
@@ -68,6 +78,10 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
                     sound_cache[file_path] = sound
         except pygame.error as e_load:
             logger.error(f"加载音频文件失败: {relative_path} | 错误: {e_load}")
+            # 即使播放失败也尝试删除文件
+            if tts_delete_after:
+                tts = TTSEngine()
+                tts.delete_audio_file(file_path)
             return
 
         volume = int(config_center.read_conf('Audio', 'volume')) / 100
@@ -79,6 +93,10 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
                 pygame.time.wait(100)
         else:
             logger.error(f"无法获取播放通道: {relative_path}")
+            # 即使播放失败也尝试删除文件
+            if tts_delete_after:
+                tts = TTSEngine()
+                tts.delete_audio_file(file_path)
 
         logger.debug(f'成功播放音频: {relative_path}')
 
