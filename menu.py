@@ -1045,6 +1045,10 @@ class SettingsMenu(FluentWindow):
     def update_tts_voices(self, available_voices):
         voice_selector = self.voice_selector
         switch_enable_TTS = self.switch_enable_TTS
+        try:
+            voice_selector.currentTextChanged.disconnect()
+        except TypeError:
+            pass
         voice_selector.clear()
 
         if not available_voices:
@@ -1087,7 +1091,7 @@ class SettingsMenu(FluentWindow):
         switch_enable_TTS.setEnabled(True)
         try:
             if voice_selector.receivers(voice_selector.currentTextChanged) > 0:
-                 voice_selector.currentTextChanged.disconnect()
+                voice_selector.currentTextChanged.disconnect()
         except TypeError:
             pass
         voice_selector.currentTextChanged.connect(lambda name: config_center.write_conf('TTS', 'voice_id', voice_selector.currentData() or ''))
