@@ -25,10 +25,10 @@ MIN_VALID_FILE_SIZE = 10
 CACHE_MAX_AGE = 86400  # 缓存最大保存时间(秒)
 
 
-def _get_edge_voices():
+async def _get_edge_voices_async():
     """获取Edge TTS语音列表"""
     try:
-        edge_voices = asyncio.run(edge_tts.list_voices())
+        edge_voices = await edge_tts.list_voices()
         return [
             {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}"}
             for voice in edge_voices
@@ -39,13 +39,13 @@ def _get_edge_voices():
         return []
 
 
-def _get_pyttsx3_voices():
+async def _get_pyttsx3_voices_async():
     """获取Pyttsx3语音列表"""
     try:
         with _pyttsx3_context() as engine:
             if not engine:
                 return []
-            voices_available = engine.getProperty("voices")
+            voices_available = await asyncio.to_thread(engine.getProperty, "voices")
             return [
                 {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
                 for voice in voices_available
@@ -124,8 +124,8 @@ _tts_voices_cache = {
     "pyttsx3": {"voices": [], "timestamp": 0},
 }
 
-def get_tts_voices(engine_filter: Optional[str] = None):
-    """获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3.
+async def get_tts_voices(engine_filter: Optional[str] = None):
+    """异步获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3.
     Args:
         engine_filter (Optional[str], optional): 指定引擎 ("edge" or "pyttsx3"). Defaults to None (获取所有).
     Returns:
@@ -137,7 +137,6 @@ def get_tts_voices(engine_filter: Optional[str] = None):
         if cache_entry["voices"] and (
             current_time - cache_entry["timestamp"] < CACHE_MAX_AGE
         ):
-            logger.debug(f"从 {engine_filter} 缓存中获取TTS语音列表")
             return cache_entry["voices"]
     elif not engine_filter:
         all_cached = True
@@ -150,11 +149,10 @@ def get_tts_voices(engine_filter: Optional[str] = None):
                 break
             combined_voices.extend(cache_entry["voices"])
         if all_cached:
-            logger.debug("从所有引擎缓存中获取TTS语音列表")
             return combined_voices
     voices = []
     if engine_filter is None or engine_filter == ENGINE_EDGE:
-        edge_voices = _get_edge_voices()
+        edge_voices = await _get_edge_voices_async()
         if edge_voices:
             voices.extend(edge_voices)
             _tts_voices_cache[ENGINE_EDGE]["voices"] = edge_voices
@@ -162,7 +160,7 @@ def get_tts_voices(engine_filter: Optional[str] = None):
         else:
             logger.warning("Edge语音获取失败，不缓存其结果。")
     if engine_filter is None or engine_filter == ENGINE_PYTTSX3:
-        pyttsx3_voices = _get_pyttsx3_voices()
+        pyttsx3_voices = await _get_pyttsx3_voices_async()
         if pyttsx3_voices:
             voices.extend(pyttsx3_voices)
             _tts_voices_cache[ENGINE_PYTTSX3]["voices"] = pyttsx3_voices
@@ -170,7 +168,7 @@ def get_tts_voices(engine_filter: Optional[str] = None):
         else:
             logger.warning("pyttsx3语音获取失败，不缓存其结果。")
 
-    log_voices_summary(voices)
+    await asyncio.to_thread(log_voices_summary, voices)
 
     return voices
 
