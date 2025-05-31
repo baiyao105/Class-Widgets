@@ -56,6 +56,10 @@ async def _get_pyttsx3_voices_async():
             logger.warning(
                 "系统语音引擎(pyttsx3/SAPI5)初始化失败，可能是组件未正确注册或损坏。将跳过加载系统语音。"
             )
+        elif platform.system() != "Windows":
+            logger.warning(
+                f"在 {platform.system()} 上获取 Pyttsx3 语音列表时发生OS错误: {oe}。" "这可能是因为系统未安装或配置兼容的TTS引擎。将跳过加载系统语音。"
+            )
         else:
             logger.error(f"获取 Pyttsx3 语音列表时发生OS错误: {oe}")
         return []

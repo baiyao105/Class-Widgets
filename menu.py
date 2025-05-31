@@ -1004,7 +1004,7 @@ class SettingsMenu(FluentWindow):
             w.yesButton.setText('知道啦~')
             w.cancelButton.hide()
             w.show()
-        elif current_engine_key == "pyttsx3":
+        elif current_engine_key == "pyttsx3" and platform.system() == "Windows":
             class CustomMessageBox(MessageBoxBase):
                 def __init__(self, parent=None):
                     super().__init__(parent)
