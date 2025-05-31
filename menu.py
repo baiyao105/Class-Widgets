@@ -862,6 +862,7 @@ class SettingsMenu(FluentWindow):
                 Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
                 Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
                 Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
+                Action(fIcon.CAFE, '放学提醒', triggered=lambda: self.play_tts_preview('after_school')),
                 Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
             ])
             preview_tts_button.setMenu(preview_tts_menu)
@@ -874,6 +875,8 @@ class SettingsMenu(FluentWindow):
                 text_to_speak = text_template.format(lesson_name='信息技术')
             elif text_type == 'prepare_class':
                 text_to_speak = text_template.format(lesson_name='信息技术', minutes='5')
+            elif text_type == 'after_school':
+                text_to_speak = text_template
             elif text_type == 'otherwise':
                 text_to_speak = text_template.format(title='通知', content='这是一条测试通知ヾ(≧▽≦*)o')
             else:
