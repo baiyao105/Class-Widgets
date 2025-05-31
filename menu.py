@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import os
+import platform
 import subprocess
 import sys
 from copy import deepcopy
@@ -1114,8 +1115,9 @@ class SettingsMenu(FluentWindow):
         voice_selector.addItem("加载失败", userData=None)
         voice_selector.setEnabled(False)
         logger.error(f"处理TTS语音加载错误: {error_message}")
-        if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():\
-            MessageBox(self.TTSSettingsDialog, "TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}")
+        if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
+            parent_widget = self.TTSSettingsDialog if isinstance(self.TTSSettingsDialog, QWidget) else self
+            MessageBox(parent_widget, "TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}")
 
     def setup_configs_interface(self):  # 配置界面
         cf_import_schedule = self.findChild(PushButton, 'im_schedule')

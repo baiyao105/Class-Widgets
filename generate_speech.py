@@ -46,7 +46,8 @@ async def _get_pyttsx3_voices_async():
         with _pyttsx3_context() as engine:
             if not engine:
                 return []
-            voices_available = await asyncio.to_thread(engine.getProperty, "voices")
+            loop = asyncio.get_running_loop()
+            voices_available = await loop.run_in_executor(None, engine.getProperty, "voices")
             return [
                 {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
                 for voice in voices_available
@@ -173,7 +174,11 @@ async def get_tts_voices(engine_filter: Optional[str] = None):
         else:
             logger.warning("pyttsx3语音获取失败，不缓存其结果。")
 
-    await asyncio.to_thread(log_voices_summary, voices)
+    if hasattr(asyncio, 'to_thread'):
+        await asyncio.to_thread(log_voices_summary, voices)
+    else:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, log_voices_summary, voices)
 
     return voices
 
@@ -290,8 +295,11 @@ class TTSEngine:
         return file_path
 
     async def _pyttsx3_tts(self, text: str, voice: str, file_path: str) -> str:
-        asyncio.get_running_loop()
-        return await asyncio.to_thread(self._sync_pyttsx3, text, voice, file_path)
+        if hasattr(asyncio, 'to_thread'):
+            return await asyncio.to_thread(self._sync_pyttsx3, text, voice, file_path)
+        else:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, self._sync_pyttsx3, text, voice, file_path)
 
     @contextmanager
     def _pyttsx3_context(self):
