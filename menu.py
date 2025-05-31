@@ -1055,8 +1055,8 @@ class SettingsMenu(FluentWindow):
         switch_enable_TTS = self.switch_enable_TTS
         try:
             voice_selector.currentTextChanged.disconnect()
-        except TypeError:
-            pass
+        except Exception as e:
+            logger.warning(f"断开voice_selector信号连接失败: {e}")
         voice_selector.clear()
 
         if not available_voices:
@@ -1066,7 +1066,6 @@ class SettingsMenu(FluentWindow):
             switch_enable_TTS.setEnabled(False)
             card_tts_speed = self.findChild(CardWidget, 'CardWidget_7')
             card_tts_speed.setVisible(False)
-            return
 
         for voice in available_voices:
             voice_selector.addItem(voice['name'], userData=voice['id'])
@@ -1080,11 +1079,15 @@ class SettingsMenu(FluentWindow):
                     break
             if index_to_select != -1:
                 voice_selector.setCurrentIndex(index_to_select)
+                config_center.write_conf('TTS', 'voice_id', current_voice_id)
             else:
                 if available_voices:
                     voice_selector.setCurrentIndex(0)
                     first_voice_id = available_voices[0]['id']
                     config_center.write_conf('TTS', 'voice_id', first_voice_id)
+                else:
+                    voice_selector.setEnabled(False)
+                    switch_enable_TTS.setEnabled(False)
         elif available_voices: # 默认选择
             voice_selector.setCurrentIndex(0)
             first_voice_id = available_voices[0]['id']
@@ -1092,16 +1095,10 @@ class SettingsMenu(FluentWindow):
         else: # 理论不会到这里
              voice_selector.setEnabled(False)
              switch_enable_TTS.setEnabled(False)
-             return
 
         voice_selector.setEnabled(True)
         switch_enable_TTS.setEnabled(True)
-        try:
-            if voice_selector.receivers(voice_selector.currentTextChanged) > 0:
-                voice_selector.currentTextChanged.disconnect()
-        except TypeError:
-            pass
-        voice_selector.currentTextChanged.connect(lambda name: config_center.write_conf('TTS', 'voice_id', voice_selector.currentData() or ''))
+        voice_selector.currentTextChanged.connect(lambda name: config_center.write_conf('TTS', 'voice_id', voice_selector.currentData()) if voice_selector.currentData() else None)
 
     def handle_tts_load_error(self, error_message):
         if not self.voice_selector or not self.switch_enable_TTS:
