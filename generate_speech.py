@@ -293,22 +293,23 @@ class TTSEngine:
         """pyttsx3引擎的上下文管理器，确保资源正确释放"""
         engine = None
         try:
-            try:
-                engine = pyttsx3.init()
-                yield engine
-            except OSError as oe:
-                if hasattr(oe, "winerror") and oe.winerror == -2147221005:
-                    logger.error(
-                        "系统语音引擎(pyttsx3/SAPI5)初始化失败，无法使用此引擎生成语音。请检查系统语音组件。"
-                    )
-                    raise RuntimeError("pyttsx3/SAPI5 初始化失败") from oe
-                else:
-                    logger.error(f"pyttsx3 初始化时发生OS错误: {oe}")
-                    raise RuntimeError("pyttsx3 初始化OS错误") from oe
-            except Exception as init_e:
-                logger.error(f"pyttsx3 初始化失败: {init_e}")
-                raise RuntimeError("pyttsx3 初始化异常") from init_e
+            pythoncom.CoInitialize()
+            engine = pyttsx3.init()
+            yield engine
+        except OSError as oe:
+            if hasattr(oe, "winerror") and oe.winerror == -2147221005:
+                logger.error(
+                    "系统语音引擎(pyttsx3/SAPI5)初始化失败，无法使用此引擎生成语音。请检查系统语音组件。"
+                )
+                raise RuntimeError("pyttsx3/SAPI5 初始化失败") from oe
+            else:
+                logger.error(f"pyttsx3 初始化时发生OS错误: {oe}")
+                raise RuntimeError("pyttsx3 初始化OS错误") from oe
+        except Exception as init_e:
+            logger.error(f"pyttsx3 初始化失败: {init_e}")
+            raise RuntimeError("pyttsx3 初始化异常") from init_e
         finally:
+            pythoncom.CoUninitialize()
             if engine:
                 try:
                     engine.stop()

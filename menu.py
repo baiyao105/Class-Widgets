@@ -1054,7 +1054,10 @@ class SettingsMenu(FluentWindow):
         voice_selector = self.voice_selector
         switch_enable_TTS = self.switch_enable_TTS
         try:
-            voice_selector.currentTextChanged.disconnect()
+            if voice_selector.currentTextChanged.disconnect():
+                pass
+        except TypeError:
+            pass
         except Exception as e:
             logger.warning(f"断开voice_selector信号连接失败: {e}")
         voice_selector.clear()
