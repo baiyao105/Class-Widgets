@@ -1629,7 +1629,7 @@ class FloatingWidget(QWidget):  # 浮窗
                 else:
                     mgr.show_windows()
                     mgr.hide_status = (current_state, 0)
-            elif hide_mode == '1': 
+            elif hide_mode == '0': 
                 mgr.show_windows()
                 self.close()
 
