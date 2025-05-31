@@ -1021,7 +1021,7 @@ class SettingsMenu(FluentWindow):
                     self.yesButton.setText('知道啦~')
                     self.cancelButton.hide()
                 def _open_settings(self):
-                    QDesktopServices.openUrl(QUrl("ms-settings:speech"))
+                    QDesktopServices.openUrl(QUrl("file:///C:/Windows/System32/Speech/SpeechUX/sapi.cpl"))
             w = CustomMessageBox(self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
             w.exec()
         else:

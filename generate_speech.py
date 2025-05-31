@@ -554,8 +554,6 @@ class TTSEngine:
                 )
                 return current_file_path
 
-            logger.debug(f"尝试使用 {current_engine} 生成 {current_filename}")
-
             try:
                 await self._execute_engine(
                     engine=current_engine,
