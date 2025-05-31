@@ -10,6 +10,7 @@ from contextlib import contextmanager
 
 import edge_tts
 import pyttsx3
+from pyttsx3.voice import Voice
 import pythoncom
 from loguru import logger
 from file import config_center
@@ -73,7 +74,7 @@ def _is_zh_voice(locale: str) -> bool:
     return "zh" in locale.lower()
 
 
-def _is_zh_pyttsx3_voice(voice) -> bool:
+def _is_zh_pyttsx3_voice(voice: Voice) -> bool:
     """检查pyttsx3中文语音"""
     name = voice.name.lower()
     if hasattr(voice, "languages") and voice.languages:
