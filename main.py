@@ -2180,22 +2180,18 @@ class DesktopWidget(QWidget):  # 主要小组件
             except TypeError: pass
 
             def _start_alert_fade_in():
-                # 检查是否有预警文本
                 if hasattr(self, 'weather_alert_text') and self.weather_alert_text.text():
                     self.weather_icon.hide()
                     self.temperature.hide()
                     self.weather_alert_opacity.setOpacity(0.0)
                     self.weather_alert_text.show()
-
-                    # 检查是否有预警图标
                     if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon is not None and not self.alert_icon.icon.isNull():
                         self.alert_icon_opacity.setOpacity(0.0)
                         self.alert_icon.show()
                         self.fade_in_group.start()
                     else:
-                        # 如果没有图标，只显示文本，并调整位置
                         self.alert_icon.hide() # 隐藏图标
-                        self.weather_alert_text.move(self.weather_icon.pos()) # 将文本移动到图标的位置
+                        self.weather_alert_text.move(self.weather_icon.pos())
                         self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
                         alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
                         alert_text_fade_in.setDuration(700)
@@ -2206,13 +2202,13 @@ class DesktopWidget(QWidget):  # 主要小组件
 
                     self.weather_info_timer.start(3000)
                 else:
-                    # 如果没有预警文本，则显示天气图标和温度
+                    # 没有预警文本显示天气图标和温度
                     self.weather_icon.show()
                     self.temperature.show()
                     if hasattr(self, 'weather_opacity'): self.weather_opacity.setOpacity(1.0)
                     if hasattr(self, 'temperature_opacity'): self.temperature_opacity.setOpacity(1.0)
                     self.showing_temperature = True
-                    self.alert_icon.hide() # 确保没有预警时图标是隐藏的}
+                    self.alert_icon.hide()
 
 
             self.fade_out_group.finished.connect(_start_alert_fade_in)
