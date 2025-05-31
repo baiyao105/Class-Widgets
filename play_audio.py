@@ -49,19 +49,22 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
                     return
 
         # 检查文件是否可读
-        if os.path.getsize(file_path) <= 0:
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
             start_time = time.time()
             while time.time() - start_time < 4:
                 if os.path.getsize(file_path) > 0:
                     break
                 time.sleep(0.1)
             else:
-                raise IOError("音频文件写入超时")
-                
-        # 检查文件大小是否正常（小于10字节的文件可能是损坏的）
+                logger.error(f"音频文件写入超时或为空: {relative_path}")
+                if tts_delete_after:
+                    tts = TTSEngine()
+                    tts.delete_audio_file(file_path)
+                return
         file_size = os.path.getsize(file_path)
         if file_size < 10:
-            logger.warning(f"音频文件可能无效，大小仅为 {file_size} 字节: {relative_path}")
+            logger.warning(f"音频文件可能无效或不完整，大小仅为 {file_size} 字节: {relative_path}")
             if tts_delete_after:
                 tts = TTSEngine()
                 tts.delete_audio_file(file_path)
@@ -99,9 +102,6 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
 
         logger.debug(f'成功播放音频: {relative_path}')
 
-        if tts_delete_after:
-            tts = TTSEngine()
-            tts.delete_audio_file(file_path)
 
     except FileNotFoundError as e:
         logger.error(f'音频文件未找到 | 路径: {relative_path} | 错误: {str(e)}')
@@ -112,7 +112,7 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
     except Exception as e:
         logger.error(f'未知播放失败 | 路径: {relative_path} | 错误: {str(e)}')
     finally:
-        if channel:
-             channel.stop()
+        if channel and channel.get_busy():
+            channel.stop()
         if sound:
             sound.stop()
