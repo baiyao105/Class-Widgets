@@ -6,6 +6,7 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+import asyncio
 
 from PyQt5 import uic, QtCore
 from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QThread
@@ -510,6 +511,8 @@ class TTSVoiceLoaderThread(QThread):
         try:
             if self.isInterruptionRequested():
                 return
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             available_voices = loop.run_until_complete(get_tts_voices(engine_filter=self.engine_filter))
             loop.close()
             if self.isInterruptionRequested():

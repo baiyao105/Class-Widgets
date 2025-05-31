@@ -1,6 +1,6 @@
 import os
 import time
-import pathlib # 导入 pathlib
+import pathlib
 
 import pygame
 import pygame.mixer
@@ -78,7 +78,6 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
                     sound_cache[file_path] = sound
         except pygame.error as e_load:
             logger.error(f"加载音频文件失败: {relative_path} | 错误: {e_load}")
-            # 即使播放失败也尝试删除文件
             if tts_delete_after:
                 tts = TTSEngine()
                 tts.delete_audio_file(file_path)

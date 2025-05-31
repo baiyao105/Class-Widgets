@@ -1,6 +1,7 @@
 import sys
 
 import os
+from collections import defaultdict
 from PyQt5 import uic
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QPoint, pyqtProperty, QThread
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPixmap
