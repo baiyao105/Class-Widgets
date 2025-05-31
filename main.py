@@ -1631,7 +1631,7 @@ class FloatingWidget(QWidget):  # 浮窗
                     mgr.hide_status = (current_state, 0)
             elif hide_mode == '1': 
                 mgr.show_windows()
-            self.close()
+                self.close()
 
     def focusInEvent(self, event):
         self.focusing = True
