@@ -509,11 +509,9 @@ class TTSVoiceLoaderThread(QThread):
     def run(self):
         try:
             if self.isInterruptionRequested():
-                logger.info("TTS语音加载线程收到中断请求，正在退出...")
                 return
             available_voices = get_tts_voices(engine_filter=self.engine_filter)
             if self.isInterruptionRequested():
-                logger.info("TTS语音加载线程收到中断请求，正在退出...")
                 return
 
             self.voicesLoaded.emit(available_voices)
@@ -775,12 +773,11 @@ class SettingsMenu(FluentWindow):
             self.viewLayout.addWidget(self.temp_widget)
 
             self.viewLayout.setContentsMargins(0, 0, 0, 0)
-            # 隐藏原有按钮
             self.cancelButton.hide()
             self.widget.setMinimumWidth(parent.width()//3*2)
             self.widget.setMinimumHeight(parent.height())
             switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
-            slider_speed_tts = self.widget.findChild(Slider, 'slider_tts_speed') # 获取语速滑块
+            slider_speed_tts = self.widget.findChild(Slider, 'slider_tts_speed')
             tts_enabled = int(config_center.read_conf('TTS', 'enable'))
             switch_enable_TTS.setChecked(tts_enabled)
             slider_speed_tts.setValue(int(config_center.read_conf('TTS', 'speed')))
@@ -797,7 +794,7 @@ class SettingsMenu(FluentWindow):
             # TTS引擎选择器
             parent.engine_selector = self.widget.findChild(ComboBox, 'engine_selector')
             if not parent.engine_selector:
-                parent.engine_selector = ComboBox(self.widget) # 动态创建
+                parent.engine_selector = ComboBox(self.widget)
             else:
                 parent.engine_selector.clear()
                 # TODO: get_available_tts_engines() 函数 获取可用引擎(目前疑似用不上)
@@ -813,7 +810,7 @@ class SettingsMenu(FluentWindow):
                 if index_to_select != -1:
                     parent.engine_selector.setCurrentIndex(index_to_select)
                 else:
-                    parent.engine_selector.setCurrentIndex(0) # 默认选择第一个
+                    parent.engine_selector.setCurrentIndex(0)
                     parent.current_loaded_engine = parent.engine_selector.itemData(0)
                     config_center.write_conf('TTS', 'engine', parent.current_loaded_engine)
 
@@ -833,7 +830,7 @@ class SettingsMenu(FluentWindow):
             if parent.available_voices is not None and parent.current_loaded_engine == parent.engine_selector.currentData():
                 parent.update_tts_voices(parent.available_voices)
             else:
-                # 启动线程由 open_tts_settings 处理
+                # 启动由 open_tts_settings 处理
                 voice_selector.clear()
                 voice_selector.addItem("加载中...", userData=None)
                 voice_selector.setEnabled(False)
@@ -858,25 +855,19 @@ class SettingsMenu(FluentWindow):
             text_notification.setText(config_center.read_conf('TTS', 'otherwise'))
             text_notification.textChanged.connect(lambda: config_center.write_conf('TTS', 'otherwise', text_notification.text()))
 
-            # 预览按钮
+            # 预览
             preview_tts_button = self.widget.findChild(PrimaryDropDownPushButton, 'preview')
-            if preview_tts_button:
-                preview_tts_menu = RoundMenu(parent=preview_tts_button)
-                preview_tts_menu.addActions([
-                    Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
-                    Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
-                    Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
-                    Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
-                ])
-                preview_tts_button.setMenu(preview_tts_menu)
-            else:
-                logger.warning("未找到 preview 按钮。")
+            preview_tts_menu = RoundMenu(parent=preview_tts_button)
+            preview_tts_menu.addActions([
+                Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
+                Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
+                Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
+                Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
+            ])
+            preview_tts_button.setMenu(preview_tts_menu)
 
         def play_tts_preview(self, text_type):
-            # 获取当前配置的文本
             text_template = config_center.read_conf('TTS', text_type)
-            # 替换占位符，这里只是简单示例，实际可能需要更复杂的逻辑
-            # 假设 lesson_name 为 '信息技术', minutes 为 '5'
             if text_type == 'attend_class':
                 text_to_speak = text_template.format(lesson_name='信息技术')
             elif text_type == 'finish_class':
@@ -888,25 +879,19 @@ class SettingsMenu(FluentWindow):
             else:
                 text_to_speak = text_template
 
-            # 调用TTS引擎播放
-            logger.info(f"生成TTS文本: {text_to_speak}")
+            logger.debug(f"生成TTS文本: {text_to_speak}")
             
             try:
-                # 获取当前选择的TTS引擎和语音
                 current_engine = self.parent_menu.engine_selector.currentData()
                 current_voice = None
                 if self.parent_menu.voice_selector and self.parent_menu.voice_selector.currentData():
                     current_voice = self.parent_menu.voice_selector.currentData()
                 
-                # 使用异步线程生成和播放TTS预览
                 if hasattr(self, 'tts_preview_thread') and self.tts_preview_thread and self.tts_preview_thread.isRunning():
-                    logger.info("停止旧的TTS预览线程...")
                     self.tts_preview_thread.requestInterruption()
                     self.tts_preview_thread.quit()
                     if not self.tts_preview_thread.wait(1000):
                         logger.warning("旧TTS预览线程未能在超时时间内退出，将在后台继续运行")
-                
-                # 创建新的预览线程
                 self.tts_preview_thread = TTSPreviewThread(
                     text=text_to_speak,
                     engine=current_engine,
@@ -914,11 +899,7 @@ class SettingsMenu(FluentWindow):
                     parent=self
                 )
                 
-                # 连接信号
                 self.tts_preview_thread.previewError.connect(self.handle_tts_preview_error)
-                
-                # 启动线程
-                logger.info(f"启动TTS预览线程，使用引擎 {current_engine}")
                 self.tts_preview_thread.start()
                 
             except Exception as e:
@@ -931,7 +912,7 @@ class SettingsMenu(FluentWindow):
                 ).exec()
                 
         def handle_tts_preview_error(self, error_message):
-            logger.error(f"TTS预览生成失败: {error_message}")
+            logger.error(f"TTS生成预览失败: {error_message}")
             from qfluentwidgets import MessageBox
             MessageBox(
                 "TTS生成失败",
@@ -949,7 +930,7 @@ class SettingsMenu(FluentWindow):
             current_selected_engine_in_selector = self.engine_selector.currentData()
 
         if self.available_voices is None or self.current_loaded_engine != current_selected_engine_in_selector:
-            logger.debug(f"加载语音: 加载引擎: {self.current_loaded_engine},{current_selected_engine_in_selector}(选择器)")
+            logger.debug(f"加载引擎: {self.current_loaded_engine},{current_selected_engine_in_selector}(选择器)")
             self.load_tts_voices_for_engine(current_selected_engine_in_selector)
         else:
             if hasattr(self, 'voice_selector') and self.voice_selector:
@@ -961,12 +942,12 @@ class SettingsMenu(FluentWindow):
     def on_engine_selected(self, engine_text):
         selected_engine_key = self.engine_selector.currentData()
         if selected_engine_key and selected_engine_key != self.current_loaded_engine:
-            logger.debug(f"TTS引擎已被更改,尝试更新列表: {selected_engine_key}")
+            logger.debug(f"TTS引擎被更改,尝试更新列表: {selected_engine_key}")
             config_center.write_conf('TTS', 'engine', selected_engine_key)
             self.current_loaded_engine = selected_engine_key # 更新当前加载的引擎
             self.load_tts_voices_for_engine(selected_engine_key)
         elif not selected_engine_key:
-            logger.warning("选择的TTS引擎键为空，不执行操作。")
+            logger.warning("选择的TTS引擎键为空")
 
     def load_tts_voices_for_engine(self, engine_key):
         if self.voice_selector:
@@ -978,7 +959,6 @@ class SettingsMenu(FluentWindow):
 
         if hasattr(self, 'tts_voice_loader_thread') and self.tts_voice_loader_thread:
             if self.tts_voice_loader_thread.isRunning():
-                logger.info("停止旧的TTS语音加载线程...")
                 self.tts_voice_loader_thread.requestInterruption()
                 self.tts_voice_loader_thread.quit()
                 if not self.tts_voice_loader_thread.wait(2000):
@@ -1000,7 +980,6 @@ class SettingsMenu(FluentWindow):
         current_engine_key = self.engine_selector.currentData()
         title = "引擎小提示"
         message = ""
-
         if current_engine_key == "edge":
             message = ("Edge TTS 需要联网才能正常发声哦~\n"
                        "请确保网络连接,不然会说不出话来(>﹏<)\n"
@@ -1103,8 +1082,6 @@ class SettingsMenu(FluentWindow):
 
         voice_selector.setEnabled(True)
         switch_enable_TTS.setEnabled(True)
-
-        # 先断旧连接
         try:
             if voice_selector.receivers(voice_selector.currentTextChanged) > 0:
                  voice_selector.currentTextChanged.disconnect()
@@ -1114,7 +1091,7 @@ class SettingsMenu(FluentWindow):
 
     def handle_tts_load_error(self, error_message):
         if not self.voice_selector or not self.switch_enable_TTS:
-            logger.warning("handle_tts_load_error 调用时 voice_selector 或 switch_enable_TTS 未初始化")
+            logger.warning("voice_selector 或 switch_enable_TTS 未初始化")
             return
             
         voice_selector = self.voice_selector

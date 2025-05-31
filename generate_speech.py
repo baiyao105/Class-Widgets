@@ -70,16 +70,12 @@ def _is_zh_voice(locale: str) -> bool:
 
 
 def _is_zh_pyttsx3_voice(voice) -> bool:
-    """检查pyttsx3语音是否为中文"""
+    """检查pyttsx3中文语音"""
     name = voice.name.lower()
-    # 检查语言属性
     if hasattr(voice, "languages") and voice.languages:
         return any("zh" in lang.lower() for lang in voice.languages)
-    # 如果没有语言属性，则根据名称关键词进行更严格的判断
-    # 避免将非中文语音误判为中文
     if "chinese" in name or "mandarin" in name:
         return True
-    # 如果既没有语言属性，名称中也没有中文关键词，则认为不是中文语音
     return False
 
 
@@ -123,13 +119,10 @@ def log_voices_summary(voices: list):
     if not voices:
         logger.warning("未能获取到任何 TTS 语音")
 
-
-# 缓存机制
 _tts_voices_cache = {
     "edge": {"voices": [], "timestamp": 0},
     "pyttsx3": {"voices": [], "timestamp": 0},
 }
-
 
 def get_tts_voices(engine_filter: Optional[str] = None):
     """获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3.
@@ -146,7 +139,7 @@ def get_tts_voices(engine_filter: Optional[str] = None):
         ):
             logger.debug(f"从 {engine_filter} 缓存中获取TTS语音列表")
             return cache_entry["voices"]
-    elif not engine_filter:  # 如果没有指定引擎，则检查所有引擎的缓存是否都有效
+    elif not engine_filter:
         all_cached = True
         combined_voices = []
         for eng, cache_entry in _tts_voices_cache.items():
@@ -224,7 +217,6 @@ DEFAULT_TTS_TIMEOUT = 10.0
 DEFAULT_DELETE_RETRIES = 5
 DEFAULT_DELETE_DELAY = 1.0
 
-
 class TTSEngine:
     """支持多平台和智能语音选择的多引擎TTS工具类"""
 
@@ -239,8 +231,6 @@ class TTSEngine:
         self.cache_dir = os.path.join(os.getcwd(), CACHE_DIR_NAME, AUDIO_DIR_NAME)
         self._ensure_cache_dir()
         self.engine_priority = [ENGINE_EDGE, ENGINE_PYTTSX3]
-
-        # 跨平台语音映射表
         self.voice_mapping = {
             ENGINE_EDGE: {LANG_ZH: "zh-CN-YunxiNeural", LANG_EN: "en-US-AriaNeural"},
             ENGINE_PYTTSX3: self._get_platform_voices(),
