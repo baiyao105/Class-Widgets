@@ -140,7 +140,7 @@
                      </sizepolicy>
                     </property>
                     <property name="text">
-                     <string>启用后将在提醒后使用TTS播报信息  *若使用 Edge 引擎需网络请求</string>
+                     <string>启用后将在提醒后使用TTS播报信息</string>
                     </property>
                     <property name="lightColor" stdset="0">
                      <color alpha="150">
@@ -241,7 +241,7 @@
                     <property name="sizeHint" stdset="0">
                      <size>
                       <width>20</width>
-                      <height>5</height>
+                      <height>1</height>
                      </size>
                     </property>
                    </spacer>

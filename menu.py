@@ -822,7 +822,12 @@ class SettingsMenu(FluentWindow):
             parent.switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
             self.tts_vocab_button = self.widget.findChild(PushButton, 'tts_vocab_button')
             def show_vocab_note():
-                w = MessageBox('小语法?', '{lesson_name}: 开始&结束&下节的课程名', self)
+                w = MessageBox('小语法?',
+                               '可以使用以下占位符来动态插入信息：\n'\
+                               '- `{lesson_name}`: 开始&结束&下节的课程名(例如：信息技术)\n'\
+                               '- `{minutes}`: 分钟数 (例如：5) *其他\n'\
+                               '- `{title}`: 通知标题 (例如：重要通知) *其他\n'\
+                               '- `{content}`: 通知内容 (例如：这是一条测试通知) *其他\n', self)
                 w.cancelButton.hide()
                 w.exec()
             self.tts_vocab_button.clicked.connect(show_vocab_note)
@@ -862,25 +867,32 @@ class SettingsMenu(FluentWindow):
                 Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
                 Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
                 Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
-                Action(fIcon.CAFE, '放学提醒', triggered=lambda: self.play_tts_preview('after_school')),
+                Action(fIcon.EMBED, '放学提醒', triggered=lambda: self.play_tts_preview('after_school')),
                 Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
             ])
             preview_tts_button.setMenu(preview_tts_menu)
 
         def play_tts_preview(self, text_type):
             text_template = config_center.read_conf('TTS', text_type)
+            from collections import defaultdict
+            format_values = defaultdict(str, {
+                'lesson_name': '信息技术',
+                'minutes': '5',
+                'title': '通知',
+                'content': '这是一条测试通知ヾ(≧▽≦*)o'
+            })
             if text_type == 'attend_class':
-                text_to_speak = text_template.format(lesson_name='信息技术')
+                text_to_speak = text_template.format_map(format_values)
             elif text_type == 'finish_class':
-                text_to_speak = text_template.format(lesson_name='信息技术')
+                text_to_speak = text_template.format_map(format_values)
             elif text_type == 'prepare_class':
-                text_to_speak = text_template.format(lesson_name='信息技术', minutes='5')
+                text_to_speak = text_template.format_map(format_values)
             elif text_type == 'after_school':
-                text_to_speak = text_template
+                text_to_speak = text_template.format_map(format_values)
             elif text_type == 'otherwise':
-                text_to_speak = text_template.format(title='通知', content='这是一条测试通知ヾ(≧▽≦*)o')
+                text_to_speak = text_template.format_map(format_values)
             else:
-                text_to_speak = text_template
+                text_to_speak = text_template.format_map(format_values)
 
             logger.debug(f"生成TTS文本: {text_to_speak}")
             
