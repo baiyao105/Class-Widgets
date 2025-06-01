@@ -524,12 +524,15 @@ class TTSVoiceLoaderThread(QThread):
                 return
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            available_voices = loop.run_until_complete(get_tts_voices(engine_filter=self.engine_filter))
+            available_voices, error_message = loop.run_until_complete(get_tts_voices(engine_filter=self.engine_filter))
             loop.close()
             if self.isInterruptionRequested():
                 return
 
-            self.voicesLoaded.emit(available_voices)
+            if error_message:
+                self.errorOccurred.emit(error_message)
+            else:
+                self.voicesLoaded.emit(available_voices)
         except Exception as e:
             logger.error(f"加载TTS语音列表时出错: {e}")
             self.errorOccurred.emit(str(e))
@@ -995,8 +998,8 @@ class SettingsMenu(FluentWindow):
         self.current_loaded_engine = engine_key
         self.available_voices = None
         self.tts_voice_loader_thread = TTSVoiceLoaderThread(engine_filter=engine_key)
-        self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
-        self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
+        self.tts_voice_loader_thread.voicesLoaded.connect(lambda voices: self.available_voices_cnt(voices) or self.switch_enable_TTS.setEnabled(True))
+        self.tts_voice_loader_thread.errorOccurred.connect(lambda error: self.handle_tts_load_error(error) or self.switch_enable_TTS.setEnabled(True))
         self.tts_voice_loader_thread.start()
 
     def populate_tts_engines(self):
@@ -1072,18 +1075,39 @@ class SettingsMenu(FluentWindow):
 
     def toggle_tts_settings(self, checked):
         switch_checked('TTS', 'enable', checked)
-        
+
         tts_dialog_widget = self.TTSSettingsDialog.widget if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else None
         if not tts_dialog_widget:
             return
         card_tts_speed = tts_dialog_widget.findChild(CardWidget, 'CardWidget_7')
         card_tts_speed.setVisible(checked)
-        can_enable_selector = checked and self.voice_selector.count() > 0 and \
-                              self.voice_selector.itemText(0) not in ["无可用语音", "加载中...", "加载失败"]
-        self.voice_selector.setEnabled(can_enable_selector)
-        self.engine_selector.setEnabled(checked)
         if checked:
-            self.load_tts_voices_for_engine(self.engine_selector.currentData())
+            self.engine_selector.setEnabled(True)
+            if self.voice_selector.itemText(0) in ["未启用", "加载失败", "无可用语音"] or self.voice_selector.count() == 0:
+                self.voice_selector.clear()
+                self.voice_selector.addItem("加载中...", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(False)
+            current_engine = self.engine_selector.currentData()
+            if current_engine:
+                self.load_tts_voices_for_engine(current_engine)
+            else:
+                logger.warning("TTS启用但未选择引擎，无法加载语音")
+                self.voice_selector.clear()
+                self.voice_selector.addItem("请选择引擎", userData=None)
+                self.voice_selector.setEnabled(False)
+                self.switch_enable_TTS.setEnabled(True)
+        else:
+            self.engine_selector.setEnabled(False)
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+            if self.tts_voice_loader_thread and self.tts_voice_loader_thread.isRunning():
+                self.tts_voice_loader_thread.requestInterruption()
+                self.tts_voice_loader_thread.quit()
+                if not self.tts_voice_loader_thread.wait(1000):
+                    logger.warning("TTS语音加载线程未能及时停止")
 
     def save_tts_speed(self, value):
         config_center.write_conf('TTS', 'speed', str(value))
@@ -1102,11 +1126,13 @@ class SettingsMenu(FluentWindow):
 
         if not available_voices:
             logger.warning("未找到可用的TTS语音引擎或语音包")
-            voice_selector.addItem("无可用语音", userData=None)
-            voice_selector.setEnabled(False)
-            switch_enable_TTS.setEnabled(False)
+            if voice_selector.count() == 0 or voice_selector.itemText(0) == "加载中...":
+                voice_selector.clear()
+                voice_selector.addItem("无可用语音", userData=None)
+                voice_selector.setEnabled(False)
+            switch_enable_TTS.setEnabled(True)
             card_tts_speed = self.findChild(CardWidget, 'CardWidget_7')
-            card_tts_speed.setVisible(False)
+            if card_tts_speed: card_tts_speed.setVisible(False)
 
         for voice in available_voices:
             voice_selector.addItem(voice['name'], userData=voice['id'])

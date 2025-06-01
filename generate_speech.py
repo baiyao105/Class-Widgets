@@ -28,17 +28,31 @@ CACHE_MAX_AGE = 86400  # 缓存最大保存时间(秒)
 
 
 async def _get_edge_voices_async():
-    """获取Edge TTS语音列表"""
+    """获取Edge TTS语音列表,优先大陆"""
     try:
         edge_voices = await edge_tts.list_voices()
-        return [
-            {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}"}
+        zh_voices = [
+            {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}", "locale": voice["Locale"]}
             for voice in edge_voices
             if _is_zh_voice(voice["Locale"])
         ]
+        def sort_key(voice):
+            name_lower = voice["name"].lower()
+            locale_lower = voice["locale"].lower()
+            if "mainland" in locale_lower or "cn" in locale_lower:
+                if "xiaoxiao" in name_lower:
+                    return 0
+                return 1
+            elif "hongkong" in locale_lower or "hk" in locale_lower:
+                return 2 
+            elif "taiwan" in locale_lower or "tw" in locale_lower:
+                return 3
+            return 4
+        zh_voices.sort(key=sort_key)
+        return [{"name": v["name"], "id": v["id"]} for v in zh_voices], None
     except Exception as e:
-        logger.error(f"获取 Edge TTS 语音列表失败: {e}")
-        return []
+        error_message = f"获取 Edge TTS 语音列表失败: {e}"
+        return [], error_message
 
 
 async def _get_pyttsx3_voices_async():
@@ -46,29 +60,26 @@ async def _get_pyttsx3_voices_async():
     try:
         with _pyttsx3_context() as engine:
             if not engine:
-                return []
+                return [], "pyttsx3引擎初始化失败或不可用"
             loop = asyncio.get_running_loop()
             voices_available = await loop.run_in_executor(None, engine.getProperty, "voices")
             return [
                 {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
                 for voice in voices_available
                 if _is_zh_pyttsx3_voice(voice)
-            ]
+            ], None
     except OSError as oe:
+        error_message = ""
         if oe.winerror == -2147221005:
-            logger.warning(
-                "系统语音引擎(pyttsx3/SAPI5)初始化失败，可能是组件未正确注册或损坏。将跳过加载系统语音。"
-            )
+            error_message = "系统语音引擎(pyttsx3/SAPI5)初始化失败,可能是组件未正确注册或损坏,跳过加载系统语音"
         elif platform.system() != "Windows":
-            logger.warning(
-                f"在 {platform.system()} 上获取 Pyttsx3 语音列表时发生OS错误: {oe}。" "这可能是因为系统未安装或配置兼容的TTS引擎。将跳过加载系统语音。"
-            )
+            error_message = f"在 {platform.system()} 上获取 Pyttsx3 语音列表时发生OS错误: {oe}。这可能是因为系统未安装或配置兼容的TTS引擎。将跳过加载系统语音。"
         else:
-            logger.error(f"获取 Pyttsx3 语音列表时发生OS错误: {oe}")
-        return []
+            error_message = f"获取 Pyttsx3 语音列表时发生OS错误: {oe}"
+        return [], error_message
     except Exception as e:
-        logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
-        return []
+        error_message = f"获取 Pyttsx3 语音列表失败: {e}"
+        return [], error_message
 
 
 def _is_zh_voice(locale: str) -> bool:
@@ -155,7 +166,7 @@ async def get_tts_voices(engine_filter: Optional[str] = None):
         if cache_entry["voices"] and (
             current_time - cache_entry["timestamp"] < CACHE_MAX_AGE
         ):
-            return cache_entry["voices"]
+            return cache_entry["voices"], None
     elif not engine_filter:
         all_cached = True
         combined_voices = []
@@ -167,29 +178,36 @@ async def get_tts_voices(engine_filter: Optional[str] = None):
                 break
             combined_voices.extend(cache_entry["voices"])
         if all_cached:
-            return combined_voices
+            return combined_voices, None
     voices = []
+    overall_error = None
+
     if engine_filter is None or engine_filter == ENGINE_EDGE:
-        edge_voices = await _get_edge_voices_async()
+        edge_voices, edge_error = await _get_edge_voices_async()
         if edge_voices:
             voices.extend(edge_voices)
             _tts_voices_cache[ENGINE_EDGE]["voices"] = edge_voices
             _tts_voices_cache[ENGINE_EDGE]["timestamp"] = current_time
         else:
             logger.warning("Edge语音获取失败，不缓存其结果。")
+            if edge_error:
+                overall_error = overall_error or edge_error
+
     if engine_filter is None or engine_filter == ENGINE_PYTTSX3:
-        pyttsx3_voices = await _get_pyttsx3_voices_async()
+        pyttsx3_voices, pyttsx3_error = await _get_pyttsx3_voices_async()
         if pyttsx3_voices:
             voices.extend(pyttsx3_voices)
             _tts_voices_cache[ENGINE_PYTTSX3]["voices"] = pyttsx3_voices
             _tts_voices_cache[ENGINE_PYTTSX3]["timestamp"] = current_time
         else:
             logger.warning("pyttsx3语音获取失败，不缓存其结果。")
+            if pyttsx3_error:
+                overall_error = overall_error or pyttsx3_error
 
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, log_voices_summary, voices)
 
-    return voices
+    return voices, overall_error
 
 
 def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None):
