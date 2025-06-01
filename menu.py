@@ -937,16 +937,31 @@ class SettingsMenu(FluentWindow):
     def open_tts_settings(self):
         if not hasattr(self, 'TTSSettingsDialog') or not self.TTSSettingsDialog:
             self.TTSSettingsDialog = self.TTSSettings(self)
-        current_selected_engine_in_selector = self.current_loaded_engine
         current_selected_engine_in_selector = self.engine_selector.currentData()
-        self.voice_selector.clear()
-        self.voice_selector.addItem("加载中...", userData=None)
-        self.voice_selector.setEnabled(False)
-        self.toggle_tts_settings(config_center.read_conf('TTS', 'enable') == '1')
+        tts_enabled = config_center.read_conf('TTS', 'enable') == '1'
+
+        if tts_enabled:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("加载中...", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(False)
+        else:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+
+        self.toggle_tts_settings(tts_enabled)
         self.TTSSettingsDialog.show()
         self.TTSSettingsDialog.exec()
         logger.debug(f"加载引擎: {self.current_loaded_engine},{current_selected_engine_in_selector}(选择器)")
-        self.load_tts_voices_for_engine(current_selected_engine_in_selector)
+        if tts_enabled:
+            self.load_tts_voices_for_engine(current_selected_engine_in_selector)
+        else:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
 
     def on_engine_selected(self, engine_text):
         selected_engine_key = self.engine_selector.currentData()
