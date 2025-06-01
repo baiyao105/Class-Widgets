@@ -54,8 +54,9 @@ class TTSAudioThread(QThread):
             logger.warning("TTS 已经播放")
             return
 
-        if platform.system() != "Windows":
-            logger.warning("当前系统不是Windows,跳过pyttsx3 TTS生成")
+        engine_type = self.voice_id.split(':')[0] if self.voice_id else None
+        if engine_type == "pyttsx3" and platform.system() != "Windows":
+            logger.warning("当前系统不是Windows,pyttsx3跳过TTS生成")
             return
 
         try:
