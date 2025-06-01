@@ -25,46 +25,6 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
     Dialog, ProgressRing, PlainTextEdit, ImageLabel, PushButton, InfoBarIcon, Flyout, FlyoutAnimationType, CheckBox, \
     PrimaryPushButton, IconWidget
 
-# patch: 由于 deregister 错误绑定造成的更改主题访问已删除元素
-import qfluentwidgets.common.style_sheet as qss
-
-class StyleSheetManager(qss.StyleSheetManager):
-
-    def register(self, source, widget: QWidget, reset=True):
-        from qfluentwidgets import StyleSheetFile, StyleSheetCompose, CustomStyleSheet
-        from qfluentwidgets.common.style_sheet import CustomStyleSheetWatcher, DirtyStyleSheetWatcher
-        """ register widget to manager
-
-        Parameters
-        ----------
-        source: str | StyleSheetBase
-            qss source, it could be:
-            * `str`: qss file path
-            * `StyleSheetBase`: style sheet instance
-
-        widget: QWidget
-            the widget to set style sheet
-
-        reset: bool
-            whether to reset the qss source
-        """
-        if isinstance(source, str):
-            source = StyleSheetFile(source)
-
-        if widget not in self.widgets:
-            widget.destroyed.connect(lambda: self.deregister(widget))
-            widget.installEventFilter(CustomStyleSheetWatcher(widget))
-            widget.installEventFilter(DirtyStyleSheetWatcher(widget))
-            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
-
-        if not reset:
-            self.source(widget).add(source)
-        else:
-            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
-
-qss.styleSheetManager = StyleSheetManager()
-# end of patch
-
 import conf
 import list_
 import tip_toast
@@ -547,19 +507,17 @@ def get_current_lesson_name():
                             current_state = 0
                         return
 
-def get_hide_status_from_current_state():
+def get_hide_status():
     # 1 -> hide, 0 -> show
     # 满分啦（
     # 祝所有用 Class Widgets 的、不用 Class Widgets 的学子体测满分啊（（
     global current_state, current_lesson_name, excluded_lessons
-    # if current_state:
-    #     if not current_lesson_name in excluded_lessons:
-    #         return 0
-    #     else:
-    #         return 1
-    # else:
-    #     return 1
-    return current_state ^ (current_lesson_name in excluded_lessons)
+    return 1 if {
+        '0': lambda: 0,
+        '1': lambda: current_state,
+        '2': lambda: check_windows_maximize() or check_fullscreen(),
+        '3': lambda: current_state
+    }[config_center.read_conf('General', 'hide')]() and not (current_lesson_name in excluded_lessons) else 0
 
 
 # 定义 RECT 结构体
@@ -1671,9 +1629,9 @@ class FloatingWidget(QWidget):  # 浮窗
                 else:
                     mgr.show_windows()
                     mgr.hide_status = (current_state, 0)
-            elif hide_mode == '1': 
+            elif hide_mode == '0': 
                 mgr.show_windows()
-            self.close()
+                self.close()
 
     def focusInEvent(self, event):
         self.focusing = True
@@ -1806,11 +1764,11 @@ class DesktopWidget(QWidget):  # 主要小组件
             
             self.showing_temperature = True  # 跟踪状态(预警/气温)
 
-            self.get_weather_data()
             self.weather_timer = QTimer(self)
             self.weather_timer.setInterval(30 * 60 * 1000)  # 30分钟更新一次
             self.weather_timer.timeout.connect(self.get_weather_data)
             self.weather_timer.start()
+            self.get_weather_data()
             update_timer.add_callback(self.detect_weather_code_changed)
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
@@ -2079,15 +2037,10 @@ class DesktopWidget(QWidget):  # 主要小组件
         get_current_lesson_name()
         get_excluded_lessons()
         get_next_lessons()
-        hide_status = get_hide_status_from_current_state()
+        hide_status = get_hide_status()
 
-        if (hide_mode:=config_center.read_conf('General', 'hide')) == '1':  # 上课自动隐藏
+        if (hide_mode:=config_center.read_conf('General', 'hide')) in ['1','2']:  # 上课自动隐藏
             if hide_status:
-                mgr.decide_to_hide()
-            else:
-                mgr.show_windows()
-        elif hide_mode == '2': # 最大化/全屏自动隐藏
-            if check_windows_maximize() or check_fullscreen():
                 mgr.decide_to_hide()
             else:
                 mgr.show_windows()
@@ -2165,9 +2118,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self):
         logger.info('获取天气数据')
-        self.weather_thread = weatherReportThread()
-        self.weather_thread.weather_signal.connect(self.update_weather_data)
-        self.weather_thread.start()
+        if not hasattr(self, 'weather_thread') or not self.weather_thread.isRunning():
+            self.weather_thread = weatherReportThread()
+            self.weather_thread.weather_signal.connect(self.update_weather_data)
+            self.weather_thread.start()
 
     def detect_weather_code_changed(self):
         current_code = config_center.read_conf('Weather')
@@ -2176,12 +2130,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.get_weather_data()
 
     def toggle_weather_alert(self):
-        if not hasattr(self, 'weather_alert_level') or not self.weather_alert_level:
-            # logger.warning("未获取到天气预警等级")
-            return
-        if not hasattr(self, 'weather_alert_text') or not self.weather_alert_text.text():
-            # logger.warning("未获取到天气预警文本")
-            return
         if self.showing_temperature:
             # 切换预警
             self.weather_alert_animation.setStartValue(0.0)
@@ -2232,21 +2180,36 @@ class DesktopWidget(QWidget):  # 主要小组件
             except TypeError: pass
 
             def _start_alert_fade_in():
-                if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon() is not None and not self.alert_icon.icon().isNull():
+                if hasattr(self, 'weather_alert_text') and self.weather_alert_text.text():
                     self.weather_icon.hide()
                     self.temperature.hide()
                     self.weather_alert_opacity.setOpacity(0.0)
-                    self.alert_icon_opacity.setOpacity(0.0)
                     self.weather_alert_text.show()
-                    self.alert_icon.show()
-                    self.fade_in_group.start()
+                    if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon is not None and not self.alert_icon.icon.isNull():
+                        self.alert_icon_opacity.setOpacity(0.0)
+                        self.alert_icon.show()
+                        self.fade_in_group.start()
+                    else:
+                        self.alert_icon.hide() # 隐藏图标
+                        self.weather_alert_text.move(self.weather_icon.pos())
+                        self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+                        alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+                        alert_text_fade_in.setDuration(700)
+                        alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+                        alert_text_fade_in.setStartValue(0.0)
+                        alert_text_fade_in.setEndValue(1.0)
+                        alert_text_fade_in.start()
+
                     self.weather_info_timer.start(3000)
                 else:
+                    # 没有预警文本显示天气图标和温度
                     self.weather_icon.show()
                     self.temperature.show()
                     if hasattr(self, 'weather_opacity'): self.weather_opacity.setOpacity(1.0)
                     if hasattr(self, 'temperature_opacity'): self.temperature_opacity.setOpacity(1.0)
                     self.showing_temperature = True
+                    self.alert_icon.hide()
+
 
             self.fade_out_group.finished.connect(_start_alert_fade_in)
 
