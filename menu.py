@@ -504,6 +504,7 @@ class TextFieldMessageBox(MessageBoxBase):
 class TTSVoiceLoaderThread(QThread):
     voicesLoaded = pyqtSignal(list)
     errorOccurred = pyqtSignal(str)
+    previewFinished = pyqtSignal(bool)
 
     def __init__(self, engine_filter=None, parent=None):
         super().__init__(parent)
@@ -1138,7 +1139,7 @@ class SettingsMenu(FluentWindow):
         logger.error(f"处理TTS语音加载错误: {error_message}")
         if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
             parent_widget = self.TTSSettingsDialog if isinstance(self.TTSSettingsDialog, QWidget) else self
-            MessageBox(parent_widget, "TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}")
+            MessageBox("TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}", parent_widget)
 
     def setup_configs_interface(self):  # 配置界面
         cf_import_schedule = self.findChild(PushButton, 'im_schedule')
