@@ -9,7 +9,7 @@ from loguru import logger
 
 import conf
 from file import config_center
-from generate_speech import TTSEngine
+from generate_speech import TTSEngine, on_audio_played
 
 sound_cache = {}
 
@@ -59,15 +59,13 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
             else:
                 logger.error(f"音频文件写入超时或为空: {relative_path}")
                 if tts_delete_after:
-                    tts = TTSEngine()
-                    tts.delete_audio_file(file_path)
+                    on_audio_played(file_path)
                 return
         file_size = os.path.getsize(file_path)
         if file_size < 10:
             logger.warning(f"音频文件可能无效或不完整，大小仅为 {file_size} 字节: {relative_path}")
             if tts_delete_after:
-                tts = TTSEngine()
-                tts.delete_audio_file(file_path)
+                on_audio_played(file_path)
             return
 
         try:
@@ -82,8 +80,7 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
         except pygame.error as e_load:
             logger.error(f"加载音频文件失败: {relative_path} | 错误: {e_load}")
             if tts_delete_after:
-                tts = TTSEngine()
-                tts.delete_audio_file(file_path)
+                on_audio_played(file_path)
             return
 
         volume = int(config_center.read_conf('Audio', 'volume')) / 100
@@ -97,11 +94,11 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
             logger.error(f"无法获取播放通道: {relative_path}")
             # 即使播放失败也尝试删除文件
             if tts_delete_after:
-                tts = TTSEngine()
-                tts.delete_audio_file(file_path)
+                on_audio_played(file_path)
 
         logger.debug(f'成功播放音频: {relative_path}')
-
+        if tts_delete_after:
+            on_audio_played(file_path)
 
     except FileNotFoundError as e:
         logger.error(f'音频文件未找到 | 路径: {relative_path} | 错误: {str(e)}')

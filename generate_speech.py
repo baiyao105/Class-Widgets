@@ -299,90 +299,198 @@ class TTSEngine:
     def _pyttsx3_context(self):
         """pyttsx3引擎的上下文管理器，确保资源正确释放"""
         engine = None
-        try:
-            pythoncom.CoInitialize()
-            engine = pyttsx3.init()
-            yield engine
-        except OSError as oe:
-            if hasattr(oe, "winerror") and oe.winerror == -2147221005:
-                logger.error(
-                    "系统语音引擎(pyttsx3/SAPI5)初始化失败，无法使用此引擎生成语音。请检查系统语音组件。"
-                )
-                raise RuntimeError("pyttsx3/SAPI5 初始化失败") from oe
-            else:
-                logger.error(f"pyttsx3 初始化时发生OS错误: {oe}")
-                raise RuntimeError("pyttsx3 初始化OS错误") from oe
-        except Exception as init_e:
-            logger.error(f"pyttsx3 初始化失败: {init_e}")
-            raise RuntimeError("pyttsx3 初始化异常") from init_e
-        finally:
-            pythoncom.CoUninitialize()
-            if engine:
-                try:
-                    engine.stop()
-                except Exception as e:
-                    logger.warning(f"关闭pyttsx3引擎时出错: {e}")
+        com_initialized = False
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                pythoncom.CoInitialize()
+                com_initialized = True
+                logger.debug(f"正在初始化pyttsx3引擎 (尝试 {attempt+1}/{max_retries})")
+                engine = pyttsx3.init()
+                if engine:
+                    try:
+                        rate = engine.getProperty('rate')
+                        logger.debug(f"pyttsx3引擎初始化成功，当前语速: {rate}")
+                        voices = engine.getProperty('voices')
+                        if not voices or len(voices) == 0:
+                            logger.warning("pyttsx3引擎未检测到任何语音")
+                            raise RuntimeError("未检测到语音")
+                        
+                        logger.debug(f"pyttsx3引擎检测到 {len(voices)} 个语音")
+                        yield engine
+                        return
+                    except Exception as check_e:
+                        logger.warning(f"pyttsx3引擎验证失败: {check_e}")
+                        raise RuntimeError(f"引擎验证失败: {check_e}")
+                else:
+                    logger.warning("pyttsx3引擎初始化返回空引擎")
+                    raise RuntimeError("初始化返回空引擎")
+                    
+            except OSError as oe:
+                if hasattr(oe, "winerror") and oe.winerror == -2147221005:
+                    logger.error(
+                        f"系统语音引擎(pyttsx3/SAPI5)初始化失败 (尝试 {attempt+1}/{max_retries})，"  
+                        f"错误码: {oe.winerror}。请检查系统语音组件。"
+                    )
+                else:
+                    logger.error(f"pyttsx3初始化时发生OS错误 (尝试 {attempt+1}/{max_retries}): {oe}")
+                if engine:
+                    try:
+                        engine.stop()
+                    except Exception:
+                        pass
+                    engine = None
+                
+                if com_initialized:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except Exception:
+                        pass
+                    com_initialized = False
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"pyttsx3/SAPI5 初始化失败，已重试 {max_retries} 次") from oe
+                wait_time = (attempt + 1) * 1.0
+                logger.info(f"等待 {wait_time} 秒后重试pyttsx3初始化...")
+                time.sleep(wait_time)
+                
+            except Exception as init_e:
+                logger.error(f"pyttsx3初始化失败 (尝试 {attempt+1}/{max_retries}): {init_e}")
+                if engine:
+                    try:
+                        engine.stop()
+                    except Exception:
+                        pass
+                    engine = None
+                
+                if com_initialized:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except Exception:
+                        pass
+                    com_initialized = False
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"pyttsx3初始化异常，已重试 {max_retries} 次") from init_e
+                wait_time = (attempt + 1) * 1.0
+                logger.info(f"等待 {wait_time} 秒后重试pyttsx3初始化...")
+                time.sleep(wait_time)
+            finally:
+                if engine:
+                    try:
+                        engine.stop()
+                    except Exception as e:
+                        logger.warning(f"关闭pyttsx3引擎时出错: {e}")
+                    engine = None
+                
+                if com_initialized:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except Exception as e:
+                        logger.warning(f"释放COM环境时出错: {e}")
+                    com_initialized = False
 
     @staticmethod
     def _sync_pyttsx3(text: str, voice: str, file_path: str):
-        """同步生成语音文件（pyttsx3引擎）"""
-        with TTSEngine()._pyttsx3_context() as engine:
-            engine.connect("started-utterance", lambda name: None)
-            engine.connect("finished-utterance", lambda name, completed: engine.stop())
-
-            if voice:
-                voices = engine.getProperty("voices")
-                found_voice = next((v for v in voices if v.id == voice), None)
-                if not found_voice:
-                    voice_id_only = voice.split(":", 1)[-1]
-                    found_voice = next(
-                        (v for v in voices if v.id == voice_id_only), None
+        """同步生成语音文件(pyttsx3)
+        """
+        temp_dir = os.path.dirname(file_path)
+        temp_filename = f"temp_{int(time.time())}_{os.getpid()}_{hash(text) % 10000}.mp3"
+        temp_file_path = os.path.join(temp_dir, temp_filename)
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except Exception as e:
+                logger.warning(f"无法删除已存在的临时文件: {temp_file_path}, 错误: {e}")
+                temp_filename = f"temp_{int(time.time())}_{os.getpid()}_{hash(text + str(time.time())) % 10000}.mp3"
+                temp_file_path = os.path.join(temp_dir, temp_filename)
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with TTSEngine()._pyttsx3_context() as engine:
+                    if not engine:
+                        raise RuntimeError("无法初始化 pyttsx3 引擎")
+                    if voice:
+                        voices = engine.getProperty("voices")
+                        found_voice = next((v for v in voices if v.id == voice), None)
+                        if not found_voice:
+                            voice_id_only = voice.split(":", 1)[-1]
+                            found_voice = next(
+                                (v for v in voices if v.id == voice_id_only), None
+                            )
+                        if found_voice:
+                            engine.setProperty("voice", found_voice.id)
+                        else:
+                            logger.warning(
+                                f"pyttsx3: 无效或不匹配的语音ID '{voice}'，将使用默认语音"
+                            )
+                    speed_value = int(config_center.read_conf("TTS", "speed"))
+                    default_rate = engine.getProperty("rate")
+                    if speed_value == 50:
+                        pyttsx3_rate = default_rate
+                    elif speed_value < 50:
+                        # 0-50范围映射到0.5-1.0倍速
+                        pyttsx3_rate = int(
+                            default_rate / 2 + (default_rate / 2) * (speed_value / 50)
+                        )
+                    else:
+                        # 50-100范围映射到1.0-1.5倍速
+                        pyttsx3_rate = int(
+                            default_rate + (default_rate * 0.5) * ((speed_value - 50) / 50)
+                        )
+                    pyttsx3_rate = max(MIN_PYTTSX3_RATE, min(pyttsx3_rate, MAX_PYTTSX3_RATE))
+                    logger.debug(
+                        f"pyttsx3 Rate: {pyttsx3_rate} (Slider: {speed_value}, Default: {default_rate})"
                     )
-                if found_voice:
-                    engine.setProperty("voice", found_voice.id)
-                else:
-                    logger.warning(
-                        f"pyttsx3: 无效或不匹配的语音ID '{voice}'，将使用默认语音"
-                    )
-            speed_value = int(config_center.read_conf("TTS", "speed"))
-            default_rate = engine.getProperty("rate")
-            if speed_value == 50:
-                pyttsx3_rate = default_rate
-            elif speed_value < 50:
-                # 0-50范围映射到0.5-1.0倍速
-                pyttsx3_rate = int(
-                    default_rate / 2 + (default_rate / 2) * (speed_value / 50)
-                )
-            else:
-                # 50-100范围映射到1.0-1.5倍速
-                pyttsx3_rate = int(
-                    default_rate + (default_rate * 0.5) * ((speed_value - 50) / 50)
-                )
-            MIN_RATE = 50
-            MAX_RATE = 400
-            pyttsx3_rate = max(MIN_RATE, min(pyttsx3_rate, MAX_RATE))
-            logger.debug(
-                f"pyttsx3 Rate: {pyttsx3_rate} (Slider: {speed_value}, Default: {default_rate})"
-            )
-            engine.setProperty("rate", pyttsx3_rate)
-            engine.save_to_file(text, file_path)
-            start_time = time.time()
-            engine.startLoop(False)
-            PYTTSX3_TIMEOUT = DEFAULT_TTS_TIMEOUT
-            ITERATION_SLEEP = 0.1
-            while engine.isBusy():
-                if time.time() - start_time > PYTTSX3_TIMEOUT:
-                    logger.warning(
-                        f"pyttsx3生成超时（{PYTTSX3_TIMEOUT}秒），尝试强制停止引擎。"
-                    )
-                    engine.stop()
-                    raise TimeoutError(f"pyttsx3生成超时（{PYTTSX3_TIMEOUT}秒）")
-                time.sleep(ITERATION_SLEEP)
-                engine.iterate()
-
-            engine.endLoop()
-
-            return file_path
+                    engine.setProperty("rate", pyttsx3_rate)
+                    engine.save_to_file(text, temp_file_path)
+                    # logger.debug(f"开始生成语音到临时文件: {temp_file_path}")
+                    engine.runAndWait()
+                    if not os.path.exists(temp_file_path):
+                        raise FileNotFoundError(f"语音生成后临时文件未找到: {temp_file_path}")
+                    
+                    file_size = os.path.getsize(temp_file_path)
+                    if file_size < MIN_VALID_FILE_SIZE:
+                        raise RuntimeError(f"生成的临时文件可能已损坏（大小: {file_size}字节）")
+                    try:
+                        with open(temp_file_path, "rb") as f:
+                            header = f.read(10)
+                            if not header or len(header) < 10:
+                                raise RuntimeError(f"临时文件头部无效，可能已损坏")
+                    except Exception as e:
+                        raise RuntimeError(f"无法读取生成的临时文件: {e}")
+                    try:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                        os.rename(temp_file_path, file_path)
+                    except Exception as e:
+                        logger.warning(f"重命名临时文件失败: {e}，尝试复制内容")
+                        try:
+                            with open(temp_file_path, "rb") as src, open(file_path, "wb") as dst:
+                                dst.write(src.read())
+                            logger.debug(f"成功通过复制内容创建目标文件: {file_path}")
+                        except Exception as copy_e:
+                            raise RuntimeError(f"无法创建目标文件: {copy_e}")
+                    if not os.path.exists(file_path):
+                        raise FileNotFoundError(f"最终目标文件未找到: {file_path}")
+                    file_size = os.path.getsize(file_path)
+                    if file_size < MIN_VALID_FILE_SIZE:
+                        raise RuntimeError(f"最终目标文件可能已损坏（大小: {file_size}字节）")
+                    
+                    return file_path
+                    
+            except Exception as e:
+                logger.error(f"pyttsx3 语音生成失败 (尝试 {attempt+1}/{max_retries}): {e}")
+                if os.path.exists(temp_file_path):
+                    try:
+                        os.remove(temp_file_path)
+                    except Exception as rm_e:
+                        logger.warning(f"清理临时文件失败: {rm_e}")
+                if attempt == max_retries - 1:
+                    raise RuntimeError(f"pyttsx3 语音生成失败，已重试 {max_retries} 次: {e}")
+                wait_time = (attempt + 1) * 0.5
+                time.sleep(wait_time)
+        raise RuntimeError("pyttsx3 语音生成失败，未知错误")
 
     @staticmethod
     def _detect_language(text: str) -> str:
@@ -709,17 +817,17 @@ def generate_speech_sync(
     timeout: float = 10.0,
     filename: Optional[str] = None,
 ) -> str:
-    """同步生成方法"""
-    tts = TTSEngine()
-    return asyncio.run(
-        tts.generate_speech(
-            text=text,
-            engine=engine,
-            voice=voice,
-            auto_fallback=auto_fallback,
-            timeout=timeout,
-            filename=filename,
-        )
+    """同步生成方法
+    
+    Note: 此函数使用队列处理器,所有 TTS 都通过单线程队列处理
+    """
+    return generate_speech_queue(
+        text=text,
+        engine=engine,
+        voice=voice,
+        auto_fallback=auto_fallback,
+        timeout=timeout,
+        filename=filename,
     )
 
 
@@ -729,7 +837,7 @@ def list_pyttsx3_voices():
         try:
             engine = pyttsx3.init()
         except OSError as oe:
-            if oe.winerror == -2147221005:
+            if hasattr(oe, "winerror") and oe.winerror == -2147221005:
                 logger.warning(
                     "系统语音引擎(pyttsx3/SAPI5)初始化失败，无法列出系统语音。"
                 )
@@ -750,3 +858,233 @@ def list_pyttsx3_voices():
     except Exception as e:
         logger.error(f"列出 Pyttsx3 语音时出错: {e}")
         return []
+
+import queue
+import threading
+import uuid
+from typing import Callable, Dict, Optional, Any
+class TTSQueueProcessor:
+    """单线程 TTS 队列处理器"""
+    _instance = None
+    _lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls):
+        """获取单例实例"""
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+                cls._instance.start()
+            return cls._instance
+    
+    def __init__(self):
+        """初始化队列处理器"""
+        self.queue = queue.Queue()
+        self.running = False
+        self.thread = None
+        self.tts_engine = TTSEngine()
+        self.callbacks: Dict[str, Dict[str, Any]] = {}
+    
+    def start(self):
+        """启动处理线程"""
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._process_queue, daemon=True)
+            self.thread.start()
+    
+    def stop(self):
+        """停止处理线程"""
+        if self.running:
+            self.running = False
+            self.queue.put(None)
+            if self.thread:
+                self.thread.join(timeout=2.0)
+    
+    def _process_queue(self):
+        """处理队列中的 TTS 请求"""
+        while self.running:
+            try:
+                task = self.queue.get(block=True, timeout=1.0)
+                if task is None:
+                    self.queue.task_done()
+                    continue
+                task_id, params, on_complete, on_error = task
+                try:
+                    if "filename" not in params:
+                        timestamp = int(time.time())
+                        unique_id = str(uuid.uuid4())[:8]
+                        text_hash = hashlib.md5(params["text"].encode()).hexdigest()[:6]
+                        params["filename"] = f"{params.get('engine', 'edge')}_{text_hash}_{timestamp}_{unique_id}.mp3"
+                    logger.debug(f"处理TTS[ID: {task_id}]: {params.get('text')[:20]}...")
+                    file_path = asyncio.run(self.tts_engine.generate_speech(**params))
+                    if on_complete:
+                        try:
+                            on_complete(file_path)
+                        except Exception as cb_e:
+                            logger.error(f"TTS成功回调执行出错 [ID: {task_id}]: {cb_e}")
+                    if file_path:
+                        self.callbacks[file_path] = {
+                            "task_id": task_id,
+                            "created_at": time.time(),
+                            "params": params
+                        }
+                        
+                except Exception as e:
+                    logger.error(f"TTS处理失败 [ID: {task_id}]: {e}")
+                    if on_error:
+                        try:
+                            on_error(str(e))
+                        except Exception as cb_e:
+                            logger.error(f"TTS错误回调执行出错 [ID: {task_id}]: {cb_e}")
+                
+                finally:
+                    self.queue.task_done()
+                    
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"TTS 队列处理器异常: {e}")
+                time.sleep(1.0)
+    
+    def add_task(self, text: str, engine: str = ENGINE_EDGE, voice: Optional[str] = None,
+                auto_fallback: bool = False, timeout: float = DEFAULT_TTS_TIMEOUT,
+                on_complete: Optional[Callable[[str], None]] = None,
+                on_error: Optional[Callable[[str], None]] = None) -> str:
+        """添加 TTS 任务到队列
+        
+        参数:
+            text: 要转换的文本
+            engine: TTS 引擎
+            voice: 语音 ID
+            auto_fallback: 是否自动回退到其他引擎
+            timeout: 超时时间
+            on_complete: 成功回调函数，参数为生成的文件路径
+            on_error: 错误回调函数，参数为错误信息
+            
+        返回:
+            任务 ID
+        """
+        task_id = str(uuid.uuid4())
+        params = {
+            "text": text,
+            "engine": engine,
+            "voice": voice,
+            "auto_fallback": auto_fallback,
+            "timeout": timeout
+        }
+        
+        self.queue.put((task_id, params, on_complete, on_error))
+        logger.debug(f"已添加 TTS 任务到队列 [ID: {task_id}]")
+        return task_id
+    
+    def on_audio_played(self, file_path: str):
+        """音频播放完成后的回调，用于安全删除文件
+        
+        参数:
+            file_path: 播放完成的音频文件路径
+        """
+        if file_path in self.callbacks:
+            task_info = self.callbacks.pop(file_path)
+            logger.debug(f"音频播放完成，准备删除文件 [ID: {task_info['task_id']}]: {file_path}")
+            def delayed_delete():
+                time.sleep(0.5)
+                try:
+                    if os.path.exists(file_path):
+                        self.tts_engine.delete_audio_file(file_path)
+                        logger.debug(f"成功删除已播放的音频文件: {file_path}")
+                except Exception as e:
+                    logger.warning(f"删除已播放的音频文件失败: {e}")
+            threading.Thread(target=delayed_delete, daemon=True).start()
+
+def queue_tts_request(text: str, engine: str = ENGINE_EDGE, voice: Optional[str] = None,
+                     auto_fallback: bool = True, timeout: float = DEFAULT_TTS_TIMEOUT,
+                     on_complete: Optional[Callable[[str], None]] = None,
+                     on_error: Optional[Callable[[str], None]] = None) -> str:
+    """将 TTS 请求加入队列处理
+    
+    参数:
+        text: 要转换的文本
+        engine: TTS 引擎
+        voice: 语音 ID
+        auto_fallback: 是否自动回退到其他引擎
+        timeout: 超时时间
+        on_complete: 成功回调函数，参数为生成的文件路径
+        on_error: 错误回调函数，参数为错误信息
+        
+    返回:
+        任务 ID
+    """
+    processor = TTSQueueProcessor.get_instance()
+    return processor.add_task(
+        text=text,
+        engine=engine,
+        voice=voice,
+        auto_fallback=auto_fallback,
+        timeout=timeout,
+        on_complete=on_complete,
+        on_error=on_error
+    )
+
+
+def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[str] = None,
+                        auto_fallback: bool = True, timeout: float = DEFAULT_TTS_TIMEOUT,
+                        filename: Optional[str] = None) -> str:
+    """队列版本的语音生成函数，与原 generate_speech 函数参数兼容
+    
+    这个函数是 generate_speech 的队列版本，将请求放入队列中串行处理，
+    避免并发问题。它会阻塞直到语音生成完成，与原函数行为一致。
+    
+    参数:
+        text: 要转换的文本
+        engine: TTS 引擎
+        voice: 语音 ID
+        auto_fallback: 是否自动回退到其他引擎
+        timeout: 超时时间
+        filename: 自定义文件名
+        
+    返回:
+        生成的音频文件路径
+    """
+    result_event = threading.Event()
+    result_container = {"file_path": None, "error": None}
+    
+    def on_complete(file_path):
+        result_container["file_path"] = file_path
+        result_event.set()
+    
+    def on_error(error_msg):
+        result_container["error"] = error_msg
+        result_event.set()
+    
+    params = {
+        "text": text,
+        "engine": engine,
+        "voice": voice,
+        "auto_fallback": auto_fallback,
+        "timeout": timeout
+    }
+    
+    if filename:
+        params["filename"] = filename
+    
+    processor = TTSQueueProcessor.get_instance()
+    processor.add_task(
+        **params,
+        on_complete=on_complete,
+        on_error=on_error
+    )
+    
+    result_event.wait()
+    if result_container["error"]:
+        raise RuntimeError(f"TTS生成失败: {result_container['error']}")
+    return result_container["file_path"]
+
+
+def on_audio_played(file_path: str):
+    """音频播放完成后调用此函数，用于安全删除文件
+    
+    参数:
+        file_path: 播放完成的音频文件路径
+    """
+    processor = TTSQueueProcessor.get_instance()
+    processor.on_audio_played(file_path)
