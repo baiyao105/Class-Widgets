@@ -1539,11 +1539,14 @@ class FloatingWidget(QWidget):  # 浮窗
         if platform.system() == "Darwin":
             curve = QEasingCurve.Type.OutQuad
             duration = int(duration * 0.85)
-        elif platform.system() == "Windows":
+        curve = QEasingCurve.Type.Linear
+        if platform.system() == "Windows":
             curve = QEasingCurve.Type.OutCubic
             if current_pos.y() > screen_center_y:
                 duration += 50  # 底部移动稍慢
             curve = QEasingCurve.Type.InOutQuad
+        elif platform.system() == "Darwin":
+            curve = QEasingCurve.Type.InOutQuad # macOS 也用这个吧
         
         self.animation = QPropertyAnimation(self, b"windowOpacity")
         self.animation.setDuration(int(duration * 1.15))

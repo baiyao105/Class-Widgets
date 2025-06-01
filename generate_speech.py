@@ -85,6 +85,17 @@ def _is_zh_pyttsx3_voice(voice: Voice) -> bool:
         return True
     return False
 
+ENGINE_EDGE = "edge"
+ENGINE_PYTTSX3 = "pyttsx3"
+
+def get_available_engines():
+    """获取可用的TTS引擎及其显示名称."""
+    engines = {
+        ENGINE_EDGE: "Edge TTS",
+    }
+    if platform.system() == "Windows":
+        engines[ENGINE_PYTTSX3] = "系统 TTS (pyttsx3)"
+    return engines
 
 @contextmanager
 def _pyttsx3_context():

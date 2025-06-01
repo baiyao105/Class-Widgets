@@ -38,6 +38,7 @@ def play_audio(file_path: str, tts_delete_after: bool = False):
 
         if not pygame.mixer.get_init():
             try:
+                pygame.mixer.quit()
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
             except pygame.error:
                 logger.warning("标准 Mixer 初始化失败，尝试兼容模式...")

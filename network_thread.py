@@ -432,8 +432,8 @@ class weatherReportThread(QThread):  # 获取最新天气信息
             self.weather_signal.emit(weather_data)
         except Exception as e:
             logger.error(f"触发天气信息失败: {e}")
-        finally:
-            self.deleteLater()
+        # finally:
+        #     self.deleteLater()  # 暂时移除
 
     @staticmethod
     def get_weather_data():

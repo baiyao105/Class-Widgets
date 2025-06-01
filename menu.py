@@ -35,7 +35,8 @@ import weather_db
 import weather_db as wd
 from conf import base_directory
 from cses_mgr import CSES_Converter
-from generate_speech import get_tts_voices, get_voice_id_by_name, get_voice_name_by_id
+from generate_speech import get_tts_voices, get_voice_id_by_name, get_voice_name_by_id, get_available_engines
+import generate_speech
 from file import config_center, schedule_center
 from network_thread import VersionThread
 from plugin import p_loader
@@ -545,7 +546,7 @@ class TTSPreviewThread(QThread):
 
     def run(self):
         try:
-            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+            if self.engine == "pyttsx3" and platform.system() != "Windows":
                 logger.warning("当前系统不是Windows，跳过pyttsx3 TTS预览。")
                 self.previewFinished.emit(False)
                 return
@@ -809,28 +810,10 @@ class SettingsMenu(FluentWindow):
             parent.engine_selector = self.widget.findChild(ComboBox, 'engine_selector')
             if not parent.engine_selector:
                 parent.engine_selector = ComboBox(self.widget)
-            else:
-                parent.engine_selector.clear()
-                # TODO: get_available_tts_engines() 函数 获取可用引擎(目前疑似用不上)
-                available_engines = [("系统 TTS (pyttsx3)", "pyttsx3"), ("Edge TTS", "edge")]
-                for name, key in available_engines:
-                    parent.engine_selector.addItem(name, userData=key)
-                current_engine_key = parent.current_loaded_engine
-                index_to_select = -1
-                for i in range(parent.engine_selector.count()):
-                    if parent.engine_selector.itemData(i) == current_engine_key:
-                        index_to_select = i
-                        break
-                if index_to_select != -1:
-                    parent.engine_selector.setCurrentIndex(index_to_select)
-                else:
-                    parent.engine_selector.setCurrentIndex(0)
-                    parent.current_loaded_engine = parent.engine_selector.itemData(0)
-                    config_center.write_conf('TTS', 'engine', parent.current_loaded_engine)
-
-                parent.engine_selector.currentTextChanged.connect(parent.on_engine_selected)
-                parent.engine_note_label = self.widget.findChild(HyperlinkLabel, 'engine_note')
-                parent.engine_note_label.clicked.connect(parent.show_engine_note)
+            parent.populate_tts_engines()
+            parent.engine_selector.currentTextChanged.connect(parent.on_engine_selected)
+            parent.engine_note_label = self.widget.findChild(HyperlinkLabel, 'engine_note')
+            parent.engine_note_label.clicked.connect(parent.show_engine_note)
 
             parent.voice_selector = self.widget.findChild(ComboBox, 'voice_selector')
             parent.switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
@@ -999,6 +982,33 @@ class SettingsMenu(FluentWindow):
         self.tts_voice_loader_thread.voicesLoaded.connect(self.available_voices_cnt)
         self.tts_voice_loader_thread.errorOccurred.connect(self.handle_tts_load_error)
         self.tts_voice_loader_thread.start()
+
+    def populate_tts_engines(self):
+        # 填充TTS引擎选项
+        self.engine_selector.clear()
+        available_engines = generate_speech.get_available_engines() #  假设 generate_speech 有这个方法
+        logger.debug(f"可用TTS引擎: {available_engines}")
+        for engine_key, engine_name in available_engines.items():
+            if engine_key == 'pyttsx3' and platform.system() != "Windows":
+                continue
+            self.engine_selector.addItem(engine_name, userData=engine_key)
+        
+        current_engine = config_center.read_conf('TTS', 'engine')
+        if current_engine in available_engines:
+            if current_engine == 'pyttsx3' and platform.system() != "Windows":
+                if self.engine_selector.count() > 0:
+                    self.engine_selector.setCurrentIndex(0)
+                    config_center.write_conf('TTS', 'engine', self.engine_selector.currentData())
+                    logger.warning(f"当前系统不支持pyttsx3，已自动切换到引擎: {self.engine_selector.currentData()}")
+                else:
+                    logger.error("没有可用的TTS引擎!")
+            else:
+                index = self.engine_selector.findData(current_engine)
+                if index != -1:
+                    self.engine_selector.setCurrentIndex(index)
+        elif self.engine_selector.count() > 0:
+            self.engine_selector.setCurrentIndex(0)
+            config_center.write_conf('TTS', 'engine', self.engine_selector.currentData())
 
     def show_engine_note(self):
         if not hasattr(self, 'engine_selector') or not self.engine_selector:
