@@ -503,6 +503,7 @@ class TextFieldMessageBox(MessageBoxBase):
 class TTSVoiceLoaderThread(QThread):
     voicesLoaded = pyqtSignal(list)
     errorOccurred = pyqtSignal(str)
+    previewFinished = pyqtSignal(bool)
 
     def __init__(self, engine_filter=None, parent=None):
         super().__init__(parent)
