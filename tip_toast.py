@@ -53,6 +53,11 @@ class TTSAudioThread(QThread):
         if tts_is_playing:
             logger.warning("TTS 已经播放")
             return
+
+        if platform.system() != "Windows":
+            logger.warning("当前系统不是Windows,跳过pyttsx3 TTS生成")
+            return
+
         try:
             tts_is_playing = True
             audio_path = generate_speech_sync(self.text, voice=self.voice_id, auto_fallback=True)

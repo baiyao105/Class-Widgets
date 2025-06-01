@@ -510,7 +510,15 @@ class TTSVoiceLoaderThread(QThread):
 
     def run(self):
         try:
+            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows,跳过pyttsx3 TTS预览")
+                self.previewFinished.emit(False)
+                return
             if self.isInterruptionRequested():
+                return
+            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows,跳过pyttsx3语音加载")
+                self.voicesLoaded.emit([])
                 return
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -537,7 +545,10 @@ class TTSPreviewThread(QThread):
 
     def run(self):
         try:
-            # 检查是否有中断请求
+            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows，跳过pyttsx3 TTS预览。")
+                self.previewFinished.emit(False)
+                return
             if self.isInterruptionRequested():
                 logger.info("TTS预览线程收到中断请求，正在退出...")
                 return

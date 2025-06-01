@@ -11,7 +11,8 @@ from contextlib import contextmanager
 import edge_tts
 import pyttsx3
 from pyttsx3.voice import Voice
-import pythoncom
+if platform.system() == "Windows":
+    import pythoncom
 from loguru import logger
 from file import config_center
 
@@ -297,7 +298,10 @@ class TTSEngine:
 
     @contextmanager
     def _pyttsx3_context(self):
-        """pyttsx3引擎的上下文管理器，确保资源正确释放"""
+        """pyttsx3引擎的上下文管理器"""
+        if platform.system() != "Windows":
+            raise RuntimeError("pyttsx3 仅支持 Windows 系统")
+
         engine = None
         com_initialized = False
         max_retries = 3
@@ -391,8 +395,7 @@ class TTSEngine:
 
     @staticmethod
     def _sync_pyttsx3(text: str, voice: str, file_path: str):
-        """同步生成语音文件(pyttsx3)
-        """
+        """同步生成语音文件(pyttsx3)"""
         temp_dir = os.path.dirname(file_path)
         temp_filename = f"temp_{int(time.time())}_{os.getpid()}_{hash(text) % 10000}.mp3"
         temp_file_path = os.path.join(temp_dir, temp_filename)
