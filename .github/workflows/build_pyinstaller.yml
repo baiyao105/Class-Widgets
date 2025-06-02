@@ -208,9 +208,9 @@ jobs:
           path: |
             ~/.cache/uv
             .venv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-uv-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-uv-
+            ${{ runner.os }}-${{ matrix.arch }}-uv-
 
       - name: Create venv and install dependencies
         if: steps.skip_check.outputs.should_skip != 'true'
