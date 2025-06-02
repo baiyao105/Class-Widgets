@@ -1341,8 +1341,12 @@ class SettingsMenu(FluentWindow):
         self.conf_combo = self.adInterface.findChild(ComboBox, 'conf_combo')
         self.conf_combo.clear()
         self.conf_combo.addItems(list_.get_schedule_config())
-        self.conf_combo.setCurrentIndex(
-            list_.get_schedule_config().index(config_center.read_conf('General', 'schedule')))
+        current_schedule = config_center.read_conf('General', 'schedule')
+        schedule_list = list_.get_schedule_config()
+        if current_schedule in schedule_list:
+            self.conf_combo.setCurrentIndex(schedule_list.index(current_schedule))
+        else:
+            self.conf_combo.setCurrentIndex(0) 
         self.conf_combo.currentIndexChanged.connect(self.ad_change_file)  # 切换配置文件
 
         conf_name = self.adInterface.findChild(LineEdit, 'conf_name')
