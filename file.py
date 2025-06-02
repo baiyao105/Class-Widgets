@@ -126,8 +126,8 @@ class ConfigCenter:
         else:
             self._load_user_config()
     
-            user_config_version_str = self.config['Version']['version'] if 'Version' in self.config and 'version' in self.config['Version'] else '0.0.0'
-            default_config_version_str = self.default_data['Version']['version'] if 'Version' in self.default_data and 'version' in self.default_data['Version'] else '0.0.0'
+            user_config_version_str = self.config.get('Version', {}).get('version', '0.0.0')
+            default_config_version_str = self.default_data.get('Version', {}).get('version', '0.0.0')
 
             try:
                 user_config_version = Version(user_config_version_str)
@@ -160,7 +160,7 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f'更新配置文件时出错: {e}')
 
-    def read_conf(self, section='General', key=''):
+    def read_conf(self, section='General', key='', fallback=None):
         """读取配置项，并根据默认配置中的类型信息进行转换"""
         if section in self.config:
             if key:
@@ -185,7 +185,7 @@ class ConfigCenter:
                         converted_section[k] = item_info
                 return converted_section
         logger.warning(f"配置项未找到: Section='{section}', Key='{key}'")
-        return None
+        return fallback
 
     def _convert_value(self, value, value_type):
         """根据指定的类型转换值"""
