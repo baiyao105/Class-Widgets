@@ -64,7 +64,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login }}:${{ github.event.pull_request.head.ref }}
         run: |
-          build_time=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M")
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
           build_commit="${GITHUB_SHA:0:7}"
           build_branch="${GITHUB_REF_NAME}"
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
