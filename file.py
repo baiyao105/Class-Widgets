@@ -84,7 +84,9 @@ class ConfigCenter:
         try:
             for section, options in self.default_data.items():
                 if section not in self.config:
-                    self.config[section] = options
+                    self.config.add_section(section)
+                    for key, value in options.items():
+                        self.config[section][key] = str(value)
                     logger.debug(f"添加新的配置节: {section}")
                 else:
                     for key, value in options.items():
@@ -92,7 +94,9 @@ class ConfigCenter:
                             self.config[section][key] = str(value)
                             logger.debug(f"添加新的配置项: {section}.{key}")
 
-            self.config.set('Version', 'version', self.default_data['Version']['version'])
+            version_from_default = self.default_data.get('Version', {}).get('version')
+            if version_from_default:
+                self.config.set('Version', 'version', version_from_default)
             self._write_config_to_file()
             logger.success(f"配置文件已更新")
         except Exception as e:
@@ -101,7 +105,9 @@ class ConfigCenter:
     def _check_schedule_config(self):
         """检查课程表配置文件"""
         schedule_dir = base_directory / 'config' / 'schedule'
-        current_schedule_file = schedule_dir / self.read_conf('General', 'schedule')
+        schedule_name = self.read_conf('General', 'schedule', '新课表 - 1.json')
+        current_schedule_file = schedule_dir / schedule_name
+
         if not current_schedule_file.exists():
             schedule_config = []
             for file_name in schedule_dir.iterdir():
@@ -109,7 +115,7 @@ class ConfigCenter:
                     schedule_config.append(file_name.name)
             if not schedule_config:
                 copy(base_directory / 'config' / 'default.json',
-                     schedule_dir / self.read_conf("General", "schedule"))
+                     schedule_dir / schedule_name)
                 logger.info(f"课程表不存在,已创建默认课程表")
             else:
                 self.write_conf('General', 'schedule', schedule_config[0])
@@ -180,29 +186,36 @@ class ConfigCenter:
 
     def read_conf(self, section='General', key='', fallback=None):
         """读取配置项，并根据默认配置中的类型信息进行转换"""
-        if section in self.config:
-            if key:
-                value = self.config[section].get(key)
-                if value is not None:
-                    return value
-            else:
+        if section not in self.config and section not in self.default_data:
+            logger.warning(f"配置节未找到: Section='{section}'")
+            if not key:
+                self.config.add_section(section)
+                logger.info(f"已为 '{section}' 添加空节")
+                return {}
+            return fallback
+        if not key:
+            if section in self.config:
                 return dict(self.config[section])
-        if section in self.default_data:
-            if key:
-                if key in self.default_data[section]:
-                    item_info = self.default_data[section][key]
-                    if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
-                        return self._convert_value(item_info["default"], item_info["type"])
-                    else:
-                        return item_info
             else:
                 converted_section = {}
-                for k, item_info in self.default_data[section].items():
+                for k, item_info in self.default_data.get(section, {}).items():
                     if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
                         converted_section[k] = self._convert_value(item_info["default"], item_info["type"])
                     else:
                         converted_section[k] = item_info
                 return converted_section
+        if section in self.config:
+            value = self.config[section].get(key)
+            if value is not None:
+                return value
+        if section in self.default_data:
+            item_info = self.default_data[section].get(key)
+            if item_info is not None:
+                if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
+                    return self._convert_value(item_info["default"], item_info["type"])
+                else:
+                    return item_info
+
         logger.warning(f"配置项未找到: Section='{section}', Key='{key}'")
         return fallback
 
