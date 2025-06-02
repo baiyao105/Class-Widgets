@@ -78,11 +78,11 @@ jobs:
             --add-data LICENSE:. `
             --add-data plugins:plugins `
             --hidden-import darkdetect
-          ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip dist/ClassWidgets/*
+          ./zip -r -q zip/ClassWidgets_${{ github.run_number }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
         uses: actions/upload-artifact@v4.4.2
         with:
-          name: windows-debug-${{ matrix.arch }}
+          name: windows-${{ matrix.arch }}_debug_${{ github.run_number }}
           path: zip
