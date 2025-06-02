@@ -34,34 +34,45 @@ jobs:
   lint:
     name: Python Syntax Check
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target'
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-      - name: Checkout PR code
+      - name: Checkout PR (merged ref)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.8"
+
       - name: Install linters
-        run: pip install ruff pylint
-      - name: Get changed Python files
+        run: |
+          pip install ruff pylint
+
+      - name: Detect changed Python files
         id: changed
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          changed_files=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }} | grep '\.py$' || true)
+          echo "🔍 获取合并前后的改动文件..."
+          changed_files=$(git diff --name-only HEAD^ HEAD | grep '\.py$' || true)
           echo "changed_files<<EOF" >> $GITHUB_OUTPUT
           echo "$changed_files" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Show changed files (debug)
+        run: |
+          echo "📝 检测到的 Python 改动文件："
+          echo "${{ steps.changed.outputs.changed_files }}"
+
       - name: Skip if no Python files changed
         if: steps.changed.outputs.changed_files == ''
         run: |
-          echo "未修改python文件,跳过语法检查。"
+          echo "✅ 没有 Python 文件改动，跳过检查"
           exit 0
 
       - name: Run ruff
@@ -80,33 +91,28 @@ jobs:
           cat pylint_output.txt
           grep -q "fatal" pylint_output.txt && exit 1 || true
 
-      - name: Comment on PR if needed
+      - name: Comment results on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            **PyLint 结果**：
-
-            <details><summary>ruff 警告</summary>
-
+            **🧪 PyLint 检查结果**
+            <details><summary>🐍 Ruff 警告</summary>
             ```txt
             $(cat ruff_output.txt | head -c 5000 || echo '无警告 🎉')
             ```
-
             </details>
-
-            <details><summary>pylint 致命错误</summary>
-
+            <details><summary>🚨 PyLint 致命错误</summary>
             ```txt
             $(cat pylint_output.txt | grep -i 'fatal' || echo '无致命错误 🎉')
             ```
-
             </details>
 
       - name: Stop build on fatal error
         if: steps.pylint.outcome == 'failure'
         run: |
-          echo "Pylint 致命错误,终止后续构建" && exit 1
+          echo "⛔ 检测到 PyLint 致命错误，终止构建流程"
+          exit 1
 
   build:
     needs: lint
@@ -118,37 +124,39 @@ jobs:
             os: windows-latest
           - arch: x64
             os: windows-latest
+    env:
+      BUILD_TRIGGERED: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.os }}
     if: |
-      github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+      github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request_target'
     steps:
       - name: Skip build for ${{ matrix.arch }}
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
         run: echo "Skip build ${{ matrix.arch }}"
 
       - name: Checkout repository
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         uses: actions/checkout@v4.2.2
 
       - name: Setup Python
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.8.10'
           architecture: ${{ matrix.arch }}
 
       - name: Setup uv
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         uses: astral-sh/setup-uv@v4
 
       - name: Prepare output directory
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         run: |
           if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
       - name: Set Build Info
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -183,7 +191,7 @@ jobs:
           echo "🧪 BUILD_TYPE:  $build_type"
 
       - name: Run Windows build & package
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         run: |
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           uv venv
@@ -206,7 +214,7 @@ jobs:
           ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
-        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        if: env.BUILD_TRIGGERED && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-${{ matrix.arch }}_debug_#${{ github.run_number }}
