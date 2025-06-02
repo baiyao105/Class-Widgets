@@ -69,6 +69,29 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
+      - name: Set Build Info
+        shell: bash
+        run: |
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          build_runid="${GITHUB_RUN_ID}"
+          build_type="Nuitka - Release"
+          config_path="config/default_config.json"
+          config_text=$(cat "$config_path")
+          config_text="${config_text//__BUILD_TIME__/$build_time}"
+          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
+          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
+          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
+          config_text="${config_text//__BUILD_TYPE__/$build_type}"
+          printf "%s" "$config_text" > "$config_path"
+          echo "🧾 写入的构建信息："
+          echo "⏰ BUILD_TIME(UTC+8):   $build_time"
+          echo "🔗 COMMIT_HASH: $build_commit"
+          echo "🌿 BRANCH:      $build_branch"
+          echo "🆔 RUN_ID:      $build_runid"
+          echo "🧪 BUILD_TYPE:  $build_type"
+
       - name: Build (Windows)
         if: ${{ startsWith(matrix.os, 'windows') }}
         uses: Nuitka/Nuitka-Action@main
@@ -200,6 +223,30 @@ jobs:
             Debian-X64-python-${{ env.PYTHON_VERSION }}-
             Debian-X64-python-
             Debian-X64-
+
+      - name: Set Build Info
+        shell: bash
+        run: |
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          build_runid="${GITHUB_RUN_ID}"
+          build_type="Nuitka - Release"
+          config_path="config/default_config.json"
+          config_text=$(cat "$config_path")
+          config_text="${config_text//__BUILD_TIME__/$build_time}"
+          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
+          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
+          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
+          config_text="${config_text//__BUILD_TYPE__/$build_type}"
+          printf "%s" "$config_text" > "$config_path"
+          echo "🧾 写入的构建信息："
+          echo "⏰ BUILD_TIME(UTC+8):   $build_time"
+          echo "🔗 COMMIT_HASH: $build_commit"
+          echo "🌿 BRANCH:      $build_branch"
+          echo "🆔 RUN_ID:      $build_runid"
+          echo "🧪 BUILD_TYPE:  $build_type"
+
       - name: Build
         shell: bash
         run: |

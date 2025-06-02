@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import configparser as config
 from pathlib import Path
 
@@ -15,30 +14,30 @@ import list_
 if os.name == 'nt':
     from win32com.client import Dispatch
 
+base_directory = Path(base_directory)
 conf = config.ConfigParser()
 name = 'Class Widgets'
 
 PLUGINS_DIR = Path(base_directory) / 'plugins'
 
 # app 图标
-if os.name == 'nt':
-    app_icon = os.path.join(base_directory, 'img', 'favicon.ico')
-elif os.name == 'darwin':
-    app_icon = os.path.join(base_directory, 'img', 'favicon.icns')
-else:
-    app_icon = os.path.join(base_directory, 'img', 'favicon.png')
+app_icon = base_directory / 'img' / (
+    'favicon.ico' if os.name == 'nt' else
+    'favicon.icns' if os.name == 'darwin' else
+    'favicon.png'
+)
 
 update_countdown_custom_last = 0
 countdown_cnt = 0
 
 def load_theme_config(theme):
     try:
-        with open(f'{base_directory}/ui/{theme}/theme.json', 'r', encoding='utf-8') as file:
+        with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
             return data
     except FileNotFoundError:
         logger.warning(f"主题配置文件 {theme} 不存在，返回默认配置")
-        return f'{base_directory}/ui/default/theme.json'
+        return str(base_directory / 'ui' / 'default' / 'theme.json')
     except Exception as e:
         logger.error(f"加载主题数据时出错: {e}")
         return None
@@ -46,11 +45,12 @@ def load_theme_config(theme):
 
 def load_plugin_config():
     try:
-        if os.path.exists(f'{base_directory}/config/plugin.json'):  # 如果配置文件存在
-            with open(f'{base_directory}/config/plugin.json', 'r', encoding='utf-8') as file:
+        plugin_config_path = base_directory / 'config' / 'plugin.json'
+        if plugin_config_path.exists():
+            with open(plugin_config_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
         else:
-            with open(f'{base_directory}/config/plugin.json', 'w', encoding='utf-8') as file:
+            with open(plugin_config_path, 'w', encoding='utf-8') as file:
                 data = {"enabled_plugins": []}
                 json.dump(data, file, ensure_ascii=False, indent=4)
         return data
@@ -63,7 +63,7 @@ def save_plugin_config(data):
     data_dict = load_plugin_config()
     data_dict.update(data)
     try:
-        with open(f'{base_directory}/config/plugin.json', 'w', encoding='utf-8') as file:
+        with open(base_directory / 'config' / 'plugin.json', 'w', encoding='utf-8') as file:
             json.dump(data_dict, file, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
@@ -74,7 +74,7 @@ def save_plugin_config(data):
 def save_installed_plugin(data):
     data = {"plugins": data}
     try:
-        with open(f'{base_directory}/plugins/plugins_from_pp.json', 'w', encoding='utf-8') as file:
+        with open(base_directory / 'plugins' / 'plugins_from_pp.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
@@ -84,7 +84,7 @@ def save_installed_plugin(data):
 
 def load_theme_width(theme):
     try:
-        with open(f'{base_directory}/ui/{theme}/theme.json', 'r', encoding='utf-8') as file:
+        with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
             return data['widget_width']
     except Exception as e:
@@ -113,29 +113,22 @@ def add_shortcut_to_startmenu(file='', icon=''):
     if os.name != 'nt':
         return
     try:
-        if file == "":
-            file_path = os.path.realpath(__file__)
-        else:
-            file_path = os.path.abspath(file)  # 将相对路径转换为绝对路径
-
-        if icon == "":
-            icon_path = file_path  # 如果未指定图标路径，则使用程序路径
-        else:
-            icon_path = os.path.abspath(icon)  # 将相对路径转换为绝对路径
+        file_path = Path(file) if file else Path(__file__).resolve()
+        icon_path = Path(icon) if icon else file_path
 
         # 获取开始菜单文件夹路径
-        menu_folder = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs')
+        menu_folder = Path(os.getenv('APPDATA')) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
 
         # 快捷方式文件名（使用文件名或自定义名称）
-        name = os.path.splitext(os.path.basename(file_path))[0]  # 使用文件名作为快捷方式名称
-        shortcut_path = os.path.join(menu_folder, f'{name}.lnk')
+        name = file_path.stem  # 使用文件名作为快捷方式名称
+        shortcut_path = menu_folder / f'{name}.lnk'
 
         # 创建快捷方式
         shell = Dispatch('WScript.Shell')
-        shortcut = shell.CreateShortCut(shortcut_path)
-        shortcut.Targetpath = file_path
-        shortcut.WorkingDirectory = os.path.dirname(file_path)
-        shortcut.IconLocation = icon_path  # 设置图标路径
+        shortcut = shell.CreateShortCut(str(shortcut_path))
+        shortcut.Targetpath = str(file_path)
+        shortcut.WorkingDirectory = str(file_path.parent)
+        shortcut.IconLocation = str(icon_path)  # 设置图标路径
         shortcut.save()
     except Exception as e:
         logger.error(f"创建开始菜单快捷方式时出错: {e}")
@@ -145,29 +138,22 @@ def add_shortcut(file='', icon=''):
     if os.name != 'nt':
         return
     try:
-        if file == "":
-            file_path = os.path.realpath(__file__)
-        else:
-            file_path = os.path.abspath(file)
-
-        if icon == "":
-            icon_path = file_path
-        else:
-            icon_path = os.path.abspath(icon)
+        file_path = Path(file) if file else Path(__file__).resolve()
+        icon_path = Path(icon) if icon else file_path
 
         # 获取桌面文件夹路径
-        desktop_folder = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+        desktop_folder = Path(os.environ['USERPROFILE']) / 'Desktop'
 
         # 快捷方式文件名（使用文件名或自定义名称）
-        name = os.path.splitext(os.path.basename(file_path))[0]  # 使用文件名作为快捷方式名称
-        shortcut_path = os.path.join(desktop_folder, f'{name}.lnk')
+        name = file_path.stem  # 使用文件名作为快捷方式名称
+        shortcut_path = desktop_folder / f'{name}.lnk'
 
         # 创建快捷方式
         shell = Dispatch('WScript.Shell')
-        shortcut = shell.CreateShortCut(shortcut_path)
-        shortcut.Targetpath = file_path
-        shortcut.WorkingDirectory = os.path.dirname(file_path)
-        shortcut.IconLocation = icon_path  # 设置图标路径
+        shortcut = shell.CreateShortCut(str(shortcut_path))
+        shortcut.Targetpath = str(file_path)
+        shortcut.WorkingDirectory = str(file_path.parent)
+        shortcut.IconLocation = str(icon_path)  # 设置图标路径
         shortcut.save()
     except Exception as e:
         logger.error(f"创建桌面快捷方式时出错: {e}")
@@ -176,29 +162,22 @@ def add_shortcut(file='', icon=''):
 def add_to_startup(file_path=f'{base_directory}/ClassWidgets.exe', icon_path=''):  # 注册到开机启动
     if os.name != 'nt':
         return
-    if file_path == "":
-        file_path = os.path.realpath(__file__)
-    else:
-        file_path = os.path.abspath(file_path)  # 将相对路径转换为绝对路径
-
-    if icon_path == "":
-        icon_path = file_path  # 如果未指定图标路径，则使用程序路径
-    else:
-        icon_path = os.path.abspath(icon_path)  # 将相对路径转换为绝对路径
+    file_path = Path(file_path) if file_path else Path(__file__).resolve()
+    icon_path = Path(icon_path) if icon_path else file_path
 
     # 获取启动文件夹路径
-    startup_folder = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+    startup_folder = Path(os.getenv('APPDATA')) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
 
     # 快捷方式文件名（使用文件名或自定义名称）
-    name = os.path.splitext(os.path.basename(file_path))[0]  # 使用文件名作为快捷方式名称
-    shortcut_path = os.path.join(startup_folder, f'{name}.lnk')
+    name = file_path.stem  # 使用文件名作为快捷方式名称
+    shortcut_path = startup_folder / f'{name}.lnk'
 
     # 创建快捷方式
     shell = Dispatch('WScript.Shell')
-    shortcut = shell.CreateShortCut(shortcut_path)
-    shortcut.Targetpath = file_path
-    shortcut.WorkingDirectory = os.path.dirname(file_path)
-    shortcut.IconLocation = icon_path  # 设置图标路径
+    shortcut = shell.CreateShortCut(str(shortcut_path))
+    shortcut.Targetpath = str(file_path)
+    shortcut.WorkingDirectory = str(file_path.parent)
+    shortcut.IconLocation = str(icon_path)  # 设置图标路径
     shortcut.save()
 
 

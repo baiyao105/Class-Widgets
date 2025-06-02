@@ -1,7 +1,16 @@
 name: 临时构建(pyinstaller)
 
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize]
+    paths-ignore:      
+    - '**/*.md'
+    - '**/*.txt'
+    - '.gitignore'
+    - '.gitattributes'
+    - '.github/ISSUE_TEMPLATE/**'
+    - '.github/DISCUSSION_TEMPLATE/**'
+    - '.github/PULL_REQUEST_TEMPLATE*'
   workflow_dispatch:
     inputs:
       architecture:
@@ -13,13 +22,94 @@ on:
           - x86
           - x64
           - all
-
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
+  lint:
+    name: Python Syntax Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install linters
+        run: pip install ruff pylint
+      - name: Get changed Python files
+        id: changed
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+          changed_files=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }} | grep '\.py$' || true)
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$changed_files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Skip if no Python files changed
+        if: steps.changed.outputs.changed_files == ''
+        run: |
+          echo "未修改python文件,跳过语法检查。"
+          exit 0
+
+      - name: Run ruff
+        id: ruff
+        continue-on-error: true
+        run: |
+          echo "${{ steps.changed.outputs.changed_files }}" > changed_files.txt
+          ruff $(cat changed_files.txt) > ruff_output.txt || true
+          cat ruff_output.txt
+
+      - name: Run pylint
+        id: pylint
+        continue-on-error: true
+        run: |
+          pylint $(cat changed_files.txt) > pylint_output.txt || true
+          cat pylint_output.txt
+          grep -q "fatal" pylint_output.txt && exit 1 || true
+
+      - name: Comment on PR if needed
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **PyLint 结果**：
+
+            <details><summary>ruff 警告</summary>
+
+            ```txt
+            $(cat ruff_output.txt | head -c 5000 || echo '无警告 🎉')
+            ```
+
+            </details>
+
+            <details><summary>pylint 致命错误</summary>
+
+            ```txt
+            $(cat pylint_output.txt | grep -i 'fatal' || echo '无致命错误 🎉')
+            ```
+
+            </details>
+
+      - name: Stop build on fatal error
+        if: steps.pylint.outcome == 'failure'
+        run: |
+          echo "Pylint 致命错误,终止后续构建" && exit 1
+
   build:
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -32,9 +122,9 @@ jobs:
     if: |
       github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: 跳过构建
+      - name: Skip build for ${{ matrix.arch }}
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
-        run: echo "跳过构建"
+        run: echo "Skip build ${{ matrix.arch }}"
 
       - name: Checkout repository
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
@@ -57,6 +147,41 @@ jobs:
           if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
+      - name: Set Build Info
+        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login }}:${{ github.event.pull_request.head.ref }}
+        run: |
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            build_branch="$PR_BRANCH"
+          fi
+          build_runid="${GITHUB_RUN_ID}"
+          build_type="pyinstaller"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            build_type="pyinstaller (Debug for PR-#${PR_NUMBER})"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" && ! "${GITHUB_REF}" =~ ^refs/tags/ ]]; then
+            build_type="pyinstaller(Debug for Test)"
+          fi
+          config_path="config/default_config.json"
+          config_text=$(cat "$config_path")
+          config_text="${config_text//__BUILD_TIME__/$build_time}"
+          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
+          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
+          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
+          config_text="${config_text//__BUILD_TYPE__/$build_type}"
+          printf "%s" "$config_text" > "$config_path"
+          echo "🧾 写入的构建信息："
+          echo "⏰ BUILD_TIME(UTC+8):   $build_time"
+          echo "🔗 COMMIT_HASH: $build_commit"
+          echo "🌿 BRANCH:      $build_branch"
+          echo "🆔 RUN_ID:      $build_runid"
+          echo "🧪 BUILD_TYPE:  $build_type"
+
       - name: Run Windows build & package
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
         run: |
@@ -78,11 +203,11 @@ jobs:
             --add-data LICENSE:. `
             --add-data plugins:plugins `
             --hidden-import darkdetect
-          ./zip -r -q zip/ClassWidgets-Windows-${{ matrix.arch }}.zip dist/ClassWidgets/*
+          ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
         uses: actions/upload-artifact@v4.4.2
         with:
-          name: windows-debug-${{ matrix.arch }}
+          name: windows-${{ matrix.arch }}_debug_#${{ github.run_number }}
           path: zip

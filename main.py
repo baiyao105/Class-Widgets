@@ -2727,7 +2727,13 @@ def init():
     update_timer.add_callback(mgr.update_widgets)
     update_timer.start()
 
-    logger.info(f'Class Widgets 初始化完成。版本: {config_center.read_conf("Other", "version")}')
+    version = config_center.read_conf("Version", "version")
+    build_uuid = config_center.read_conf("Version", "build_runid") or "(Debug)"
+    build_type = config_center.read_conf("Version", "build_type")
+    if "__BUILD_RUNID__" in build_uuid or "__BUILD_TYPE__" in build_type:
+        logger.success(f'Class Widgets 初始化完成。版本: {version} - (Debug)')
+    else:
+        logger.success(f'Class Widgets 初始化完成。版本: {version} Build UUID: {build_uuid}({build_type})')
     p_loader.run_plugins()  # 运行插件
 
     first_start = False
@@ -2861,7 +2867,7 @@ if __name__ == '__main__':
 
         # w = ErrorDialog()
         # w.exec()
-        if config_center.read_conf('Other', 'auto_check_update') == '1':
+        if config_center.read_conf('Version', 'auto_check_update') == '1':
             check_update()
 
     status = app.exec()

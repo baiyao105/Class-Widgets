@@ -116,13 +116,28 @@ class ExtraMenu(FluentWindow):
         try:
             temp_week = self.findChild(ComboBox, 'select_temp_week')
             temp_schedule_set = self.findChild(ComboBox, 'select_temp_schedule')
+            current_full_schedule_data = schedule_center.schedule_data
+            if 'schedule' not in current_full_schedule_data or not isinstance(current_full_schedule_data['schedule'], dict):
+                current_full_schedule_data['schedule'] = {}
+            if 'schedule_even' not in current_full_schedule_data or not isinstance(current_full_schedule_data['schedule_even'], dict):
+                current_full_schedule_data['schedule_even'] = {}
+            current_full_schedule_data['schedule'].update(temp_schedule.get('schedule', {}))
+            current_full_schedule_data['schedule_even'].update(temp_schedule.get('schedule_even', {}))
+            for key in ['timeline', 'default', 'part_name']:
+                if key in temp_schedule:
+                    if isinstance(temp_schedule[key], dict) and key in current_full_schedule_data and isinstance(current_full_schedule_data[key], dict):
+                        current_full_schedule_data[key].update(temp_schedule[key])
+                    else:
+                        current_full_schedule_data[key] = temp_schedule[key]
+
             if temp_schedule != {'schedule': {}, 'schedule_even': {}}:
                 if config_center.read_conf('Temp', 'temp_schedule') == '':  # 备份检测
                     copy(f'{base_directory}/config/schedule/{config_center.schedule_name}',
                          f'{base_directory}/config/schedule/backup.json')  # 备份课表配置
                     logger.info(f'备份课表配置成功：已将 {config_center.schedule_name} -备份至-> backup.json')
                     config_center.write_conf('Temp', 'temp_schedule', config_center.schedule_name)
-                file.save_data_to_json(temp_schedule, config_center.schedule_name)
+                # 使用合并后的完整数据进行保存
+                file.save_data_to_json(current_full_schedule_data, config_center.schedule_name)
             schedule_center.update_schedule()
             config_center.write_conf('Temp', 'set_week', str(temp_week.currentIndex()))
             config_center.write_conf('Temp', 'set_schedule',str(temp_schedule_set.currentIndex()))
