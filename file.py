@@ -59,7 +59,7 @@ class ConfigCenter:
             dlg.buttonLayout.insertStretch(0, 1)
             dlg.setFixedWidth(550)
             dlg.exec()
-            sys.exit(1)
+            utils.stop(0)
 
     def _load_user_config(self):
         """加载用户配置文件"""
@@ -144,7 +144,8 @@ class ConfigCenter:
                 user_config_version_str = self.config['Version'].get('version', '0.0.0')
             else:
                 user_config_version_str = '0.0.0'
-                default_config_version_str = self.default_data.get('Version', {}).get('version', '0.0.0')
+
+            default_config_version_str = self.default_data.get('Version', {}).get('version', '0.0.0')
 
             try:
                 user_config_version = Version(user_config_version_str)
@@ -181,8 +182,9 @@ class ConfigCenter:
         """读取配置项，并根据默认配置中的类型信息进行转换"""
         if section in self.config:
             if key:
-                if key in self.config[section]:
-                    return self.config[section][key]
+                value = self.config[section].get(key)
+                if value is not None:
+                    return value
             else:
                 return dict(self.config[section])
         if section in self.default_data:
