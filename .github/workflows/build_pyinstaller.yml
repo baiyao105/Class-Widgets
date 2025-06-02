@@ -86,7 +86,7 @@ jobs:
         if: steps.changed.outputs.changed_files == ''
         run: |
           echo "✅ 没有 Python 文件改动，跳过检查"
-          echo "should_skip_lint=true" >> $GITHUB_OUTPUT
+          echo "::set-output name=should_skip_lint::true"
 
       - name: Run Ruff (with SARIF)
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
@@ -184,7 +184,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
         run: |
           echo "Skip build ${{ matrix.arch }}"
-          echo "should_skip=true" >> $GITHUB_OUTPUT
+          echo "::set-output name=should_skip::true"
 
       - name: Checkout repository
         if: env.BUILD_TRIGGERED == 'true' && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch) && steps.skip_check.outputs.should_skip != 'true'
