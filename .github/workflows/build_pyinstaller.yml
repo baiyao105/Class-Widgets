@@ -68,13 +68,18 @@ jobs:
         id: changed
         run: |
           echo "🔍 获取改动 Python 文件..."
-          changed=$(git diff --name-only HEAD^ HEAD | grep '\.py$' | xargs -I {} sh -c 'test -f {} && echo {}' || true)
-          echo "$changed" > changed_files.txt
-          echo "changed_files=$(echo "$changed" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
+          changed_files=$(git diff --name-only HEAD^ HEAD | grep '\.py$' | xargs -r realpath --relative-to=. || true)
+          echo "$changed_files" > changed_files.txt
+          echo "changed_files_json=$(echo "$changed_files" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
+          if [ -z "$changed_files" ]; then
+            echo "has_changed_files=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changed_files=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Skip if no Python files changed
         id: skip_lint_check
-        if: steps.changed.outputs.changed_files == ''
+        if: steps.changed.outputs.has_changed_files == 'false'
         run: |
           echo "✅ 没有 Python 文件改动，跳过检查"
           echo "::set-output name=should_skip_lint::true"
@@ -83,13 +88,14 @@ jobs:
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: chartboost/ruff-action@v1
         with:
-          args: check ${{ steps.changed.outputs.changed_files }}
+          args: check ${{ steps.changed.outputs.changed_files_json }}
 
       - name: Run Pyright and annotate
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: jakebailey/pyright-action@v2
         with:
           pylance-version: latest-release
+          args: ${{ steps.changed.outputs.changed_files_json }}
 
       - name: Run PyLint and comment summary
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
@@ -98,7 +104,7 @@ jobs:
           if [ -s changed_files.txt ]; then
             pylint $(cat changed_files.txt) > pylint_output.txt || true
           else
-            echo "" > pylint_output.txt
+            echo "没有需要检查的Python文件" > pylint_output.txt
           fi
 
       - name: Post PyLint comment to PR
@@ -107,11 +113,11 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            **🧪 PyLint 检查结果简报**
+            **🧪 PyLint 检查结果**
             <details><summary>查看详情</summary>
 
             ```
-            ${{ steps.changed.outputs.changed_files }}
+            ${{ steps.changed.outputs.changed_files_json }}
             ```
             ```text
             $(cat pylint_output.txt)
@@ -142,7 +148,6 @@ jobs:
           echo "::set-output name=should_skip::true"
 
       - name: Checkout repository
-        if: env.BUILD_TRIGGERED == 'true' && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch) && steps.skip_check.outputs.should_skip != 'true'
         uses: actions/checkout@v4.2.2
 
       - name: Setup Python
