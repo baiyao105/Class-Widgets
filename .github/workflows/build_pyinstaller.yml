@@ -30,6 +30,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  security-events: write
 
 jobs:
   lint:
@@ -84,7 +85,7 @@ jobs:
         continue-on-error: true
         run: |
           echo "${{ steps.changed.outputs.changed_files }}" > changed_files.txt
-          cat changed_files.txt | xargs ruff --output-format sarif > ruff.sarif || true
+          ruff --output-format sarif --output ruff.sarif $(cat changed_files.txt) || true
 
       - name: Upload Ruff annotations
         uses: github/codeql-action/upload-sarif@v3
@@ -161,7 +162,9 @@ jobs:
     steps:
       - name: Skip build for ${{ matrix.arch }}
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
-        run: echo "Skip build ${{ matrix.arch }}"
+        run: |
+          echo "Skip build ${{ matrix.arch }}"
+          exit 0
 
       - name: Checkout repository
         if: env.BUILD_TRIGGERED == 'true' && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
