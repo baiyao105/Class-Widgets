@@ -57,6 +57,31 @@ jobs:
           if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
+      - name: Set Build Info
+        if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          build_time=$(date +"%Y-%m-%d %H:%M:%S")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          build_runid="${GITHUB_RUN_ID}"
+          build_type="pyinstaller"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            build_type="pyinstaller(Debug for PR - #${PR_NUMBER})"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" && ! "${GITHUB_REF}" =~ ^refs/tags/ ]]; then
+            build_type="pyinstaller(Debug for Test)"
+          fi
+          config_path="config/default_config.json"
+          config_text=$(cat "$config_path")
+          config_text="${config_text//__BUILD_TIME__/$build_time}"
+          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
+          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
+          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
+          config_text="${config_text//__BUILD_TYPE__/$build_type}"
+          printf "%s" "$config_text" > "$config_path"
+
       - name: Run Windows build & package
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
         run: |

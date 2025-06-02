@@ -81,7 +81,7 @@ class ConfigCenter:
             with open(path, 'r', encoding='utf-8') as configfile:
                 self.config.read_file(configfile)
 
-            if self.config['Other']['version'] != self.default_data['Other']['version']:  # 如果配置文件版本不同，则更新配置文件
+            if self.config['Version']['version'] != self.default_data['Version']['version']:  # 如果配置文件版本不同，则更新配置文件
                 logger.info(f"配置文件版本不同，将重新适配")
                 try:
                     for section, options in self.default_data.items():
@@ -91,7 +91,7 @@ class ConfigCenter:
                             for key, value in options.items():
                                 if key not in self.config[section]:
                                     self.config[section][key] = str(value)
-                    self.config.set('Other', 'version', self.default_data['Other']['version'])
+                    self.config.set('Version', 'version', self.default_data['Version']['version'])
                     with open(path, 'w', encoding='utf-8') as configfile:
                         self.config.write(configfile)
                     logger.info(f"配置文件已更新")

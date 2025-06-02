@@ -64,6 +64,14 @@
     "temp_schedule": "",
     "set_schedule": ""
   },
+  "Version": {
+    "version": "v1.1.7.2",
+    "build_time": "__BUILD_TIME__",
+    "build_commit": "__BUILD_COMMIT__",
+    "build_branch": "__BUILD_BRANCH__",
+    "build_runid": "__BUILD_RUNID__",
+    "build_type": "__BUILD_TYPE__"
+  },
   "Other": {
     "do_not_log": 0,
     "safe_mode": 0,
@@ -71,7 +79,6 @@
     "multiple_programs": 0,
     "version_channel": 0,
     "auto_check_update": 1,
-    "cses_version": 1,
-    "version": "v1.1.7.2"
+    "cses_version": 1
   }
 }
