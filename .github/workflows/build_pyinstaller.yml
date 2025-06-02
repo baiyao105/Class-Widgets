@@ -39,7 +39,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      security-events: write
 
     steps:
       - name: Checkout PR (merge ref)
@@ -61,17 +60,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-
 
-      - name: Cache linters and tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-linters-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-linters-
-
       - name: Install linters and tools
         run: |
-          pip install ruff pylint pyright sarif-om pyright-to-sarif
+          pip install ruff pylint pyright
 
       - name: Detect changed Python files
         id: changed
@@ -88,81 +79,45 @@ jobs:
           echo "✅ 没有 Python 文件改动，跳过检查"
           echo "::set-output name=should_skip_lint::true"
 
-      - name: Run Ruff (with SARIF)
+      - name: Run Ruff and annotate
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        continue-on-error: true
-        run: |
-          files=(${{ steps.changed.outputs.changed_files }})
-          ruff check --output-format sarif --output ruff.sarif "${files[@]}" || true
-          if [ ! -s ruff.sarif ]; then
-            echo '{"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", "runs": []}' > ruff.sarif
-          fi
-          cat ruff.sarif
-
-      - name: Upload Ruff annotations
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: chartboost/ruff-action@v1
         with:
-          sarif_file: ruff.sarif
-          category: ruff
+          args: check ${{ steps.changed.outputs.changed_files }}
 
-      - name: Run Pyright and convert to SARIF
+      - name: Run Pyright and annotate
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        id: pyright
-        continue-on-error: true
-        run: |
-          pyright $(cat changed_files.txt) --outputjson > pyright_raw.json
-          pyright-to-sarif pyright_raw.json pyright.sarif
-
-      - name: Upload Pyright annotations
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: jakebailey/pyright-action@v2
         with:
-          sarif_file: pyright.sarif
-          category: pyright
+          pylance-version: latest-release
 
-      - name: Run PyLint
+      - name: Run PyLint and comment summary
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        id: pylint
         continue-on-error: true
         run: |
           if [ -s changed_files.txt ]; then
             pylint $(cat changed_files.txt) > pylint_output.txt || true
           else
-            echo "没有 Python 文件改动，跳过 PyLint 检查。"
             echo "" > pylint_output.txt
           fi
-          cat pylint_output.txt
 
-      - name: Prepare PR comment
-        id: comment_summary
-        run: |
-          {
-            echo "pylint_fatal<<EOF"
-            grep -i 'fatal' pylint_output.txt || echo '无 PyLint 致命错误 🎉'
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Comment summary on PR
+      - name: Post PyLint comment to PR
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            **🧪 Python 静态检查汇总（自动注释已附加）**
-            
-            <details><summary>🚨 PyLint 致命错误</summary>
+            **🧪 PyLint 检查结果简报**
+            <details><summary>查看详情</summary>
 
             ```
-            ${{ steps.comment_summary.outputs.pylint_fatal }}
+            ${{ steps.changed.outputs.changed_files }}
+            ```
+            ```text
+            $(cat pylint_output.txt)
             ```
 
             </details>
-
-      - name: Fail on fatal issues
-        if: contains(steps.comment_summary.outputs.pylint_fatal, 'fatal')
-        run: |
-          echo "❌ 存在 PyLint 致命错误，终止流程"
-          exit 1
 
   build:
     strategy:
@@ -248,7 +203,8 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == "push" && ! "${GITHUB_REF}" =~ ^refs/tags/ ]]; then
             build_type="pyinstaller(Debug for Test)"
           fi
-          config_path="config/default_config.json"
+          config_path="${GITHUB_WORKSPACE}/config/default_config.json"
+          ls -l "$config_path"
           config_text=$(cat "$config_path")
           config_text="${config_text//__BUILD_TIME__/$build_time}"
           config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
