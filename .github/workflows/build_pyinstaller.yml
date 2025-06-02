@@ -29,8 +29,7 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
-  security-events: write
+  pull-requests: read
 
 jobs:
   lint:
@@ -40,6 +39,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      security-events: write
 
     steps:
       - name: Checkout PR (merge ref)
@@ -63,17 +63,15 @@ jobs:
 
       - name: Install linters and tools
         run: |
-          pip install ruff pylint
+          pip install ruff pylint pyright
           pip install sarif-om
 
       - name: Detect changed Python files
         id: changed
         run: |
           echo "🔍 获取改动 Python 文件..."
-          changed=$(git diff --name-only HEAD^ HEAD | grep '\.py$' || true)
-          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$changed" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          changed=$(git diff --name-only HEAD^ HEAD | grep '\.py$' | xargs -I {} sh -c 'test -f {} && echo {}' || true)
+          echo "changed_files=$(echo "$changed" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
 
       - name: Skip if no Python files changed
         if: steps.changed.outputs.changed_files == ''
@@ -84,8 +82,16 @@ jobs:
       - name: Run Ruff (with SARIF)
         continue-on-error: true
         run: |
-          echo "${{ steps.changed.outputs.changed_files }}" > changed_files.txt
-          ruff --output-format sarif --output ruff.sarif $(cat changed_files.txt) || true
+          files=(${{ steps.changed.outputs.changed_files }})
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "没有需要检查的文件"
+            exit 0
+          fi
+          ruff check --output-format sarif --output ruff.sarif "${files[@]}" || true
+          if [ ! -s ruff.sarif ]; then
+            echo '{"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", "runs": []}' > ruff.sarif
+          fi
+          cat ruff.sarif
 
       - name: Upload Ruff annotations
         uses: github/codeql-action/upload-sarif@v3
@@ -97,9 +103,9 @@ jobs:
         id: pyright
         continue-on-error: true
         run: |
-          pyright $(cat changed_files.txt) --outputjson > pyright_raw.json || true
+          pyright $(cat changed_files.txt) --outputjson > pyright_raw.json
           curl -sSL https://raw.githubusercontent.com/yuchanns/pyright-to-sarif/main/pyright2sarif.py -o pyright2sarif.py
-          python pyright2sarif.py pyright_raw.json pyright.sarif || true
+          python pyright2sarif.py pyright_raw.json pyright.sarif
 
       - name: Upload Pyright annotations
         uses: github/codeql-action/upload-sarif@v3
