@@ -106,10 +106,24 @@ jobs:
         continue-on-error: true
         run: |
           if [ -s changed_files.txt ]; then
-            pylint $(cat changed_files.txt) > pylint_output.txt || true
+            pylint --errors-only $(cat changed_files.txt) > pylint_output.txt || true
           else
             echo "没有需要检查的Python文件" > pylint_output.txt
           fi
+
+      - name: Read PyLint Output
+        id: pylint_output_read
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
+        run: |
+          echo '::group::读取 PyLint 输出内容'
+          if [ -f pylint_output.txt ] && [ -s pylint_output.txt ]; then
+            echo "output<<EOF" >> $GITHUB_OUTPUT
+            cat pylint_output.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "output=没有需要检查的Python文件" >> $GITHUB_OUTPUT
+          fi
+          echo '::endgroup::'
 
       - name: Post PyLint comment to PR
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
@@ -124,7 +138,7 @@ jobs:
             ${{ steps.changed.outputs.changed_files_json }}
             ```
             ```text
-            $(cat pylint_output.txt)
+            ${{ steps.pylint_output_read.outputs.output }}
             ```
 
             </details>
