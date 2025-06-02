@@ -531,6 +531,7 @@ class SettingsMenu(FluentWindow):
         self.version_number_label = self.ifInterface.findChild(QLabel, 'version_number_label')
         self.build_commit_label = self.ifInterface.findChild(QLabel, 'build_commit_label')
         self.build_uuid_label = self.ifInterface.findChild(QLabel, 'build_uuid_label')
+        self.build_date_label = self.ifInterface.findChild(QLabel, 'build_date_label')
 
         self.init_nav()
         self.init_window()
@@ -1233,8 +1234,9 @@ class SettingsMenu(FluentWindow):
     def check_version(self, version):  # 检查更新
         if 'error' in version:
             self.version_number_label.setText(f'版本号：获取失败！')
-            self.build_commit_label.setText(f'Build Commit：获取失败！')
-            self.build_uuid_label.setText(f'Build UUID：获取失败！')
+            self.build_commit_label.setText(f'获取失败！')
+            self.build_uuid_label.setText(f'获取失败！')
+            self.build_date_label.setText(f'获取失败！')
 
             if utils.tray_icon:
                 utils.tray_icon.push_error_notification(
@@ -1249,13 +1251,15 @@ class SettingsMenu(FluentWindow):
 
         logger.debug(f"服务端版本: {Version(new_version)}，本地版本: {Version(local_version)}")
         if Version(new_version) <= Version(local_version):
-            self.version_number_label.setText(f'版本号：{local_version}({config_center.read_conf("Version", "build_time")})\n已是最新版本！')
-            self.build_commit_label.setText(f'Build Commit：{config_center.read_conf("Version", "build_commit")}({config_center.read_conf("Version", "build_branch")})')
-            self.build_uuid_label.setText(f'Build UUID：{config_center.read_conf("Version", "build_runid")}({config_center.read_conf("Version", "build_type")})')
+            self.version_number_label.setText(f'版本号：{local_version}\n已是最新版本！')
+            self.build_commit_label.setText(f'{config_center.read_conf("Version", "build_commit")}({config_center.read_conf("Version", "build_branch")})')
+            self.build_uuid_label.setText(f'{config_center.read_conf("Version", "build_runid")} - {config_center.read_conf("Version", "build_type")}')
+            self.build_date_label.setText(f'{config_center.read_conf("Version", "build_time")}')
         else:
-            self.version_number_label.setText(f'版本号：{local_version}({config_center.read_conf("Version", "build_time")})\n最新版本: {new_version}')
-            self.build_commit_label.setText(f'Build Commit：{config_center.read_conf("Version", "build_commit")}({config_center.read_conf("Version", "build_branch")})')
-            self.build_uuid_label.setText(f'Build UUID：{config_center.read_conf("Version", "build_runid")}({config_center.read_conf("Version", "build_type")})')
+            self.version_number_label.setText(f'版本号：{local_version}\n可更新版本: {new_version}')
+            self.build_commit_label.setText(f'{config_center.read_conf("Version", "build_commit")}({config_center.read_conf("Version", "build_branch")})')
+            self.build_uuid_label.setText(f'{config_center.read_conf("Version", "build_runid")} - {config_center.read_conf("Version", "build_type")}')
+            self.build_date_label.setText(f'{config_center.read_conf("Version", "build_time")}')
 
             if utils.tray_icon:
                 utils.tray_icon.push_update_notification(f"新版本速递：{new_version}")

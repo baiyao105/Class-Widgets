@@ -62,14 +62,18 @@ jobs:
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login }}:${{ github.event.pull_request.head.ref }}
         run: |
-          build_time=$(date +"%Y-%m-%d %H:%M:%S")
+          build_time=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M")
           build_commit="${GITHUB_SHA:0:7}"
           build_branch="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            build_branch="$PR_BRANCH"
+          fi
           build_runid="${GITHUB_RUN_ID}"
           build_type="pyinstaller"
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" || "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
-            build_type="pyinstaller(Debug for PR - #${PR_NUMBER})"
+            build_type="pyinstaller (Debug for PR-#${PR_NUMBER})"
           elif [[ "${GITHUB_EVENT_NAME}" == "push" && ! "${GITHUB_REF}" =~ ^refs/tags/ ]]; then
             build_type="pyinstaller(Debug for Test)"
           fi
@@ -81,6 +85,12 @@ jobs:
           config_text="${config_text//__BUILD_RUNID__/$build_runid}"
           config_text="${config_text//__BUILD_TYPE__/$build_type}"
           printf "%s" "$config_text" > "$config_path"
+          echo "🧾 写入的构建信息："
+          echo "⏰ BUILD_TIME(UTC+8):   $build_time"
+          echo "🔗 COMMIT_HASH: $build_commit"
+          echo "🌿 BRANCH:      $build_branch"
+          echo "🆔 RUN_ID:      $build_runid"
+          echo "🧪 BUILD_TYPE:  $build_type"
 
       - name: Run Windows build & package
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
