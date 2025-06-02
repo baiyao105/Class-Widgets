@@ -44,7 +44,7 @@ class CSES_Converter:
         return self.parser
 
     def load_generator(self):
-        self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Other', 'cses_version')))
+        self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Version', 'cses_version')))
 
     def convert_to_cw(self):
         """

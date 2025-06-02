@@ -780,16 +780,16 @@ class SettingsMenu(FluentWindow):
         check_update_btn.clicked.connect(self.check_update)
 
         self.auto_check_update = self.ifInterface.findChild(SwitchButton, 'auto_check_update')
-        self.auto_check_update.setChecked(int(config_center.read_conf("Other", "auto_check_update")))
+        self.auto_check_update.setChecked(int(config_center.read_conf("Version", "auto_check_update")))
         self.auto_check_update.checkedChanged.connect(
-            lambda checked: switch_checked("Other", "auto_check_update", checked)
+            lambda checked: switch_checked("Version", "auto_check_update", checked)
         )  # 自动检查更新
 
         self.version_channel = self.findChild(ComboBox, 'version_channel')
         self.version_channel.addItems(list_.version_channel)
-        self.version_channel.setCurrentIndex(int(config_center.read_conf("Other", "version_channel")))
+        self.version_channel.setCurrentIndex(int(config_center.read_conf("Version", "version_channel")))
         self.version_channel.currentIndexChanged.connect(
-            lambda: config_center.write_conf("Other", "version_channel", self.version_channel.currentIndex())
+            lambda: config_center.write_conf("Version", "version_channel", self.version_channel.currentIndex())
         )  # 版本更新通道
 
         github_page = self.findChild(PushButton, "button_github")
@@ -1245,7 +1245,7 @@ class SettingsMenu(FluentWindow):
                 )
             return False
 
-        channel = int(config_center.read_conf("Other", "version_channel"))
+        channel = int(config_center.read_conf("Version", "version_channel"))
         new_version = version['version_release' if channel == 0 else 'version_beta']
         local_version = config_center.read_conf("Version", "version") or "0.0.0"
 

@@ -413,7 +413,7 @@ def check_version(version):  # 检查更新
         )
         return False
     
-    channel = int(config_center.read_conf("Other", "version_channel"))
+    channel = int(config_center.read_conf("Version", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
     local_version = config_center.read_conf("Version", "version")
     logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")

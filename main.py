@@ -2864,7 +2864,7 @@ if __name__ == '__main__':
 
         # w = ErrorDialog()
         # w.exec()
-        if config_center.read_conf('Other', 'auto_check_update') == '1':
+        if config_center.read_conf('Version', 'auto_check_update') == '1':
             check_update()
 
     status = app.exec()

@@ -66,6 +66,9 @@
   },
   "Version": {
     "version": "v1.1.7.2",
+    "version_channel": 0,
+    "auto_check_update": 1,
+    "cses_version": 1,
     "build_time": "__BUILD_TIME__",
     "build_commit": "__BUILD_COMMIT__",
     "build_branch": "__BUILD_BRANCH__",
@@ -76,9 +79,6 @@
     "do_not_log": 0,
     "safe_mode": 0,
     "initialstartup": 1,
-    "multiple_programs": 0,
-    "version_channel": 0,
-    "auto_check_update": 1,
-    "cses_version": 1
+    "multiple_programs": 0
   }
 }
