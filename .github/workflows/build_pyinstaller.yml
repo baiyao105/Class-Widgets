@@ -196,9 +196,11 @@ jobs:
       - name: Create venv and install dependencies
         shell: pwsh
         run: |
+          pwd
           uv venv .venv
           $env:UV_VENV_PATH = ".venv"
-          uv pip install --system -r requirements.txt pyinstaller
+          uv pip install -r requirements.txt
+          uv pip install pyinstaller
 
       - name: Prepare output directory
         run: |
