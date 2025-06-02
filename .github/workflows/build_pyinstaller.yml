@@ -1,7 +1,8 @@
 name: 临时构建(pyinstaller)
 
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize]
     paths-ignore:      
     - '**/*.md'
     - '**/*.txt'
