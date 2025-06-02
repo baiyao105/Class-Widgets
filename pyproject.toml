@@ -1,0 +1,13 @@
+[tool.ruff]
+select = ["E", "F", "W", "I", "N", "D", "UP", "A", "B", "C", "Q", "T", "ANN", "S", "RSE", "RET", "SIM", "PTH", "PL", "TRY", "PERF", "RUF"]
+ignore = []
+
+[tool.ruff.lint]
+# 只报告错误，不报告警告
+severity = "error"
+
+[tool.ruff.format]
+# Enable auto-formatting
+indent-style = "space"
+quote-style = "double"
+line-ending = "auto"
