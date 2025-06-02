@@ -61,32 +61,38 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-
 
+      - name: Cache linters and tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-linters-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-linters-
+
       - name: Install linters and tools
         run: |
-          pip install ruff pylint pyright
-          pip install sarif-om
+          pip install ruff pylint pyright sarif-om pyright-to-sarif
 
       - name: Detect changed Python files
         id: changed
         run: |
           echo "🔍 获取改动 Python 文件..."
           changed=$(git diff --name-only HEAD^ HEAD | grep '\.py$' | xargs -I {} sh -c 'test -f {} && echo {}' || true)
+          echo "$changed" > changed_files.txt
           echo "changed_files=$(echo "$changed" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
 
       - name: Skip if no Python files changed
+        id: skip_lint_check
         if: steps.changed.outputs.changed_files == ''
         run: |
           echo "✅ 没有 Python 文件改动，跳过检查"
-          exit 0
+          echo "::set-output name=should_skip_lint::true"
 
       - name: Run Ruff (with SARIF)
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         continue-on-error: true
         run: |
           files=(${{ steps.changed.outputs.changed_files }})
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "没有需要检查的文件"
-            exit 0
-          fi
           ruff check --output-format sarif --output ruff.sarif "${files[@]}" || true
           if [ ! -s ruff.sarif ]; then
             echo '{"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", "runs": []}' > ruff.sarif
@@ -94,32 +100,39 @@ jobs:
           cat ruff.sarif
 
       - name: Upload Ruff annotations
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ruff.sarif
           category: ruff
 
       - name: Run Pyright and convert to SARIF
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         id: pyright
         continue-on-error: true
         run: |
           pyright $(cat changed_files.txt) --outputjson > pyright_raw.json
-          curl -sSL https://raw.githubusercontent.com/yuchanns/pyright-to-sarif/main/pyright2sarif.py -o pyright2sarif.py
-          python pyright2sarif.py pyright_raw.json pyright.sarif
+          pyright-to-sarif pyright_raw.json pyright.sarif
 
       - name: Upload Pyright annotations
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: pyright.sarif
           category: pyright
 
       - name: Run PyLint
+        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         id: pylint
         continue-on-error: true
         run: |
-          pylint $(cat changed_files.txt) > pylint_output.txt || true
+          if [ -s changed_files.txt ]; then
+            pylint $(cat changed_files.txt) > pylint_output.txt || true
+          else
+            echo "没有 Python 文件改动，跳过 PyLint 检查。"
+            echo "" > pylint_output.txt
+          fi
           cat pylint_output.txt
-          grep -q "fatal" pylint_output.txt && exit 1 || true
 
       - name: Prepare PR comment
         id: comment_summary
@@ -146,7 +159,7 @@ jobs:
             </details>
 
       - name: Fail on fatal issues
-        if: steps.pylint.outcome == 'failure'
+        if: contains(steps.comment_summary.outputs.pylint_fatal, 'fatal')
         run: |
           echo "❌ 存在 PyLint 致命错误，终止流程"
           exit 1
@@ -167,25 +180,29 @@ jobs:
       github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request_target'
     steps:
       - name: Skip build for ${{ matrix.arch }}
+        id: skip_check
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
         run: |
           echo "Skip build ${{ matrix.arch }}"
-          exit 0
+          echo "::set-output name=should_skip::true"
 
       - name: Checkout repository
-        if: env.BUILD_TRIGGERED == 'true' && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch)
+        if: env.BUILD_TRIGGERED == 'true' && (github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch) && steps.skip_check.outputs.should_skip != 'true'
         uses: actions/checkout@v4.2.2
 
       - name: Setup Python
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.8.10'
           architecture: ${{ matrix.arch }}
 
       - name: Setup uv
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: astral-sh/setup-uv@v4
 
       - name: Cache Python dependencies
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -196,6 +213,7 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Create venv and install dependencies
+        if: steps.skip_check.outputs.should_skip != 'true'
         shell: pwsh
         run: |
           pwd
@@ -205,11 +223,13 @@ jobs:
           uv pip install pyinstaller
 
       - name: Prepare output directory
+        if: steps.skip_check.outputs.should_skip != 'true'
         run: |
           if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
       - name: Set Build Info
+        if: steps.skip_check.outputs.should_skip != 'true'
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
@@ -244,6 +264,7 @@ jobs:
           echo "🧪 BUILD_TYPE:  $build_type"
 
       - name: Run Windows build & package
+        if: steps.skip_check.outputs.should_skip != 'true'
         shell: pwsh
         run: |
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
@@ -265,6 +286,7 @@ jobs:
           ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-${{ matrix.arch }}_debug_#${{ github.run_number }}
