@@ -45,6 +45,20 @@ class ConfigCenter:
                 self.default_data = json.load(default)
         except Exception as e:
             logger.error(f"加载默认配置文件失败: {e}")
+            from qfluentwidgets import Dialog
+            from PyQt5.QtWidgets import QApplication
+            import sys
+            app = QApplication.instance() or QApplication(sys.argv)
+            dlg = Dialog(
+                'Class Widgets 启动失败w(ﾟДﾟ)w',
+                f'加载默认配置文件失败,请检查文件完整性或尝试重新安装。\n错误信息: {e}'
+            )
+            dlg.yesButton.setText('好')
+            dlg.cancelButton.hide()
+            dlg.buttonLayout.insertStretch(0, 1)
+            dlg.setFixedWidth(550)
+            dlg.exec()
+            sys.exit(1)
             self.default_data = {}
 
     def _load_user_config(self):
@@ -126,8 +140,11 @@ class ConfigCenter:
         else:
             self._load_user_config()
     
-            user_config_version_str = self.config.get('Version', {}).get('version', '0.0.0')
-            default_config_version_str = self.default_data.get('Version', {}).get('version', '0.0.0')
+            if 'Version' in self.config:
+                user_config_version_str = self.config['Version'].get('version', '0.0.0')
+            else:
+                user_config_version_str = '0.0.0'
+                default_config_version_str = self.default_data.get('Version', {}).get('version', '0.0.0')
 
             try:
                 user_config_version = Version(user_config_version_str)
