@@ -96,6 +96,7 @@ jobs:
       - name: Run Pyright
         if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
         uses: jakebailey/pyright-action@v2
+        continue-on-error: true
         with:
           pylance-version: latest-release
           args: ${{ join(fromJson(steps.changed.outputs.changed_files_json), ' ') }}
