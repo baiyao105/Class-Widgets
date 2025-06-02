@@ -32,9 +32,9 @@ jobs:
     if: |
       github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: 跳过构建
+      - name: Skip build for ${{ matrix.arch }}
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
-        run: echo "跳过构建"
+        run: echo "Skip build ${{ matrix.arch }}"
 
       - name: Checkout repository
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
@@ -78,7 +78,7 @@ jobs:
             --add-data LICENSE:. `
             --add-data plugins:plugins `
             --hidden-import darkdetect
-          ./zip -r -q zip/ClassWidgets_${{ github.run_number }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
+          ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
         if: github.event_name == 'pull_request' || github.event.inputs.architecture == 'all' || github.event.inputs.architecture == matrix.arch
