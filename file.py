@@ -45,6 +45,7 @@ class ConfigCenter:
                 self.default_data = json.load(default)
         except Exception as e:
             logger.error(f"加载默认配置文件失败: {e}")
+            self.default_data = {}
             from qfluentwidgets import Dialog
             from PyQt5.QtWidgets import QApplication
             import sys
@@ -59,7 +60,6 @@ class ConfigCenter:
             dlg.setFixedWidth(550)
             dlg.exec()
             sys.exit(1)
-            self.default_data = {}
 
     def _load_user_config(self):
         """加载用户配置文件"""
