@@ -159,21 +159,21 @@ for folder in not_exist_themes:
     theme_folder.remove(folder)
 
 
-def get_widget_list():
+def get_widget_list() -> list[str]:
     rl = []
     for item, value in widget_conf.items():
         rl.append(item)
     return rl
 
 
-def get_widget_names():
+def get_widget_names() -> list[str]:
     rl = []
     for item, value in widget_name.items():
         rl.append(value)
     return rl
 
 
-def get_current_theme_num():
+def get_current_theme_num() -> int | str:
     for i in range(len(theme_folder)):
         if not os.path.exists(f'{base_directory}/config/schedule/{theme_folder[i]}.json'):
             return "default"
@@ -181,14 +181,14 @@ def get_current_theme_num():
             return i
 
 
-def get_theme_ui_path(name):
+def get_theme_ui_path(name: str) -> str:
     for i in range(len(theme_folder)):
         if theme_names[i] == name:
             return theme_folder[i]
     return 'default'
 
 
-def get_subject_abbreviation(key):
+def get_subject_abbreviation(key: str) -> str:
     if key in subject_abbreviation:
         return subject_abbreviation[key]
     else:
@@ -196,7 +196,7 @@ def get_subject_abbreviation(key):
 
 
 # 学科图标
-def get_subject_icon(key):
+def get_subject_icon(key: str) -> str:
     if key in subject_icon:
         return f'{base_directory}/img/subject/{subject_icon[key]}.svg'
     else:
@@ -204,14 +204,14 @@ def get_subject_icon(key):
 
 
 # 学科主题色
-def subject_color(key):
+def subject_color(key: str) -> str:
     if key in subject:
         return f'{subject[key]}'
     else:
         return '(75, 170, 255'
 
 
-def get_schedule_config():
+def get_schedule_config() -> list[str]:
     schedule_config = []
     # 遍历目标目录下的所有文件
     for file_name in os.listdir(schedule_dir):
@@ -223,7 +223,7 @@ def get_schedule_config():
     return schedule_config
 
 
-def return_default_schedule_number():
+def return_default_schedule_number() -> int:
     total = 0
     for file_name in os.listdir(schedule_dir):
         # 找json
@@ -232,11 +232,11 @@ def return_default_schedule_number():
     return total
 
 
-def create_new_profile(filename):
+def create_new_profile(filename: str) -> None:
     copy(f'{base_directory}/config/default.json', f'{base_directory}/config/schedule/{filename}')
 
 
-def import_schedule(filepath, filename):  # 导入课表
+def import_schedule(filepath: str, filename: str) -> bool | Exception:  # 导入课表
     try:
         with open(filepath, 'r', encoding='utf-8') as file:
             check_data = json.load(file)
@@ -257,7 +257,7 @@ def import_schedule(filepath, filename):  # 导入课表
         return e
 
 
-def convert_schedule(check_data):  # 转换课表
+def convert_schedule(check_data: dict) -> dict | bool:  # 转换课表
     # 校验课程表
     if check_data is None:
         logger.warning('此文件为空')
@@ -306,7 +306,7 @@ def convert_schedule(check_data):  # 转换课表
     return check_data
 
 
-def export_schedule(filepath, filename):  # 导出课表
+def export_schedule(filepath: str, filename: str) -> bool | Exception:  # 导出课表
     try:
         copy(f'{base_directory}/config/schedule/{filename}', filepath)
         return True
@@ -315,7 +315,7 @@ def export_schedule(filepath, filename):  # 导出课表
         return e
 
 
-def get_widget_config():
+def get_widget_config() -> list[str]:
     try:
         if os.path.exists(f'{base_directory}/config/widget.json'):
             with open(f'{base_directory}/config/widget.json', 'r', encoding='utf-8') as file:

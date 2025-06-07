@@ -30,7 +30,7 @@ app_icon = base_directory / 'img' / (
 update_countdown_custom_last = 0
 countdown_cnt = 0
 
-def load_theme_config(theme):
+def load_theme_config(theme: str) -> dict | str | None:
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
@@ -43,7 +43,7 @@ def load_theme_config(theme):
         return None
 
 
-def load_plugin_config():
+def load_plugin_config() -> dict | None:
     try:
         plugin_config_path = base_directory / 'config' / 'plugin.json'
         if plugin_config_path.exists():
@@ -59,7 +59,7 @@ def load_plugin_config():
         return None
 
 
-def save_plugin_config(data):
+def save_plugin_config(data: dict) -> bool:
     data_dict = load_plugin_config()
     data_dict.update(data)
     try:
@@ -71,7 +71,7 @@ def save_plugin_config(data):
         return False
 
 
-def save_installed_plugin(data):
+def save_installed_plugin(data: list) -> bool:
     data = {"plugins": data}
     try:
         with open(base_directory / 'plugins' / 'plugins_from_pp.json', 'w', encoding='utf-8') as file:
@@ -82,7 +82,7 @@ def save_installed_plugin(data):
         return False
 
 
-def load_theme_width(theme):
+def load_theme_width(theme: str) -> int:
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
@@ -92,14 +92,14 @@ def load_theme_width(theme):
         return list_.widget_width
 
 
-def is_temp_week():
+def is_temp_week() -> bool:
     if config_center.read_conf('Temp', 'set_week') is None or config_center.read_conf('Temp', 'set_week') == '':
         return False
     else:
         return config_center.read_conf('Temp', 'set_week')
 
 
-def is_temp_schedule():
+def is_temp_schedule() -> bool:
     if (
         config_center.read_conf('Temp', 'temp_schedule') is None
         or config_center.read_conf('Temp', 'temp_schedule') == ''
@@ -109,7 +109,7 @@ def is_temp_schedule():
         return config_center.read_conf('Temp', 'temp_schedule')
 
 
-def add_shortcut_to_startmenu(file='', icon=''):
+def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
     if os.name != 'nt':
         return
     try:
@@ -134,7 +134,7 @@ def add_shortcut_to_startmenu(file='', icon=''):
         logger.error(f"创建开始菜单快捷方式时出错: {e}")
 
 
-def add_shortcut(file='', icon=''):
+def add_shortcut(file: str = '', icon: str = '') -> None:
     if os.name != 'nt':
         return
     try:
@@ -159,7 +159,7 @@ def add_shortcut(file='', icon=''):
         logger.error(f"创建桌面快捷方式时出错: {e}")
 
 
-def add_to_startup(file_path=f'{base_directory}/ClassWidgets.exe', icon_path=''):  # 注册到开机启动
+def add_to_startup(file_path: str = f'{base_directory}/ClassWidgets.exe', icon_path: str = '') -> None:  # 注册到开机启动
     if os.name != 'nt':
         return
     file_path = Path(file_path) if file_path else Path(__file__).resolve()
@@ -181,21 +181,21 @@ def add_to_startup(file_path=f'{base_directory}/ClassWidgets.exe', icon_path='')
     shortcut.save()
 
 
-def remove_from_startup():
+def remove_from_startup() -> None:
     startup_folder = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
     shortcut_path = os.path.join(startup_folder, f'{name}.lnk')
     if os.path.exists(shortcut_path):
         os.remove(shortcut_path)
 
 
-def get_time_offset():  # 获取时差偏移
+def get_time_offset() -> int:  # 获取时差偏移
     time_offset = config_center.read_conf('General', 'time_offset')
     if time_offset is None or time_offset == '' or time_offset == '0':
         return 0
     else:
         return int(time_offset)
     
-def update_countdown(cnt):
+def update_countdown(cnt: int) -> None:
     global update_countdown_custom_last
     global countdown_cnt
     if (length:=len(config_center.read_conf('Date', 'cd_text_custom').split(','))) == 0:
@@ -208,7 +208,7 @@ def update_countdown(cnt):
         if countdown_cnt >= length:
             countdown_cnt = 0 if length != 0 else -1
         
-def get_cd_text_custom():
+def get_cd_text_custom() -> str:
     global countdown_cnt
     if countdown_cnt == -1:
         return '未设置'
@@ -217,7 +217,7 @@ def get_cd_text_custom():
     return li[countdown_cnt] if countdown_cnt >= 0 else ''
 
 
-def get_custom_countdown():
+def get_custom_countdown() -> str:
     global countdown_cnt
     if countdown_cnt == -1:
         return '未设置'
@@ -243,7 +243,7 @@ def get_custom_countdown():
             # )
 
 
-def get_week_type(): 
+def get_week_type() -> int: 
     if (temp_schedule := config_center.read_conf('Temp', 'set_schedule')) not in ('', None):  # 获取单双周
         return int(temp_schedule)
     start_date_str = config_center.read_conf('Date', 'start_date')
@@ -263,7 +263,7 @@ def get_week_type():
         return 0  # 默认单周
 
 
-def get_is_widget_in(widget='example.ui'):
+def get_is_widget_in(widget: str = 'example.ui') -> bool:
     widgets_list = list_.get_widget_config()
     if widget in widgets_list:
         return True
@@ -271,7 +271,7 @@ def get_is_widget_in(widget='example.ui'):
         return False
 
 
-def save_widget_conf_to_json(new_data):
+def save_widget_conf_to_json(new_data: dict) -> bool | Exception:
     # 初始化 data_dict 为一个空字典
     data_dict = {}
     if os.path.exists(f'{base_directory}/config/widget.json'):
@@ -291,7 +291,7 @@ def save_widget_conf_to_json(new_data):
         return e
 
 
-def load_plugins():  # 加载插件配置文件
+def load_plugins() -> dict:  # 加载插件配置文件
     plugin_dict = {}
     for folder in Path(PLUGINS_DIR).iterdir():
         if folder.is_dir() and (folder / 'plugin.json').exists():
