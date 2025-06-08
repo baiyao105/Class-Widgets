@@ -2009,23 +2009,37 @@ class SettingsMenu(FluentWindow):
 
     def sp_fill_grid_row(self):  # 填充预览表格
         subtitle = self.findChild(SubtitleLabel, 'subtitle_file')
-        subtitle.setText(f'预览  -  {config_center.schedule_name[:-5]}')
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+
         sp_week_type_combo = self.findChild(ComboBox, 'pre_week_type_combo')
-        schedule_view = self.findChild(TableWidget, 'schedule_view')
-        schedule_view.setRowCount(sp_get_class_num())
         if sp_week_type_combo.currentIndex() == 1:
             schedule_dict_sp = schedule_even_dict
+            week_type = 'even'
         else:
             schedule_dict_sp = schedule_dict
+            week_type = 'odd'
+        is_adjusted = any(adjusted_classes.get(f'{week_type}_{i}', False) for i in range(len(schedule_dict_sp)))
+        schedule_name = config_center.schedule_name[:-5]
+        if is_adjusted:
+            subtitle.setText(f'预览  -  [调休] {schedule_name}')
+        else:
+            subtitle.setText(f'预览  -  {schedule_name}')
+        schedule_view = self.findChild(TableWidget, 'schedule_view')
+        schedule_view.setRowCount(sp_get_class_num())
+
         for i in range(len(schedule_dict_sp)):  # 周数
             for j in range(len(schedule_dict_sp[str(i)])):  # 一天内全部课程
                 item_text = schedule_dict_sp[str(i)][j].split('-')[0]
                 if item_text != '未添加':
-                    item = QTableWidgetItem(item_text)
+                    if adjusted_classes.get(f'{week_type}_{i}', False):
+                        item = QTableWidgetItem(f'{item_text}')
+                        item.setBackground(QColor('#E0F7FA'))
+                    else:
+                        item = QTableWidgetItem(item_text)
                 else:
                     item = QTableWidgetItem('')
                 schedule_view.setItem(j, i, item)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置单元格文本居中对齐
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
     # 加载时间线
     def te_load_item(self):
