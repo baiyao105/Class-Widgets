@@ -456,39 +456,13 @@ def get_next_lessons():
                     c_time += dt.timedelta(minutes=add_time)
 
 
-def get_next_lessons_text():
+def get_next_lessons_text() -> str: 
     if not next_lessons:
-        cache_text = '当前暂无课程'
-    else:
-        cache_text = ''
-        if len(next_lessons) >= 5:
-            range_time = 5
-        else:
-            range_time = len(next_lessons)
-        MAX_DISPLAY_LENGTH = 6
-        for i in range(range_time):
-            lesson_name = next_lessons[i]
-            display_name = ''
-            if lesson_name != '暂无课程':
-                if range_time > 2:
-                    abbreviation = list_.get_subject_abbreviation(lesson_name)
-                    if len(abbreviation) > MAX_DISPLAY_LENGTH:
-                        display_name = abbreviation[:MAX_DISPLAY_LENGTH-1] + '...'
-                    else:
-                        display_name = abbreviation
-                else:
-                    if len(lesson_name) > MAX_DISPLAY_LENGTH:
-                        display_name = lesson_name[:MAX_DISPLAY_LENGTH-1] + '...'
-                    else:
-                        display_name = lesson_name
-            else:
-                if range_time > 2:
-                    display_name = '无'
-                else:
-                    display_name = '暂无'
-            cache_text += f'{display_name}  '
-    return cache_text
-
+        return '当前暂无课程'
+    MAX_DISPLAY_LENGTH = 16
+    if utils.get_str_length(full_text := (' '.join(next_lessons))) <= MAX_DISPLAY_LENGTH:
+        return full_text
+    return ' '.join([list_.get_subject_abbreviation(x) for x in next_lessons[:5]])
 
 # 获取当前活动
 def get_current_lesson_name():

@@ -261,6 +261,25 @@ class UnionUpdateTimer(QObject):
             except Exception as e:
                 logger.error(f"停止 QTimer 时发生未知错误: {e}")
 
+def get_str_length(text: str) -> int:
+    """
+    计算字符串长度，汉字计为2，英文和数字计为1
+    
+    Args:
+        text: 要计算的字符串
+    
+    Returns:
+        int: 字符串长度
+    """
+    length = 0
+    for char in text:
+        # 使用 ord() 获取字符的 Unicode 码点
+        # 如果大于 0x4e00 (中文范围开始) 就是汉字，计为2
+        if ord(char) > 0x4e00:
+            length += 2
+        else:
+            length += 1
+    return length
 
 tray_icon = None
 update_timer = UnionUpdateTimer()
