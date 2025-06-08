@@ -23,7 +23,7 @@ from qfluentwidgets import (
     CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
     SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
     PrimaryDropDownPushButton, Action, RoundMenu, CardWidget, ImageLabel, StrongBodyLabel,
-    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton, HyperlinkLabel
+    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton, HyperlinkLabel, themeColor
 )
 
 import conf
@@ -2074,7 +2074,9 @@ class SettingsMenu(FluentWindow):
                 if item_text != '未添加':
                     if adjusted_classes.get(f'{week_type}_{i}', False):
                         item = QTableWidgetItem(f'{item_text}')
-                        item.setBackground(QColor('#E0F7FA'))
+                        color = themeColor()
+                        color.setAlpha(64)
+                        item.setBackground(color)
                     else:
                         item = QTableWidgetItem(item_text)
                 else:
