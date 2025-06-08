@@ -2007,6 +2007,47 @@ class SettingsMenu(FluentWindow):
             print(f'切换配置文件时发生错误：{e}')
             logger.error(f'切换配置文件时发生错误：{e}')
 
+    def check_and_disable_schedule_edit(self):
+        """检查是否存在调休状态，如果存在则禁用课程表编辑功能"""
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+        is_adjusted = bool(adjusted_classes)
+
+        if is_adjusted:
+            se_set_button = self.findChild(ToolButton, 'set_button')
+            se_clear_button = self.findChild(ToolButton, 'clear_button')
+            se_class_kind_combo = self.findChild(ComboBox, 'class_combo')
+            se_custom_class_text = self.findChild(LineEdit, 'custom_class')
+            se_save_button = self.findChild(PrimaryPushButton, 'save_schedule')
+            se_copy_schedule_button = self.findChild(PushButton, 'copy_schedule')
+            quick_set_schedule = self.findChild(ListWidget, 'subject_list')
+            quick_select_week_button = self.findChild(PushButton, 'quick_select_week')
+            se_set_button.setEnabled(False)
+            se_clear_button.setEnabled(False)
+            se_class_kind_combo.setEnabled(False)
+            se_custom_class_text.setEnabled(False)
+            se_save_button.setEnabled(False)
+            se_copy_schedule_button.setEnabled(False)
+            quick_set_schedule.setEnabled(False)
+            quick_select_week_button.setEnabled(False)
+
+    def check_and_disable_timeline_edit(self):
+        """检查是否存在调休状态，如果存在则禁用时间线编辑功能"""
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+        is_adjusted = bool(adjusted_classes)
+        if is_adjusted:
+            te_add_button = self.findChild(ToolButton, 'add_button')
+            te_add_part_button = self.findChild(ToolButton, 'add_part_button')
+            te_delete_part_button = self.findChild(ToolButton, 'delete_part_button')
+            te_edit_button = self.findChild(ToolButton, 'edit_button')
+            te_delete_button = self.findChild(ToolButton, 'delete_button')
+            te_save_button = self.findChild(PrimaryPushButton, 'save')
+            te_add_button.setEnabled(False)
+            te_add_part_button.setEnabled(False)
+            te_delete_part_button.setEnabled(False)
+            te_edit_button.setEnabled(False)
+            te_delete_button.setEnabled(False)
+            te_save_button.setEnabled(False)
+
     def sp_fill_grid_row(self):  # 填充预览表格
         subtitle = self.findChild(SubtitleLabel, 'subtitle_file')
         adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
@@ -2646,6 +2687,8 @@ class SettingsMenu(FluentWindow):
     def init_window(self):
         self.stackedWidget.setCurrentIndex(0)  # 设置初始页面
         self.load_all_item()
+        self.check_and_disable_schedule_edit()
+        self.check_and_disable_timeline_edit()
         self.setMinimumWidth(700)
         self.setMinimumHeight(400)
         self.navigationInterface.setExpandWidth(250)
