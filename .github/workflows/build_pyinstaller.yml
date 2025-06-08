@@ -61,6 +61,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-
 
+      - name: Install project dependencies
+        run: |
+          pip install -r requirements.txt
+  
       - name: Install linters and tools
         run: |
           pip install ruff pylint pyright

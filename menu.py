@@ -951,7 +951,7 @@ class SettingsMenu(FluentWindow):
             self.voice_selector.clear()
             self.voice_selector.addItem("加载中...", userData=None)
             self.voice_selector.setEnabled(False)
-            self.switch_enable_TTS.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
         else:
             self.voice_selector.clear()
             self.voice_selector.addItem("未启用", userData=None)
@@ -990,7 +990,8 @@ class SettingsMenu(FluentWindow):
         self.voice_selector.clear()
         self.voice_selector.addItem("加载中...", userData=None)
         self.voice_selector.setEnabled(False)
-        self.switch_enable_TTS.setEnabled(False) # 临时禁用TTS开关
+        if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog.isVisible():
+            self.switch_enable_TTS.setEnabled(False) # 临时禁用TTS开关
 
         if self.tts_voice_loader_thread and self.tts_voice_loader_thread.isRunning():
             self.tts_voice_loader_thread.requestInterruption()
