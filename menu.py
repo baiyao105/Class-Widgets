@@ -157,7 +157,7 @@ class I18nManager:
                 app.installTranslator(main_translator)
                 self.current_language_view = lang_code
                 config_center.write_conf('General', 'language_view', lang_code)
-                logger.info(f"成功加载界面语言包: {lang_code} ({self.available_languages_view.get(lang_code, lang_code)})")
+                logger.success(f"成功加载界面语言: {lang_code} ({self.available_languages_view.get(lang_code, lang_code)})")
                 return True
             return False
 
@@ -187,7 +187,7 @@ class I18nManager:
                 app.installTranslator(dark_translator)
             self.current_language_widgets = lang_code
             config_center.write_conf('General', 'language_widgets', lang_code)
-            logger.success(f"加载组件语言: {lang_code} ({self.available_languages_widgets.get(lang_code, lang_code)})")
+            logger.success(f"成功加载组件语言: {lang_code} ({self.available_languages_widgets.get(lang_code, lang_code)})")
             return True
 
         except Exception as e:
@@ -206,7 +206,7 @@ class I18nManager:
             if qm_path.exists():
                 translator = QTranslator()
                 if translator.load(str(qm_path)):
-                    logger.debug(f"成功加载文件: {qm_path}")
+                    #logger.debug(f"成功加载文件: {qm_path}")
                     return translator
                 else:
                     logger.warning(f"无法加载文件: {qm_path}")
@@ -877,11 +877,11 @@ class SettingsMenu(FluentWindow):
         global global_i18n_manager
         if global_i18n_manager:
             self.i18n_manager = global_i18n_manager
-            logger.info(f"复用i18n旧例,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
+            logger.debug(f"复用i18n旧例,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
         else:
             self.i18n_manager = I18nManager()
             self.i18n_manager.init_from_config()
-            logger.info(f"创建新i18n管理,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
+            logger.debug(f"创建新i18n管理,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
 
         self.init_nav()
         self.init_window()

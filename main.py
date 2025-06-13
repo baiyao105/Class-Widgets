@@ -2764,7 +2764,7 @@ if __name__ == '__main__':
     from menu import I18nManager
     global_i18n_manager = I18nManager()
     global_i18n_manager.init_from_config()
-    logger.info(f"i18n加载语言,界面: {global_i18n_manager.get_current_language_view_name()}, 组件: {global_i18n_manager.get_current_language_widgets_name()}")
+    logger.debug(f"i18n加载,界面: {global_i18n_manager.get_current_language_view_name()},组件: {global_i18n_manager.get_current_language_widgets_name()}")
     import menu
     menu.global_i18n_manager = global_i18n_manager
     
