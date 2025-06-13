@@ -1,5 +1,9 @@
 > [!Warning]
-> Class Widgets *1* 目前完全由社区开发者进行开发，详见[此处](https://github.com/orgs/Class-Widgets/teams/community/members)
+> Class Widgets *1* 目前完全由社区开发者进行开发
+> 
+> [![](https://github.com/pizeroLOL.png?size=80)](https://github.com/pizeroLOL) [![](https://github.com/IsHPDuwu.png?size=80)](https://github.com/IsHPDuwu) [![](https://github.com/baiyao105.png?size=80)](https://github.com/baiyao105) [![](https://github.com/Artist-MOBAI.png?size=80)](https://github.com/Artist-MOBAI)
+> 
+> 有任何需要社区开发者帮忙的地方，请前往 QQ 群或提 issue
 
 > [!NOTE]
 > Class Widgets 有 QQ 群和 Discord 服务器啦！详见[此处](#社区)
@@ -100,6 +104,7 @@ Copyright © 2025 RinLit.
 
 感谢以下人员对本项目的支持。
 - [猞猁](http://dq6666.cn/)
+- [JerryQAQ](http://hub.rinlit.cn/)
 
 感谢以下赞助商对本项目的支持。
 

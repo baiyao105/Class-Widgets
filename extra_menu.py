@@ -36,19 +36,6 @@ temp_schedule = {'schedule': {}, 'schedule_even': {}}
 
 
 def open_settings():
-    if config_center.read_conf('Temp', 'temp_schedule'):
-        w = Dialog(
-            "暂时无法使用“设置”",
-            "由于您正在使用临时课表，将无法使用“设置”的课程表功能；\n若要启用“设置”，请重新启动 Class Widgets。"
-            "\n(重启后，临时课表也将会恢复)",
-            None
-        )
-        w.cancelButton.hide()
-        w.buttonLayout.insertStretch(1)
-        w.exec()
-
-        return
-
     global settings
     if settings is None or not settings.isVisible():
         settings = SettingsMenu()
@@ -116,16 +103,33 @@ class ExtraMenu(FluentWindow):
         try:
             temp_week = self.findChild(ComboBox, 'select_temp_week')
             temp_schedule_set = self.findChild(ComboBox, 'select_temp_schedule')
-            if temp_schedule != {'schedule': {}, 'schedule_even': {}}:
-                if config_center.read_conf('Temp', 'temp_schedule') == '':  # 备份检测
-                    copy(f'{base_directory}/config/schedule/{config_center.schedule_name}',
-                         f'{base_directory}/config/schedule/backup.json')  # 备份课表配置
-                    logger.info(f'备份课表配置成功：已将 {config_center.schedule_name} -备份至-> backup.json')
-                    config_center.write_conf('Temp', 'temp_schedule', config_center.schedule_name)
-                file.save_data_to_json(temp_schedule, config_center.schedule_name)
+            if config_center.read_conf('Temp', 'temp_schedule') == '':
+                copy(f'{base_directory}/config/schedule/{config_center.schedule_name}',
+                     f'{base_directory}/config/schedule/backup.json')
+                logger.success(f'原课表配置已备份：{config_center.schedule_name} --> backup.json')
+                config_center.write_conf('Temp', 'temp_schedule', config_center.schedule_name)
+            current_full_schedule_data = schedule_center.schedule_data
+            adjusted_week = str(temp_week.currentIndex())
+            is_even_week = temp_schedule_set.currentIndex() == 1
+            
+            if is_even_week:
+                if adjusted_week in temp_schedule.get('schedule_even', {}):
+                    current_full_schedule_data['schedule_even'] = current_full_schedule_data.get('schedule_even', {})
+                    current_full_schedule_data['schedule_even'][adjusted_week] = temp_schedule['schedule_even'][adjusted_week]
+                    current_full_schedule_data['adjusted_classes'] = current_full_schedule_data.get('adjusted_classes', {})
+                    current_full_schedule_data['adjusted_classes'][f'even_{adjusted_week}'] = True
+            else:
+                if adjusted_week in temp_schedule.get('schedule', {}):
+                    current_full_schedule_data['schedule'] = current_full_schedule_data.get('schedule', {})
+                    current_full_schedule_data['schedule'][adjusted_week] = temp_schedule['schedule'][adjusted_week]
+                    current_full_schedule_data['adjusted_classes'] = current_full_schedule_data.get('adjusted_classes', {})
+                    current_full_schedule_data['adjusted_classes'][f'odd_{adjusted_week}'] = True
+
+            file.save_data_to_json(current_full_schedule_data, config_center.schedule_name)
             schedule_center.update_schedule()
             config_center.write_conf('Temp', 'set_week', str(temp_week.currentIndex()))
-            config_center.write_conf('Temp', 'set_schedule',str(temp_schedule_set.currentIndex()))
+            config_center.write_conf('Temp', 'set_schedule', str(temp_schedule_set.currentIndex()))
+
             Flyout.create(
                 icon=InfoBarIcon.SUCCESS,
                 title='保存成功',
@@ -136,6 +140,7 @@ class ExtraMenu(FluentWindow):
                 aniType=FlyoutAnimationType.PULL_UP
             )
         except Exception as e:
+            logger.error(f'保存临时课表时发生错误: {e}')
             Flyout.create(
                 icon=InfoBarIcon.ERROR,
                 title='保存失败',

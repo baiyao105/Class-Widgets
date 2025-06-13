@@ -1,17 +1,19 @@
 import datetime as dt
 import json
 import os
+import platform
 import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+import asyncio
 
 from PyQt5 import uic, QtCore
-from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QTranslator, QLocale, QCoreApplication
+from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QThread, QTranslator, QLocale, QCoreApplication
 from PyQt5.QtGui import QIcon, QDesktopServices, QColor
 from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
-    QSpacerItem, QFileDialog, QVBoxLayout, QScroller
+    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget
 from packaging.version import Version
 from loguru import logger
 from qfluentwidgets import (
@@ -21,7 +23,7 @@ from qfluentwidgets import (
     CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
     SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
     PrimaryDropDownPushButton, Action, RoundMenu, CardWidget, ImageLabel, StrongBodyLabel,
-    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton, FlyoutView
+    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, HyperlinkButton, FlyoutView, HyperlinkLabel, themeColor
 )
 
 import conf
@@ -33,6 +35,8 @@ import weather_db
 import weather_db as wd
 from conf import base_directory
 from cses_mgr import CSES_Converter
+from generate_speech import get_tts_voices, get_voice_id_by_name, get_voice_name_by_id, get_available_engines
+import generate_speech
 from file import config_center, schedule_center
 from network_thread import VersionThread
 from plugin import p_loader
@@ -734,13 +738,112 @@ class TextFieldMessageBox(MessageBoxBase):
         self.tipsLabel.setText('很好！就这样！ヾ(≧▽≦*)o')
 
 
+class TTSVoiceLoaderThread(QThread):
+    voicesLoaded = pyqtSignal(list)
+    errorOccurred = pyqtSignal(str)
+    previewFinished = pyqtSignal(bool)
+
+    def __init__(self, engine_filter=None, parent=None):
+        super().__init__(parent)
+        self.engine_filter = engine_filter
+
+    def run(self):
+        try:
+            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows,跳过pyttsx3 TTS预览")
+                self.previewFinished.emit(False)
+                return
+            if self.isInterruptionRequested():
+                return
+            if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows,跳过pyttsx3语音加载")
+                self.voicesLoaded.emit([])
+                return
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            available_voices, error_message = loop.run_until_complete(get_tts_voices(engine_filter=self.engine_filter))
+            loop.close()
+            if self.isInterruptionRequested():
+                return
+
+            if error_message:
+                self.errorOccurred.emit(error_message)
+            else:
+                self.voicesLoaded.emit(available_voices)
+        except Exception as e:
+            logger.error(f"加载TTS语音列表时出错: {e}")
+            self.errorOccurred.emit(str(e))
+
+
+class TTSPreviewThread(QThread):
+    previewFinished = pyqtSignal(bool)
+    previewError = pyqtSignal(str)
+
+    def __init__(self, text, engine, voice, parent=None):
+        super().__init__(parent)
+        self.text = text
+        self.engine = engine
+        self.voice = voice
+
+    def run(self):
+        try:
+            if self.engine == "pyttsx3" and platform.system() != "Windows":
+                logger.warning("当前系统不是Windows，跳过pyttsx3 TTS预览。")
+                self.previewFinished.emit(False)
+                return
+            if self.isInterruptionRequested():
+                logger.info("TTS预览线程收到中断请求，正在退出...")
+                return
+                
+            from generate_speech import generate_speech_sync, TTSEngine
+            from play_audio import play_audio
+            import os
+            
+            logger.info(f"使用引擎 {self.engine} 生成预览语音")
+            audio_file = generate_speech_sync(
+                text=self.text,
+                engine=self.engine,
+                voice=self.voice,
+                auto_fallback=True,
+                timeout=10.0
+            )
+            
+            # 再次检查是否有中断请求
+            if self.isInterruptionRequested():
+                logger.info("TTS预览线程收到中断请求，正在退出...")
+                # 删除已生成的音频文件
+                TTSEngine.delete_audio_file(audio_file)
+                return
+            
+            # 检查文件是否存在且有效
+            if not os.path.exists(audio_file):
+                raise FileNotFoundError(f"生成的音频文件不存在: {audio_file}")
+                
+            # 检查文件大小是否正常（小于10字节的文件可能是损坏的）
+            file_size = os.path.getsize(audio_file)
+            if file_size < 10:
+                logger.warning(f"生成的音频文件可能无效，大小仅为 {file_size} 字节: {audio_file}")
+                # 删除可能损坏的文件
+                TTSEngine.delete_audio_file(audio_file)
+                raise ValueError(f"生成的音频文件可能无效，大小仅为 {file_size} 字节")
+                
+            play_audio(audio_file, tts_delete_after=True)
+            self.previewFinished.emit(True)
+        except Exception as e:
+            logger.error(f"TTS预览生成失败: {str(e)}")
+            self.previewError.emit(str(e))
+
+
 class SettingsMenu(FluentWindow):
     closed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
+        self.tts_voice_loader_thread = None
         self.button_clear_log = None
         self.version_thread = None
+        self.engine_selector = None # TTS引擎选择器
+        self.current_loaded_engine = config_center.read_conf('TTS', 'engine') # 加载的TTS引擎
 
         # 创建子页面
         self.spInterface = uic.loadUi(f'{base_directory}/view/menu/preview.ui')  # 预览
@@ -765,6 +868,10 @@ class SettingsMenu(FluentWindow):
         self.hdInterface.setObjectName("hdInterface")
         self.plInterface = uic.loadUi(f'{base_directory}/view/menu/plugin_mgr.ui')  # 插件
         self.plInterface.setObjectName("plInterface")
+        self.version_number_label = self.ifInterface.findChild(QLabel, 'version_number_label')
+        self.build_commit_label = self.ifInterface.findChild(QLabel, 'build_commit_label')
+        self.build_uuid_label = self.ifInterface.findChild(QLabel, 'build_uuid_label')
+        self.build_date_label = self.ifInterface.findChild(QLabel, 'build_date_label')
 
         # 向后兼容
         global global_i18n_manager
@@ -910,6 +1017,423 @@ class SettingsMenu(FluentWindow):
         spin_prepare_time.setValue(int(config_center.read_conf('Toast', 'prepare_minutes')))
         spin_prepare_time.valueChanged.connect(self.save_prepare_time)  # 准备时间
 
+        # TTS
+        tts_settings = self.findChild(PushButton, 'TTS_PushButton')
+        tts_settings.clicked.connect(self.open_tts_settings)
+        self.available_voices = None
+        self.current_loaded_engine = config_center.read_conf('TTS', 'engine') # 加载的TTS引擎
+
+        self.voice_selector = None
+        self.switch_enable_TTS = None
+
+    def available_voices_cnt(self, voices):
+        self.available_voices = voices
+        if hasattr(self, 'voice_selector') and self.voice_selector and hasattr(self, 'update_tts_voices') and self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
+            self.update_tts_voices(self.available_voices)
+        self.switch_enable_TTS.setEnabled(True if voices else False)
+        self.voice_selector.setEnabled(True if voices else False)
+
+    class TTSSettings(MessageBoxBase): # TTS设置页
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.parent_menu = parent # 保存父菜单的引用
+            self.temp_widget = QWidget()
+            ui_path = f'{base_directory}/view/menu/tts_settings.ui'
+            uic.loadUi(ui_path, self.temp_widget)
+            self.viewLayout.addWidget(self.temp_widget)
+
+            self.viewLayout.setContentsMargins(0, 0, 0, 0)
+            self.cancelButton.hide()
+            self.widget.setMinimumWidth(parent.width()//3*2)
+            self.widget.setMinimumHeight(parent.height())
+            switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
+            slider_speed_tts = self.widget.findChild(Slider, 'slider_tts_speed')
+            tts_enabled = int(config_center.read_conf('TTS', 'enable'))
+            switch_enable_TTS.setChecked(tts_enabled)
+            slider_speed_tts.setValue(int(config_center.read_conf('TTS', 'speed')))
+
+            switch_enable_TTS.checkedChanged.connect(parent.toggle_tts_settings)
+            slider_speed_tts.valueChanged.connect(parent.save_tts_speed)
+
+            voice_selector = self.widget.findChild(ComboBox, 'voice_selector')
+            voice_selector.clear()
+            voice_selector.addItem("加载中...", userData=None)
+            voice_selector.setEnabled(False)
+            switch_enable_TTS.setEnabled(False)
+
+            # TTS引擎选择器
+            parent.engine_selector = self.widget.findChild(ComboBox, 'engine_selector')
+            if not parent.engine_selector:
+                parent.engine_selector = ComboBox(self.widget)
+            parent.populate_tts_engines()
+            parent.engine_selector.currentTextChanged.connect(parent.on_engine_selected)
+            parent.engine_note_label = self.widget.findChild(HyperlinkLabel, 'engine_note')
+            parent.engine_note_label.clicked.connect(parent.show_engine_note)
+
+            parent.voice_selector = self.widget.findChild(ComboBox, 'voice_selector')
+            parent.switch_enable_TTS = self.widget.findChild(SwitchButton, 'switch_enable_tts')
+            self.tts_vocab_button = self.widget.findChild(PushButton, 'tts_vocab_button')
+            def show_vocab_note():
+                w = MessageBox('小语法?',
+                               '可以使用以下占位符来动态插入信息：\n'\
+                               '- `{lesson_name}`: 开始&结束&下节的课程名(例如：信息技术)\n'\
+                               '- `{minutes}`: 分钟数 (例如：5) *其他\n'\
+                               '- `{title}`: 通知标题 (例如：重要通知) *其他\n'\
+                               '- `{content}`: 通知内容 (例如：这是一条测试通知) *其他\n', self)
+                w.cancelButton.hide()
+                w.exec()
+            self.tts_vocab_button.clicked.connect(show_vocab_note)
+
+            if parent.available_voices is not None and parent.current_loaded_engine == parent.engine_selector.currentData():
+                parent.update_tts_voices(parent.available_voices)
+            else:
+                # 启动由 open_tts_settings 处理
+                voice_selector.clear()
+                voice_selector.addItem("加载中...", userData=None)
+                voice_selector.setEnabled(False)
+
+            text_attend_class = self.widget.findChild(LineEdit, 'text_attend_class')
+            text_attend_class.setText(config_center.read_conf('TTS', 'attend_class'))
+            text_attend_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'attend_class', text_attend_class.text()))
+
+            text_prepare_class = self.widget.findChild(LineEdit, 'text_prepare_class')
+            text_prepare_class.setText(config_center.read_conf('TTS', 'prepare_class'))
+            text_prepare_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'prepare_class', text_prepare_class.text()))
+
+            text_finish_class = self.widget.findChild(LineEdit, 'text_finish_class')
+            text_finish_class.setText(config_center.read_conf('TTS', 'finish_class'))
+            text_finish_class.textChanged.connect(lambda: config_center.write_conf('TTS', 'finish_class', text_finish_class.text()))
+
+            text_after_school = self.widget.findChild(LineEdit, 'text_after_school')
+            text_after_school.setText(config_center.read_conf('TTS', 'after_school'))
+            text_after_school.textChanged.connect(lambda: config_center.write_conf('TTS', 'after_school', text_after_school.text()))
+
+            text_notification = self.widget.findChild(LineEdit, 'text_notification')
+            text_notification.setText(config_center.read_conf('TTS', 'otherwise'))
+            text_notification.textChanged.connect(lambda: config_center.write_conf('TTS', 'otherwise', text_notification.text()))
+
+            # 预览
+            preview_tts_button = self.widget.findChild(PrimaryDropDownPushButton, 'preview')
+            preview_tts_menu = RoundMenu(parent=preview_tts_button)
+            preview_tts_menu.addActions([
+                Action(fIcon.EDUCATION, '上课提醒', triggered=lambda: self.play_tts_preview('attend_class')),
+                Action(fIcon.CAFE, '下课提醒', triggered=lambda: self.play_tts_preview('finish_class')),
+                Action(fIcon.BOOK_SHELF, '预备提醒', triggered=lambda: self.play_tts_preview('prepare_class')),
+                Action(fIcon.EMBED, '放学提醒', triggered=lambda: self.play_tts_preview('after_school')),
+                Action(fIcon.CODE, '其他提醒', triggered=lambda: self.play_tts_preview('otherwise'))
+            ])
+            preview_tts_button.setMenu(preview_tts_menu)
+
+        def play_tts_preview(self, text_type):
+            text_template = config_center.read_conf('TTS', text_type)
+            from collections import defaultdict
+            format_values = defaultdict(str, {
+                'lesson_name': '信息技术',
+                'minutes': '5',
+                'title': '通知',
+                'content': '这是一条测试通知ヾ(≧▽≦*)o'
+            })
+            if text_type == 'attend_class':
+                text_to_speak = text_template.format_map(format_values)
+            elif text_type == 'finish_class':
+                text_to_speak = text_template.format_map(format_values)
+            elif text_type == 'prepare_class':
+                text_to_speak = text_template.format_map(format_values)
+            elif text_type == 'after_school':
+                text_to_speak = text_template.format_map(format_values)
+            elif text_type == 'otherwise':
+                text_to_speak = text_template.format_map(format_values)
+            else:
+                text_to_speak = text_template.format_map(format_values)
+
+            logger.debug(f"生成TTS文本: {text_to_speak}")
+            
+            try:
+                current_engine = self.parent_menu.engine_selector.currentData()
+                current_voice = None
+                if self.parent_menu.voice_selector and self.parent_menu.voice_selector.currentData():
+                    current_voice = self.parent_menu.voice_selector.currentData()
+                
+                if hasattr(self, 'tts_preview_thread') and self.tts_preview_thread and self.tts_preview_thread.isRunning():
+                    self.tts_preview_thread.requestInterruption()
+                    self.tts_preview_thread.quit()
+                    if not self.tts_preview_thread.wait(1000):
+                        logger.warning("旧TTS预览线程未能在超时时间内退出，将在后台继续运行")
+                self.tts_preview_thread = TTSPreviewThread(
+                    text=text_to_speak,
+                    engine=current_engine,
+                    voice=current_voice,
+                    parent=self
+                )
+                
+                self.tts_preview_thread.previewError.connect(self.handle_tts_preview_error)
+                self.tts_preview_thread.start()
+                
+            except Exception as e:
+                logger.error(f"启动TTS预览线程失败: {str(e)}")
+                from qfluentwidgets import MessageBox
+                MessageBox(
+                    "TTS预览失败",
+                    f"启动TTS预览时出错: {str(e)}",
+                    self
+                ).exec()
+                
+        def handle_tts_preview_error(self, error_message):
+            logger.error(f"TTS生成预览失败: {error_message}")
+            from qfluentwidgets import MessageBox
+            MessageBox(
+                "TTS生成失败",
+                f"生成或播放语音时出错: {error_message}",
+                self
+            ).exec()
+
+
+    def open_tts_settings(self):
+        if not hasattr(self, 'TTSSettingsDialog') or not self.TTSSettingsDialog:
+            self.TTSSettingsDialog = self.TTSSettings(self)
+        current_selected_engine_in_selector = self.engine_selector.currentData()
+        tts_enabled = config_center.read_conf('TTS', 'enable') == '1'
+
+        if tts_enabled:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("加载中...", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+        else:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+
+        self.toggle_tts_settings(tts_enabled)
+        self.TTSSettingsDialog.show()
+        self.TTSSettingsDialog.exec()
+        logger.debug(f"加载引擎: {self.current_loaded_engine},{current_selected_engine_in_selector}(选择器)")
+        if tts_enabled:
+            self.load_tts_voices_for_engine(current_selected_engine_in_selector)
+        else:
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+
+    def on_engine_selected(self, engine_text):
+        selected_engine_key = self.engine_selector.currentData()
+        if selected_engine_key and selected_engine_key != self.current_loaded_engine:
+            logger.debug(f"TTS引擎被更改,尝试更新列表: {selected_engine_key}")
+            config_center.write_conf('TTS', 'engine', selected_engine_key)
+            self.current_loaded_engine = selected_engine_key # 更新当前加载的引擎
+            self.load_tts_voices_for_engine(selected_engine_key)
+        elif not selected_engine_key:
+            logger.warning("选择的TTS引擎键为空")
+
+    def load_tts_voices_for_engine(self, engine_key):
+        if config_center.read_conf('TTS', 'enable') == '0':
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+            return
+        self.voice_selector.clear()
+        self.voice_selector.addItem("加载中...", userData=None)
+        self.voice_selector.setEnabled(False)
+        if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog.isVisible():
+            self.switch_enable_TTS.setEnabled(False) # 临时禁用TTS开关
+
+        if self.tts_voice_loader_thread and self.tts_voice_loader_thread.isRunning():
+            self.tts_voice_loader_thread.requestInterruption()
+            self.tts_voice_loader_thread.quit()
+            if not self.tts_voice_loader_thread.wait(2000):
+                logger.warning("旧TTS加载线程未能在超时时间内退出，将在后台继续运行")
+        self.tts_voice_loader_thread = None
+
+        self.current_loaded_engine = engine_key
+        self.available_voices = None
+        self.tts_voice_loader_thread = TTSVoiceLoaderThread(engine_filter=engine_key)
+        self.tts_voice_loader_thread.voicesLoaded.connect(lambda voices: self.available_voices_cnt(voices) or self.switch_enable_TTS.setEnabled(True))
+        self.tts_voice_loader_thread.errorOccurred.connect(lambda error: self.handle_tts_load_error(error) or self.switch_enable_TTS.setEnabled(True))
+        self.tts_voice_loader_thread.start()
+
+    def populate_tts_engines(self):
+        # 填充TTS引擎选项
+        self.engine_selector.clear()
+        available_engines = generate_speech.get_available_engines() #  假设 generate_speech 有这个方法
+        logger.debug(f"可用TTS引擎: {available_engines}")
+        for engine_key, engine_name in available_engines.items():
+            if engine_key == 'pyttsx3' and platform.system() != "Windows":
+                continue
+            self.engine_selector.addItem(engine_name, userData=engine_key)
+        
+        current_engine = config_center.read_conf('TTS', 'engine')
+        if current_engine in available_engines:
+            if current_engine == 'pyttsx3' and platform.system() != "Windows":
+                if self.engine_selector.count() > 0:
+                    self.engine_selector.setCurrentIndex(0)
+                    config_center.write_conf('TTS', 'engine', self.engine_selector.currentData())
+                    logger.warning(f"当前系统不支持pyttsx3，已自动切换到引擎: {self.engine_selector.currentData()}")
+                else:
+                    logger.error("没有可用的TTS引擎!")
+            else:
+                index = self.engine_selector.findData(current_engine)
+                if index != -1:
+                    self.engine_selector.setCurrentIndex(index)
+        elif self.engine_selector.count() > 0:
+            self.engine_selector.setCurrentIndex(0)
+            config_center.write_conf('TTS', 'engine', self.engine_selector.currentData())
+
+    def show_engine_note(self):
+        if not hasattr(self, 'engine_selector') or not self.engine_selector:
+            logger.warning("引擎选择器未初始化")
+            return
+
+        current_engine_key = self.engine_selector.currentData()
+        title = "引擎小提示"
+        message = ""
+        if current_engine_key == "edge":
+            message = ("Edge TTS 需要联网才能正常发声哦~\n"
+                       "请确保网络连接,不然会说不出话来(>﹏<)\n"
+                       "* 可能会有一定的延迟,耐心等待一下~")
+            w = MessageBox(title, message, self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.yesButton.setText('知道啦~')
+            w.cancelButton.hide()
+            w.show()
+        elif current_engine_key == "pyttsx3" and platform.system() == "Windows":
+            class CustomMessageBox(MessageBoxBase):
+                def __init__(self, parent=None):
+                    super().__init__(parent)
+                    self.titleLabel = StrongBodyLabel(title, self)
+                    self.contentLabel = BodyLabel(
+                        "系统 TTS（pyttsx3）用的是系统自带的语音服务噢~\n"
+                        "您可以在系统设置里添加更多语音(*≧▽≦)", 
+                        self)
+                    self.hyperlinkLabel = HyperlinkLabel("打开Windows语音设置", self)
+                    self.hyperlinkLabel.clicked.connect(self._open_settings)
+                    self.viewLayout.addWidget(self.titleLabel)
+                    self.viewLayout.addWidget(self.contentLabel)
+                    self.viewLayout.addWidget(self.hyperlinkLabel)
+                    self.yesButton.setText('知道啦~')
+                    self.cancelButton.hide()
+                def _open_settings(self):
+                    QDesktopServices.openUrl(QUrl("file:///C:/Windows/System32/Speech/SpeechUX/sapi.cpl"))
+            w = CustomMessageBox(self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.exec()
+        else:
+            message = "这个语音引擎还没有提示信息呢~(・ω<)"
+            w = MessageBox(title, message, self.TTSSettingsDialog if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else self.parent_menu)
+            w.yesButton.setText('知道啦~')
+            w.cancelButton.hide()
+            w.show()
+
+
+    def toggle_tts_settings(self, checked):
+        switch_checked('TTS', 'enable', checked)
+
+        tts_dialog_widget = self.TTSSettingsDialog.widget if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog else None
+        if not tts_dialog_widget:
+            return
+        card_tts_speed = tts_dialog_widget.findChild(CardWidget, 'CardWidget_7')
+        card_tts_speed.setVisible(checked)
+        if checked:
+            self.engine_selector.setEnabled(True)
+            if self.voice_selector.itemText(0) in ["未启用", "加载失败", "无可用语音"] or self.voice_selector.count() == 0:
+                self.voice_selector.clear()
+                self.voice_selector.addItem("加载中...", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(False)
+            current_engine = self.engine_selector.currentData()
+            if current_engine:
+                self.load_tts_voices_for_engine(current_engine)
+            else:
+                logger.warning("TTS启用但未选择引擎，无法加载语音")
+                self.voice_selector.clear()
+                self.voice_selector.addItem("请选择引擎", userData=None)
+                self.voice_selector.setEnabled(False)
+                self.switch_enable_TTS.setEnabled(True)
+        else:
+            self.engine_selector.setEnabled(False)
+            self.voice_selector.clear()
+            self.voice_selector.addItem("未启用", userData=None)
+            self.voice_selector.setEnabled(False)
+            self.switch_enable_TTS.setEnabled(True)
+            if self.tts_voice_loader_thread and self.tts_voice_loader_thread.isRunning():
+                self.tts_voice_loader_thread.requestInterruption()
+                self.tts_voice_loader_thread.quit()
+                if not self.tts_voice_loader_thread.wait(1000):
+                    logger.warning("TTS语音加载线程未能及时停止")
+
+    def save_tts_speed(self, value):
+        config_center.write_conf('TTS', 'speed', str(value))
+
+    def update_tts_voices(self, available_voices):
+        voice_selector = self.voice_selector
+        switch_enable_TTS = self.switch_enable_TTS
+        try:
+            if voice_selector.currentTextChanged.disconnect():
+                pass
+        except TypeError:
+            pass
+        except Exception as e:
+            logger.warning(f"断开voice_selector信号连接失败: {e}")
+        voice_selector.clear()
+
+        if not available_voices:
+            logger.warning("未找到可用的TTS语音引擎或语音包")
+            if voice_selector.count() == 0 or voice_selector.itemText(0) == "加载中...":
+                voice_selector.clear()
+                voice_selector.addItem("无可用语音", userData=None)
+                voice_selector.setEnabled(False)
+            switch_enable_TTS.setEnabled(True)
+            card_tts_speed = self.findChild(CardWidget, 'CardWidget_7')
+            if card_tts_speed: card_tts_speed.setVisible(False)
+
+        for voice in available_voices:
+            voice_selector.addItem(voice['name'], userData=voice['id'])
+        current_voice_id = config_center.read_conf('TTS', 'voice_id')
+        current_voice_name = get_voice_name_by_id(current_voice_id, available_voices)
+        if current_voice_name:
+            index_to_select = -1
+            for i in range(voice_selector.count()):
+                if voice_selector.itemData(i) == current_voice_id:
+                    index_to_select = i
+                    break
+            if index_to_select != -1:
+                voice_selector.setCurrentIndex(index_to_select)
+                config_center.write_conf('TTS', 'voice_id', current_voice_id)
+            else:
+                if available_voices:
+                    voice_selector.setCurrentIndex(0)
+                    first_voice_id = available_voices[0]['id']
+                    config_center.write_conf('TTS', 'voice_id', first_voice_id)
+                else:
+                    voice_selector.setEnabled(False)
+                    switch_enable_TTS.setEnabled(False)
+        elif available_voices: # 默认选择
+            voice_selector.setCurrentIndex(0)
+            first_voice_id = available_voices[0]['id']
+            config_center.write_conf('TTS', 'voice_id', first_voice_id)
+        else: # 理论不会到这里
+             voice_selector.setEnabled(False)
+             switch_enable_TTS.setEnabled(False)
+
+        voice_selector.setEnabled(True)
+        switch_enable_TTS.setEnabled(True)
+        voice_selector.currentTextChanged.connect(lambda name: config_center.write_conf('TTS', 'voice_id', voice_selector.currentData()) if voice_selector.currentData() else None)
+
+    def handle_tts_load_error(self, error_message):
+        if not self.voice_selector or not self.switch_enable_TTS:
+            logger.warning("voice_selector 或 switch_enable_TTS 未初始化")
+            return
+            
+        voice_selector = self.voice_selector
+        switch_enable_TTS = self.switch_enable_TTS
+        voice_selector.clear()
+        voice_selector.addItem("加载失败", userData=None)
+        voice_selector.setEnabled(False)
+        logger.error(f"处理TTS语音加载错误: {error_message}")
+        if self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
+            parent_widget = self.TTSSettingsDialog if isinstance(self.TTSSettingsDialog, QWidget) else self
+            MessageBox("TTS语音加载失败", f"加载TTS语音时发生错误:\n{error_message}", parent_widget)
+
     def setup_configs_interface(self):  # 配置界面
         cf_import_schedule = self.findChild(PushButton, 'im_schedule')
         cf_import_schedule.clicked.connect(self.cf_import_schedule)  # 导入课程表
@@ -1023,16 +1547,16 @@ class SettingsMenu(FluentWindow):
         check_update_btn.clicked.connect(self.check_update)
 
         self.auto_check_update = self.ifInterface.findChild(SwitchButton, 'auto_check_update')
-        self.auto_check_update.setChecked(int(config_center.read_conf("Other", "auto_check_update")))
+        self.auto_check_update.setChecked(int(config_center.read_conf("Version", "auto_check_update")))
         self.auto_check_update.checkedChanged.connect(
-            lambda checked: switch_checked("Other", "auto_check_update", checked)
+            lambda checked: switch_checked("Version", "auto_check_update", checked)
         )  # 自动检查更新
 
         self.version_channel = self.findChild(ComboBox, 'version_channel')
         self.version_channel.addItems(list_.version_channel)
-        self.version_channel.setCurrentIndex(int(config_center.read_conf("Other", "version_channel")))
+        self.version_channel.setCurrentIndex(int(config_center.read_conf("Version", "version_channel")))
         self.version_channel.currentIndexChanged.connect(
-            lambda: config_center.write_conf("Other", "version_channel", self.version_channel.currentIndex())
+            lambda: config_center.write_conf("Version", "version_channel", self.version_channel.currentIndex())
         )  # 版本更新通道
 
         github_page = self.findChild(PushButton, "button_github")
@@ -1065,8 +1589,12 @@ class SettingsMenu(FluentWindow):
         self.conf_combo = self.adInterface.findChild(ComboBox, 'conf_combo')
         self.conf_combo.clear()
         self.conf_combo.addItems(list_.get_schedule_config())
-        self.conf_combo.setCurrentIndex(
-            list_.get_schedule_config().index(config_center.read_conf('General', 'schedule')))
+        current_schedule = config_center.read_conf('General', 'schedule')
+        schedule_list = list_.get_schedule_config()
+        if current_schedule in schedule_list:
+            self.conf_combo.setCurrentIndex(schedule_list.index(current_schedule))
+        else:
+            self.conf_combo.setCurrentIndex(0) 
         self.conf_combo.currentIndexChanged.connect(self.ad_change_file)  # 切换配置文件
 
         conf_name = self.adInterface.findChild(LineEdit, 'conf_name')
@@ -1500,14 +2028,16 @@ class SettingsMenu(FluentWindow):
                     return 0
 
     def check_update(self):
-        self.version.setText(f'当前版本：{config_center.read_conf("Other", "version")}\n正在检查最新版本…')
         self.version_thread = VersionThread()
         self.version_thread.version_signal.connect(self.check_version)
         self.version_thread.start()
 
     def check_version(self, version):  # 检查更新
         if 'error' in version:
-            self.version.setText(f'当前版本：{config_center.read_conf("Other", "version")}\n{version["error"]}')
+            self.version_number_label.setText(f'版本号：获取失败！')
+            self.build_commit_label.setText(f'获取失败！')
+            self.build_uuid_label.setText(f'获取失败！')
+            self.build_date_label.setText(f'获取失败！')
 
             if utils.tray_icon:
                 utils.tray_icon.push_error_notification(
@@ -1516,15 +2046,26 @@ class SettingsMenu(FluentWindow):
                 )
             return False
 
-        channel = int(config_center.read_conf("Other", "version_channel"))
+        channel = int(config_center.read_conf("Version", "version_channel"))
         new_version = version['version_release' if channel == 0 else 'version_beta']
-        local_version = config_center.read_conf("Other", "version")
+        local_version = config_center.read_conf("Version", "version") or "0.0.0"
+        build_commit = config_center.read_conf("Version", "build_commit")
+        build_branch = config_center.read_conf("Version", "build_branch")
+        build_runid = config_center.read_conf("Version", "build_runid")
+        build_type = config_center.read_conf("Version", "build_type")
+        build_time = config_center.read_conf("Version", "build_time")
 
         logger.debug(f"服务端版本: {Version(new_version)}，本地版本: {Version(local_version)}")
         if Version(new_version) <= Version(local_version):
-            self.version.setText(f'当前版本：{local_version}\n当前为最新版本')
+            self.version_number_label.setText(f'版本号：{local_version}\n已是最新版本！')
+            self.build_commit_label.setText(f'{build_commit if build_commit != "__BUILD_COMMIT__" else "Debug"}({build_branch if build_branch != "__BUILD_BRANCH__" else "Debug"})')
+            self.build_uuid_label.setText(f'{build_runid if build_runid != "__BUILD_RUNID__" else "Debug"} - {build_type if build_type != "__BUILD_TYPE__" else "Debug"}')
+            self.build_date_label.setText(f'{build_time if build_time != "__BUILD_TIME__" else "Debug"}')
         else:
-            self.version.setText(f'当前版本：{local_version}\n最新版本：{new_version}')
+            self.version_number_label.setText(f'版本号：{local_version}\n可更新版本: {new_version}')
+            self.build_commit_label.setText(f'{build_commit if build_commit != "__BUILD_COMMIT__" else "Debug"}({build_branch if build_branch != "__BUILD_BRANCH__" else "Debug"})')
+            self.build_uuid_label.setText(f'{build_runid if build_runid != "__BUILD_RUNID__" else "Debug"} - {build_type if build_type != "__BUILD_TYPE__" else "Debug"}')
+            self.build_date_label.setText(f'{build_time if build_time != "__BUILD_TIME__" else "Debug"}')
 
             if utils.tray_icon:
                 utils.tray_icon.push_update_notification(f"新版本速递：{new_version}")
@@ -1744,25 +2285,82 @@ class SettingsMenu(FluentWindow):
             print(f'切换配置文件时发生错误：{e}')
             logger.error(f'切换配置文件时发生错误：{e}')
 
+    def check_and_disable_schedule_edit(self):
+        """检查是否存在调休状态，如果存在则禁用课程表编辑功能"""
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+        is_adjusted = bool(adjusted_classes)
+
+        if is_adjusted:
+            se_set_button = self.findChild(ToolButton, 'set_button')
+            se_clear_button = self.findChild(ToolButton, 'clear_button')
+            se_class_kind_combo = self.findChild(ComboBox, 'class_combo')
+            se_custom_class_text = self.findChild(LineEdit, 'custom_class')
+            se_save_button = self.findChild(PrimaryPushButton, 'save_schedule')
+            se_copy_schedule_button = self.findChild(PushButton, 'copy_schedule')
+            quick_set_schedule = self.findChild(ListWidget, 'subject_list')
+            quick_select_week_button = self.findChild(PushButton, 'quick_select_week')
+            se_set_button.setEnabled(False)
+            se_clear_button.setEnabled(False)
+            se_class_kind_combo.setEnabled(False)
+            se_custom_class_text.setEnabled(False)
+            se_save_button.setEnabled(False)
+            se_copy_schedule_button.setEnabled(False)
+            quick_set_schedule.setEnabled(False)
+            quick_select_week_button.setEnabled(False)
+
+    def check_and_disable_timeline_edit(self):
+        """检查是否存在调休状态，如果存在则禁用时间线编辑功能"""
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+        is_adjusted = bool(adjusted_classes)
+        if is_adjusted:
+            te_add_button = self.findChild(ToolButton, 'add_button')
+            te_add_part_button = self.findChild(ToolButton, 'add_part_button')
+            te_delete_part_button = self.findChild(ToolButton, 'delete_part_button')
+            te_edit_button = self.findChild(ToolButton, 'edit_button')
+            te_delete_button = self.findChild(ToolButton, 'delete_button')
+            te_save_button = self.findChild(PrimaryPushButton, 'save')
+            te_add_button.setEnabled(False)
+            te_add_part_button.setEnabled(False)
+            te_delete_part_button.setEnabled(False)
+            te_edit_button.setEnabled(False)
+            te_delete_button.setEnabled(False)
+            te_save_button.setEnabled(False)
+
     def sp_fill_grid_row(self):  # 填充预览表格
         subtitle = self.findChild(SubtitleLabel, 'subtitle_file')
-        subtitle.setText(f'预览  -  {config_center.schedule_name[:-5]}')
+        adjusted_classes = schedule_center.schedule_data.get('adjusted_classes', {})
+
         sp_week_type_combo = self.findChild(ComboBox, 'pre_week_type_combo')
-        schedule_view = self.findChild(TableWidget, 'schedule_view')
-        schedule_view.setRowCount(sp_get_class_num())
         if sp_week_type_combo.currentIndex() == 1:
             schedule_dict_sp = schedule_even_dict
+            week_type = 'even'
         else:
             schedule_dict_sp = schedule_dict
+            week_type = 'odd'
+        is_adjusted = any(adjusted_classes.get(f'{week_type}_{i}', False) for i in range(len(schedule_dict_sp)))
+        schedule_name = config_center.schedule_name[:-5]
+        if is_adjusted:
+            subtitle.setText(f'预览  -  [调休] {schedule_name}')
+        else:
+            subtitle.setText(f'预览  -  {schedule_name}')
+        schedule_view = self.findChild(TableWidget, 'schedule_view')
+        schedule_view.setRowCount(sp_get_class_num())
+
         for i in range(len(schedule_dict_sp)):  # 周数
             for j in range(len(schedule_dict_sp[str(i)])):  # 一天内全部课程
                 item_text = schedule_dict_sp[str(i)][j].split('-')[0]
                 if item_text != '未添加':
-                    item = QTableWidgetItem(item_text)
+                    if adjusted_classes.get(f'{week_type}_{i}', False):
+                        item = QTableWidgetItem(f'{item_text}')
+                        color = themeColor()
+                        color.setAlpha(64)
+                        item.setBackground(color)
+                    else:
+                        item = QTableWidgetItem(item_text)
                 else:
                     item = QTableWidgetItem('')
                 schedule_view.setItem(j, i, item)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置单元格文本居中对齐
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
     # 加载时间线
     def te_load_item(self):
@@ -2369,6 +2967,8 @@ class SettingsMenu(FluentWindow):
     def init_window(self):
         self.stackedWidget.setCurrentIndex(0)  # 设置初始页面
         self.load_all_item()
+        self.check_and_disable_schedule_edit()
+        self.check_and_disable_timeline_edit()
         self.setMinimumWidth(700)
         self.setMinimumHeight(400)
         self.navigationInterface.setExpandWidth(250)

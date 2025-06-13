@@ -28,8 +28,18 @@
     "attend_class": 1,
     "finish_class": 1,
     "prepare_class": 1,
-    "after_school": 1,
-    "smooth_volume": 0
+    "after_school": 1
+  },
+  "TTS": {
+    "enable": 0,
+    "engine": "edge",
+    "voice_id": "",
+    "speed": 50,
+    "attend_class": "活动开始, {lesson_name}",
+    "finish_class": "活动结束, 下一节课 {lesson_name}",
+    "prepare_class": "活动即将开始, 下一节课 {lesson_name}",
+    "after_school": "活动全部结束",
+    "otherwise": ""
   },
   "Weather": {
     "city": 0,
@@ -66,14 +76,21 @@
     "temp_schedule": "",
     "set_schedule": ""
   },
+  "Version": {
+    "version": "v1.1.7.2",
+    "version_channel": 0,
+    "auto_check_update": 1,
+    "cses_version": 1,
+    "build_time": "__BUILD_TIME__",
+    "build_commit": "__BUILD_COMMIT__",
+    "build_branch": "__BUILD_BRANCH__",
+    "build_runid": "__BUILD_RUNID__",
+    "build_type": "__BUILD_TYPE__"
+  },
   "Other": {
     "do_not_log": 0,
     "safe_mode": 0,
     "initialstartup": 1,
-    "multiple_programs": 0,
-    "version_channel": 0,
-    "auto_check_update": 1,
-    "cses_version": 1,
-    "version": "v1.1.7.2"
+    "multiple_programs": 0
   }
 }

@@ -270,7 +270,8 @@ def convert_schedule(check_data):  # 转换课表
         logger.warning('此课程表格式不支持单双周')
         check_data['schedule_even'] = {str(i): [] for i in range(0, 6)}
 
-    if len(check_data.get('part').get('0')) == 2:
+    part_data = check_data.get('part')
+    if part_data and len(part_data.get('0', [])) == 2:
         logger.warning('此课程表格式不支持休息段')
         for i in range(len(check_data.get('part'))):
             check_data['part'][str(i)].append('节点')

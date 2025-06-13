@@ -413,9 +413,9 @@ def check_version(version):  # 检查更新
         )
         return False
     
-    channel = int(config_center.read_conf("Other", "version_channel"))
+    channel = int(config_center.read_conf("Version", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
-    local_version = config_center.read_conf("Other", "version")
+    local_version = config_center.read_conf("Version", "version")
     logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
     if Version(server_version) > Version(local_version):
         utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
@@ -432,8 +432,8 @@ class weatherReportThread(QThread):  # 获取最新天气信息
             self.weather_signal.emit(weather_data)
         except Exception as e:
             logger.error(f"触发天气信息失败: {e}")
-        finally:
-            self.deleteLater()
+        # finally:
+        #     self.deleteLater()  # 暂时移除
 
     @staticmethod
     def get_weather_data():

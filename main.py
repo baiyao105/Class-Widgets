@@ -25,46 +25,6 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
     Dialog, ProgressRing, PlainTextEdit, ImageLabel, PushButton, InfoBarIcon, Flyout, FlyoutAnimationType, CheckBox, \
     PrimaryPushButton, IconWidget
 
-# patch: 由于 deregister 错误绑定造成的更改主题访问已删除元素
-import qfluentwidgets.common.style_sheet as qss
-
-class StyleSheetManager(qss.StyleSheetManager):
-
-    def register(self, source, widget: QWidget, reset=True):
-        from qfluentwidgets import StyleSheetFile, StyleSheetCompose, CustomStyleSheet
-        from qfluentwidgets.common.style_sheet import CustomStyleSheetWatcher, DirtyStyleSheetWatcher
-        """ register widget to manager
-
-        Parameters
-        ----------
-        source: str | StyleSheetBase
-            qss source, it could be:
-            * `str`: qss file path
-            * `StyleSheetBase`: style sheet instance
-
-        widget: QWidget
-            the widget to set style sheet
-
-        reset: bool
-            whether to reset the qss source
-        """
-        if isinstance(source, str):
-            source = StyleSheetFile(source)
-
-        if widget not in self.widgets:
-            widget.destroyed.connect(lambda: self.deregister(widget))
-            widget.installEventFilter(CustomStyleSheetWatcher(widget))
-            widget.installEventFilter(DirtyStyleSheetWatcher(widget))
-            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
-
-        if not reset:
-            self.source(widget).add(source)
-        else:
-            self.widgets[widget] = StyleSheetCompose([source, CustomStyleSheet(widget)])
-
-qss.styleSheetManager = StyleSheetManager()
-# end of patch
-
 import conf
 import list_
 import tip_toast
@@ -496,28 +456,13 @@ def get_next_lessons():
                     c_time += dt.timedelta(minutes=add_time)
 
 
-def get_next_lessons_text():
+def get_next_lessons_text() -> str: 
     if not next_lessons:
-        cache_text = '当前暂无课程'
-    else:
-        cache_text = ''
-        if len(next_lessons) >= 5:
-            range_time = 5
-        else:
-            range_time = len(next_lessons)
-        for i in range(range_time):
-            if range_time > 2:
-                if next_lessons[i] != '暂无课程':
-                    cache_text += f'{list_.get_subject_abbreviation(next_lessons[i])}  '  # 获取课程简称
-                else:
-                    cache_text += f'无  '
-            else:
-                if next_lessons[i] != '暂无课程':
-                    cache_text += f'{next_lessons[i]}  '
-                else:
-                    cache_text += f'暂无  '
-    return cache_text
-
+        return '当前暂无课程'
+    MAX_DISPLAY_LENGTH = 16
+    if utils.get_str_length(full_text := (' '.join(next_lessons))) <= MAX_DISPLAY_LENGTH:
+        return full_text
+    return ' '.join([list_.get_subject_abbreviation(x) for x in next_lessons[:5]])
 
 # 获取当前活动
 def get_current_lesson_name():
@@ -547,19 +492,17 @@ def get_current_lesson_name():
                             current_state = 0
                         return
 
-def get_hide_status_from_current_state():
+def get_hide_status():
     # 1 -> hide, 0 -> show
     # 满分啦（
     # 祝所有用 Class Widgets 的、不用 Class Widgets 的学子体测满分啊（（
     global current_state, current_lesson_name, excluded_lessons
-    # if current_state:
-    #     if not current_lesson_name in excluded_lessons:
-    #         return 0
-    #     else:
-    #         return 1
-    # else:
-    #     return 1
-    return current_state ^ (current_lesson_name in excluded_lessons)
+    return 1 if {
+        '0': lambda: 0,
+        '1': lambda: current_state,
+        '2': lambda: check_windows_maximize() or check_fullscreen(),
+        '3': lambda: current_state
+    }[config_center.read_conf('General', 'hide')]() and not (current_lesson_name in excluded_lessons) else 0
 
 
 # 定义 RECT 结构体
@@ -828,7 +771,7 @@ class PluginMethod:  # 插件方法
     @staticmethod
     def send_notification(state=1, lesson_name='示例课程', title='通知示例', subtitle='副标题',
                           content='这是一条通知示例', icon=None, duration=2000):  # 发送通知
-        notification.main(state, lesson_name, title, subtitle, content, icon, duration)
+        notification.push_notification(state, lesson_name, title, subtitle, content, icon, duration)
 
     @staticmethod
     def subprocess_exec(title, action):  # 执行系统命令
@@ -1440,7 +1383,7 @@ class FloatingWidget(QWidget):  # 浮窗
 
     def update_data(self):
         time_color = QColor(f'#{config_center.read_conf("Color", "floating_time")}')
-        self.activity_countdown.setStyleSheet(f"color: {time_color.name()};")
+        self.activity_countdown.setStyleSheet(f"color: {time_color.name()}; background: transparent")
         if self.animating:  # 执行动画时跳过更新
             return
         if platform.system() == 'Windows' and platform.release() != '7':
@@ -1581,11 +1524,14 @@ class FloatingWidget(QWidget):  # 浮窗
         if platform.system() == "Darwin":
             curve = QEasingCurve.Type.OutQuad
             duration = int(duration * 0.85)
-        elif platform.system() == "Windows":
+        curve = QEasingCurve.Type.Linear
+        if platform.system() == "Windows":
             curve = QEasingCurve.Type.OutCubic
             if current_pos.y() > screen_center_y:
                 duration += 50  # 底部移动稍慢
             curve = QEasingCurve.Type.InOutQuad
+        elif platform.system() == "Darwin":
+            curve = QEasingCurve.Type.InOutQuad # macOS 也用这个吧
         
         self.animation = QPropertyAnimation(self, b"windowOpacity")
         self.animation.setDuration(int(duration * 1.15))
@@ -1671,9 +1617,9 @@ class FloatingWidget(QWidget):  # 浮窗
                 else:
                     mgr.show_windows()
                     mgr.hide_status = (current_state, 0)
-            elif hide_mode == '1': 
+            elif hide_mode == '0': 
                 mgr.show_windows()
-            self.close()
+                self.close()
 
     def focusInEvent(self, event):
         self.focusing = True
@@ -1806,11 +1752,11 @@ class DesktopWidget(QWidget):  # 主要小组件
             
             self.showing_temperature = True  # 跟踪状态(预警/气温)
 
-            self.get_weather_data()
             self.weather_timer = QTimer(self)
             self.weather_timer.setInterval(30 * 60 * 1000)  # 30分钟更新一次
             self.weather_timer.timeout.connect(self.get_weather_data)
             self.weather_timer.start()
+            self.get_weather_data()
             update_timer.add_callback(self.detect_weather_code_changed)
 
         if hasattr(self, 'img'):  # 自定义图片主题兼容
@@ -1879,10 +1825,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         # 设置窗口无边框和透明背景
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        if config_center.read_conf('General', 'hide') == '2' or (not int(config_center.read_conf('General', 'enable_click'))):
-            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        else:
-            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, config_center.read_conf('General', 'enable_click') == '0')
 
         if config_center.read_conf('General', 'pin_on_top') == '1':  # 置顶
             self.setWindowFlags(
@@ -2079,15 +2022,10 @@ class DesktopWidget(QWidget):  # 主要小组件
         get_current_lesson_name()
         get_excluded_lessons()
         get_next_lessons()
-        hide_status = get_hide_status_from_current_state()
+        hide_status = get_hide_status()
 
-        if (hide_mode:=config_center.read_conf('General', 'hide')) == '1':  # 上课自动隐藏
+        if (hide_mode:=config_center.read_conf('General', 'hide')) in ['1','2']:  # 上课自动隐藏
             if hide_status:
-                mgr.decide_to_hide()
-            else:
-                mgr.show_windows()
-        elif hide_mode == '2': # 最大化/全屏自动隐藏
-            if check_windows_maximize() or check_fullscreen():
                 mgr.decide_to_hide()
             else:
                 mgr.show_windows()
@@ -2165,9 +2103,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self):
         logger.info('获取天气数据')
-        self.weather_thread = weatherReportThread()
-        self.weather_thread.weather_signal.connect(self.update_weather_data)
-        self.weather_thread.start()
+        if not hasattr(self, 'weather_thread') or not self.weather_thread.isRunning():
+            self.weather_thread = weatherReportThread()
+            self.weather_thread.weather_signal.connect(self.update_weather_data)
+            self.weather_thread.start()
 
     def detect_weather_code_changed(self):
         current_code = config_center.read_conf('Weather')
@@ -2176,12 +2115,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.get_weather_data()
 
     def toggle_weather_alert(self):
-        if not hasattr(self, 'weather_alert_level') or not self.weather_alert_level:
-            # logger.warning("未获取到天气预警等级")
-            return
-        if not hasattr(self, 'weather_alert_text') or not self.weather_alert_text.text():
-            # logger.warning("未获取到天气预警文本")
-            return
         if self.showing_temperature:
             # 切换预警
             self.weather_alert_animation.setStartValue(0.0)
@@ -2232,21 +2165,36 @@ class DesktopWidget(QWidget):  # 主要小组件
             except TypeError: pass
 
             def _start_alert_fade_in():
-                if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon() is not None and not self.alert_icon.icon().isNull():
+                if hasattr(self, 'weather_alert_text') and self.weather_alert_text.text():
                     self.weather_icon.hide()
                     self.temperature.hide()
                     self.weather_alert_opacity.setOpacity(0.0)
-                    self.alert_icon_opacity.setOpacity(0.0)
                     self.weather_alert_text.show()
-                    self.alert_icon.show()
-                    self.fade_in_group.start()
+                    if hasattr(self, 'alert_icon') and isinstance(self.alert_icon, IconWidget) and self.alert_icon.icon is not None and not self.alert_icon.icon.isNull():
+                        self.alert_icon_opacity.setOpacity(0.0)
+                        self.alert_icon.show()
+                        self.fade_in_group.start()
+                    else:
+                        self.alert_icon.hide() # 隐藏图标
+                        self.weather_alert_text.move(self.weather_icon.pos())
+                        self.weather_alert_text.setGraphicsEffect(self.weather_alert_opacity)
+                        alert_text_fade_in = QPropertyAnimation(self.weather_alert_opacity, b'opacity')
+                        alert_text_fade_in.setDuration(700)
+                        alert_text_fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+                        alert_text_fade_in.setStartValue(0.0)
+                        alert_text_fade_in.setEndValue(1.0)
+                        alert_text_fade_in.start()
+
                     self.weather_info_timer.start(3000)
                 else:
+                    # 没有预警文本显示天气图标和温度
                     self.weather_icon.show()
                     self.temperature.show()
                     if hasattr(self, 'weather_opacity'): self.weather_opacity.setOpacity(1.0)
                     if hasattr(self, 'temperature_opacity'): self.temperature_opacity.setOpacity(1.0)
                     self.showing_temperature = True
+                    self.alert_icon.hide()
+
 
             self.fade_out_group.finished.connect(_start_alert_fade_in)
 
@@ -2761,7 +2709,13 @@ def init():
     update_timer.add_callback(mgr.update_widgets)
     update_timer.start()
 
-    logger.info(f'Class Widgets 初始化完成。版本: {config_center.read_conf("Other", "version")}')
+    version = config_center.read_conf("Version", "version")
+    build_uuid = config_center.read_conf("Version", "build_runid") or "(Debug)"
+    build_type = config_center.read_conf("Version", "build_type")
+    if "__BUILD_RUNID__" in build_uuid or "__BUILD_TYPE__" in build_type:
+        logger.success(f'Class Widgets 初始化完成。版本: {version} - (Debug)')
+    else:
+        logger.success(f'Class Widgets 初始化完成。版本: {version} Build UUID: {build_uuid}({build_type})')
     p_loader.run_plugins()  # 运行插件
 
     first_start = False
@@ -2903,7 +2857,7 @@ if __name__ == '__main__':
 
         # w = ErrorDialog()
         # w.exec()
-        if config_center.read_conf('Other', 'auto_check_update') == '1':
+        if config_center.read_conf('Version', 'auto_check_update') == '1':
             check_update()
 
     status = app.exec()
