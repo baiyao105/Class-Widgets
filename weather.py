@@ -699,7 +699,7 @@ class WeatherDatabase:
         current_api = self.weather_manager.get_current_api()
         api_params = self.weather_manager.api_config.get('weather_api_parameters', {})
         db_name = api_params.get(current_api, {}).get('database', 'xiaomi_weather.db')
-        self.db_path = f'{base_directory}/config/data/{db_name}'
+        self.db_path = os.path.join(base_directory, 'config', 'data', db_name)
         return self.db_path
     
     def search_city_by_name(self, search_term: str) -> List[str]:
@@ -801,7 +801,7 @@ class WeatherDataProcessor:
             return self._status_cache[api_name]
         
         try:
-            with open(f"{base_directory}/config/data/{api_name}_status.json", 'r', encoding='utf-8') as f:
+            with open(os.path.join(base_directory, 'config', 'data', f'{api_name}_status.json'), 'r', encoding='utf-8') as f:
                 status_data = json.load(f)
                 self._status_cache[api_name] = status_data
                 return status_data
@@ -835,16 +835,16 @@ class WeatherDataProcessor:
         
         if not weather_code:
             logger.error(f'未找到天气代码 {code}')
-            return f'{base_directory}/img/weather/99.svg'
+            return os.path.join(base_directory, 'img', 'weather', '99.svg')
         
         # 根据时间和天气类型选择图标
         if weather_code in ('0', '1', '3', '13'):  # 晴、多云、阵雨、阵雪
             if current_time.hour < 6 or current_time.hour >= 18:  # 夜间
-                return f'{base_directory}/img/weather/{weather_code}d.svg'
-        icon_path = f'{base_directory}/img/weather/{weather_code}.svg'
+                return os.path.join(base_directory, 'img', 'weather', f'{weather_code}d.svg')
+        icon_path = os.path.join(base_directory, 'img', 'weather', f'{weather_code}.svg')
         if not os.path.exists(icon_path):
             logger.warning(f'天气图标文件不存在: {icon_path}')
-            return f'{base_directory}/img/weather/99.svg'
+            return os.path.join(base_directory, 'img', 'weather', '99.svg')
             
         return icon_path
     
@@ -862,11 +862,11 @@ class WeatherDataProcessor:
         
         if weather_code in ('0', '1', '3', '99', '900'):  # 晴、多云、阵雨、未知
             if 6 <= current_time.hour < 18:  # 日间
-                return 'img/weather/bkg/day.png'
+                return os.path.join('img', 'weather', 'bkg', 'day.png')
             else:  # 夜间
-                return 'img/weather/bkg/night.png'
+                return os.path.join('img', 'weather', 'bkg', 'night.png')
         
-        return 'img/weather/bkg/rain.png'
+        return os.path.join('img', 'weather', 'bkg', 'rain.png')
     
     def get_weather_code_by_description(self, description: str, api_name: Optional[str] = None) -> str:
         """根据天气描述获取天气代码"""
@@ -880,13 +880,13 @@ class WeatherDataProcessor:
         """获取天气预警图标路径"""
         provider = self.weather_manager.get_current_provider()
         if not provider or not provider.supports_alerts():
-            return f'{base_directory}/img/weather/alerts/blue.png'
+            return os.path.join(base_directory, 'img', 'weather', 'alerts', 'blue.png')
         
         alerts_config = provider.config.get('alerts', {})
         alerts_types = alerts_config.get('types', {})
         
         icon_name = alerts_types.get(alert_type, 'blue.png')
-        return f'{base_directory}/img/weather/alerts/{icon_name}'
+        return os.path.join(base_directory, 'img', 'weather', 'alerts', icon_name)
     
     def is_alert_supported(self) -> bool:
         """检查当前api是否支持天气预警"""
