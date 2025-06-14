@@ -352,7 +352,7 @@ class GenericWeatherProvider(WeatherapiProvider):
                 return None
             
             url = alert_url.format(location_key=location_key, key=api_key)
-            #logger.debug(f'{self.api_name} 预警请求URL: {url.replace(api_key, "***" if api_key else "(空)")}')
+            # logger.debug(f'{self.api_name} 预警请求URL: {url.replace(api_key, "***" if api_key else "(空)")}')
             response = requests.get(url, proxies=proxies, timeout=10)
             response.raise_for_status()
             return response.json()
@@ -522,8 +522,6 @@ class QWeatherProvider(GenericWeatherProvider):
             
             if temp is not None:
                 return f"{temp}°"
-            
-            logger.error(f"和风天气api温度数据为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析和风天气温度失败: {e}")
@@ -538,8 +536,6 @@ class QWeatherProvider(GenericWeatherProvider):
             
             if icon_code is not None:
                 return str(icon_code)
-            
-            logger.error(f"和风天气api图标代码为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析和风天气图标失败: {e}")
@@ -569,7 +565,7 @@ class QWeatherProvider(GenericWeatherProvider):
             from network_thread import proxies
             # 和风天气预警API
             alert_url = f"https://devapi.qweather.com/v7/warning/now?location={location_key}&key={api_key}"
-            logger.debug(f'和风天气预警请求URL: {alert_url.replace(api_key, "***" if api_key else "(空)")}')
+            # logger.debug(f'和风天气预警请求URL: {alert_url.replace(api_key, "***" if api_key else "(空)")}')
             
             response = requests.get(alert_url, proxies=proxies, timeout=10)
             response.raise_for_status()
@@ -582,15 +578,12 @@ class QWeatherProvider(GenericWeatherProvider):
         """解析和风天气预警数据"""
         alerts = []
         try:
-            # 检查API响应状态
             if data.get('code') != '200':
                 logger.warning(f"和风天气预警API返回错误: {data.get('code')}")
                 return alerts
-            
-            # 解析预警列表
             warning_list = data.get('warning', [])
             if not warning_list:
-                logger.debug("和风天气: 当前无预警信息")
+                #logger.debug("和风天气: 当前无预警信息")
                 return alerts
             
             for warning in warning_list:
@@ -643,8 +636,6 @@ class AmapWeatherProvider(GenericWeatherProvider):
                 temp = lives[0].get('temperature')
                 if temp is not None:
                     return f"{temp}°"
-            
-            logger.error(f"高德天气api温度数据为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析高德天气温度失败: {e}")
@@ -659,8 +650,6 @@ class AmapWeatherProvider(GenericWeatherProvider):
                 weather = lives[0].get('weather')
                 if weather is not None:
                     return str(weather)
-            
-            logger.error(f"高德天气api图标代码为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析高德天气图标失败: {e}")
@@ -694,8 +683,6 @@ class QQWeatherProvider(GenericWeatherProvider):
                 temp = realtime[0].get('infos', {}).get('temp')
                 if temp is not None:
                     return f"{temp}°"
-            
-            logger.error(f"腾讯天气api温度数据为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析腾讯天气温度失败: {e}")
@@ -710,8 +697,6 @@ class QQWeatherProvider(GenericWeatherProvider):
                 weather_code = realtime[0].get('infos', {}).get('weather_code')
                 if weather_code is not None:
                     return str(weather_code)
-            
-            logger.error(f"腾讯天气api图标代码为空: {data}")
             return None
         except Exception as e:
             logger.error(f"解析腾讯天气图标失败: {e}")

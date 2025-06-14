@@ -2389,6 +2389,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.current_alert_index = 0
 
             weather_name = db.get_weather_by_code(db.get_weather_data('icon', weather_data))
+            temp_data = db.get_weather_data('temp', weather_data)
+            if temp_data and temp_data.lower() != 'none':
+                temperature = temp_data
+            else:
+                temperature = '--°'
             current_city = self.findChild(QLabel, 'current_city')
             try:
                 self.weather_icon.setPixmap(
@@ -2411,7 +2416,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                     self.weather_alert_text.hide()
                     self.alert_icon.hide()
 
-                self.temperature.setText(f"{db.get_weather_data('temp', weather_data)}")
+                temp_data = db.get_weather_data('temp', weather_data)
+                if temp_data and temp_data.lower() != 'none':
+                    self.temperature.setText(temp_data)
+                else:
+                    self.temperature.setText('--°')
                 current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · "
                                      f"{weather_name}")
                 path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace('\\', '/')
@@ -2435,9 +2444,10 @@ class DesktopWidget(QWidget):  # 主要小组件
                     if current_city:
                         current_city.setText(f"{db.search_by_num(config_center.read_conf('Weather', 'city'))} · 未知")
                     if hasattr(self, 'backgnd'):
+                        path = db.get_weather_stylesheet('99').replace('\\', '/')
                         update_stylesheet = re.sub(
-                            r'border-image: url\((.*?)\);',
-                            f"border-image: url({db.get_weather_stylesheet('99')});",
+                            r'border-image: url\([^)]*\);',
+                            f"border-image: url({path});",
                             self.backgnd.styleSheet()
                         )
                         self.backgnd.setStyleSheet(update_stylesheet)
