@@ -2309,7 +2309,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.weather_alert_text.setText(alert_text)
         self.weather_alert_text.setAlignment(Qt.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
-        if hasattr(self, 'alert_icon') and hasattr(self.alert_icon, 'setIcon'):
+        if hasattr(self, 'alert_icon'):
             icon_path = self._get_alert_icon_by_severity(severity)
             if icon_path:
                 self.alert_icon.setIcon(QIcon(icon_path))

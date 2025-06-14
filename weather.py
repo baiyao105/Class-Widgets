@@ -932,7 +932,17 @@ class WeatherDataProcessor:
         alerts_config = provider.config.get('alerts', {})
         alerts_types = alerts_config.get('types', {})
         
-        icon_name = alerts_types.get(alert_type, 'blue.png')
+        color_mapping = {
+            'blue': '蓝色',
+            'yellow': '黄色', 
+            'orange': '橙色',
+            'red': '红色'
+        }
+        icon_name = alerts_types.get(alert_type)
+        if not icon_name and alert_type in color_mapping:
+            icon_name = alerts_types.get(color_mapping[alert_type])
+        if not icon_name:
+            icon_name = 'blue.png'
         return os.path.join(base_directory, 'img', 'weather', 'alerts', icon_name)
     
     def is_alert_supported(self) -> bool:
