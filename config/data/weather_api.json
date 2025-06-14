@@ -29,7 +29,7 @@
       "icon": "now.icon",
       "alerts": {
         "url": "https://devapi.qweather.com/v7/warning/now?location={location_key}&key={key}",
-        "title": "warning.title",
+        "title": "warning.0.title",
         "description": "warning.0.text",
         "type": "warning.0.severityColor",
         "types": {

@@ -31,8 +31,8 @@ import list_ as list_
 import tip_toast
 import utils
 from utils import update_tray_tooltip
-import weather_db
-import weather_db as wd
+import weather
+import weather as wd
 from conf import base_directory
 from cses_mgr import CSES_Converter
 from generate_speech import get_tts_voices, get_voice_id_by_name, get_voice_name_by_id, get_available_engines
@@ -1275,13 +1275,13 @@ class SettingsMenu(FluentWindow):
         )
 
         select_weather_api = self.findChild(ComboBox, 'select_weather_api')  # 天气API选择
-        select_weather_api.addItems(weather_db.api_config['weather_api_list_zhCN'])
-        select_weather_api.setCurrentIndex(weather_db.api_config['weather_api_list'].index(
+        select_weather_api.addItems(weather.weather_manager.api_config['weather_api_list_zhCN'])
+        select_weather_api.setCurrentIndex(weather.weather_manager.api_config['weather_api_list'].index(
             config_center.read_conf('Weather', 'api')
         ))
         select_weather_api.currentIndexChanged.connect(
             lambda: config_center.write_conf('Weather', 'api',
-                                             weather_db.api_config['weather_api_list'][
+                                             weather.weather_manager.api_config['weather_api_list'][
                                                  select_weather_api.currentIndex()])
         )
 
