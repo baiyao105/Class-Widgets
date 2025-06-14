@@ -7,6 +7,7 @@ import datetime
 import time
 import requests
 import os
+import re
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Union
 from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
@@ -161,7 +162,13 @@ class WeatherManager:
                     'database': api_params.get('database', 'xiaomi_weather.db'),
                     'return_desc': api_params.get('return_desc', False)
                 }
-                provider_class_name = f'{api_name.capitalize()}WeatherProvider'
+                if api_name == 'xiaomi_weather':
+                    provider_class_name = 'XiaomiWeatherProvider'
+                elif api_name == 'qweather':
+                    provider_class_name = 'QWeatherProvider'
+                else:
+                    provider_class_name = f'{api_name.capitalize()}WeatherProvider'
+                
                 if provider_class_name in globals():
                     provider_class = globals()[provider_class_name]
                 else:
@@ -461,6 +468,45 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             logger.error(f"解析小米天气描述失败: {e}")
             return None
     
+    def fetch_weather_alerts(self, location_key: str, api_key: str) -> Optional[Dict[str, Any]]:
+        """获取小米天气预警数据"""
+        try:
+            weather_data = self.fetch_current_weather(location_key, api_key)
+            if weather_data:
+                alerts = self.parse_weather_alerts(weather_data)
+                if alerts:
+                    result = {'warning': alerts}
+                    return result
+            return None
+        except Exception as e:
+            return None
+    
+    def parse_weather_alerts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """解析小米天气预警数据"""
+        alerts = []
+        try:
+            alerts_data = data.get('alerts', [])
+            
+            if not alerts_data:
+                return alerts
+            
+            for i, alert_item in enumerate(alerts_data):
+                if isinstance(alert_item, dict):
+                    alert = {
+                        'id': alert_item.get('alertId', ''),
+                        'title': alert_item.get('title', ''),
+                        'level': alert_item.get('level', ''),
+                        'detail': alert_item.get('detail', ''),
+                        'start_time': alert_item.get('pubTime', ''),
+                        'end_time': alert_item.get('end_time', ''),
+                        'type': alert_item.get('type', ''),
+                        'description': alert_item.get('detail', '')
+                    }
+                    alerts.append(alert)
+            return alerts
+            
+        except Exception as e:
+            return alerts
 
 
 
@@ -806,7 +852,7 @@ class WeatherDataProcessor:
                 self._status_cache[api_name] = status_data
                 return status_data
         except Exception as e:
-            logger.error(f'加载天气状态配置失败 ({api_name}): {e}')
+            logger.error(f'加载天气状态配置失败: {e}')
             return {'weatherinfo': []}
     
     def get_weather_by_code(self, code: str, api_name: Optional[str] = None) -> str:
@@ -814,6 +860,7 @@ class WeatherDataProcessor:
         weather_status = self._load_weather_status(api_name)
         for weather in weather_status.get('weatherinfo', []):
             if str(weather.get('code')) == str(code):
+                # logger.debug(f'天气代码 {code} 对应的天气描述为: {weather.get("wea", "未知")}')
                 return weather.get('wea', '未知')
         return '未知'
     
@@ -834,7 +881,7 @@ class WeatherDataProcessor:
                 break
         
         if not weather_code:
-            logger.error(f'未找到天气代码 {code}')
+            logger.error(f'未找到天气代码({api_name}) {code}')
             return os.path.join(base_directory, 'img', 'weather', '99.svg')
         
         # 根据时间和天气类型选择图标
@@ -928,6 +975,9 @@ class WeatherDataProcessor:
         
         if isinstance(provider, QWeatherProvider):
             return self._extract_qweather_alert_data(key, weather_data)
+        elif isinstance(provider, XiaomiWeatherProvider):
+            return self._extract_xiaomi_alert_data(key, weather_data)
+        
         alerts_config = provider.config.get('alerts', {})
         if key == 'alert':
             path = alerts_config.get('type', '')
@@ -967,33 +1017,61 @@ class WeatherDataProcessor:
             logger.error(f"提取和风天气预警数据失败: {e}")
             return None
     
+    def _extract_xiaomi_alert_data(self, key: str, weather_data: Dict[str, Any]) -> Optional[str]:
+        """提取小米天气预警数据"""
+        try:
+            # 预警数据alert.warning
+            alert_data = weather_data.get('alert', {})
+            if not alert_data or 'warning' not in alert_data:
+                return None
+            alerts_data = alert_data.get('warning', [])
+            if not alerts_data or not isinstance(alerts_data, list):
+                return None
+            first_alert = alerts_data[0]
+            if not isinstance(first_alert, dict):
+                return None
+            result = None
+            if key == 'alert':
+                result = first_alert.get('level', '')
+            elif key == 'alert_title':
+                result = first_alert.get('title', '')
+            elif key == 'alert_desc':
+                result = first_alert.get('detail', '')
+            else:
+                return None
+            return result
+                
+        except Exception as e:
+            return None
+    
     def get_weather_alerts(self, weather_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """获取所有预警信息"""
         provider = self.weather_manager.get_current_provider()
         if not provider or not provider.supports_alerts():
             return []
         
-        # 处理和风天气提供商
         if isinstance(provider, QWeatherProvider):
             alert_data = weather_data.get('alert', {})
             if hasattr(provider, 'parse_weather_alerts'):
                 return provider.parse_weather_alerts(alert_data)
         
-        # 处理通用提供商(包括小米天气等)
-        # 对于测试场景，我们需要能够处理和风天气格式的数据
+        if isinstance(provider, XiaomiWeatherProvider):
+            alert_data = weather_data.get('alert', {})
+            
+            if alert_data and 'warning' in alert_data and isinstance(alert_data.get('warning'), list):
+                warnings = alert_data.get('warning', [])
+                return warnings
+            return []
+
         alert_data = weather_data.get('alert', {})
         if alert_data:
-            # 检查是否是和风天气格式的数据
             if 'warning' in alert_data and isinstance(alert_data.get('warning'), list):
-                # 使用和风天气的解析逻辑
                 warnings = alert_data.get('warning', [])
                 alerts = []
                 for warning in warnings:
                     if isinstance(warning, dict):
                         alerts.append(warning)
                 return alerts
-            
-            # 处理其他格式的预警数据
             if 'alerts' in alert_data:
                 return alert_data.get('alerts', [])
         
@@ -1063,6 +1141,8 @@ class WeatherDataProcessor:
                 return self._normalize_qweather_alert(alert)
             elif isinstance(provider, QWeatherProvider):
                 return self._normalize_qweather_alert(alert)
+            elif isinstance(provider, XiaomiWeatherProvider):
+                return self._normalize_xiaomi_alert(alert)
             else:
                 return self._normalize_generic_alert(alert)
         except Exception as e:
@@ -1099,8 +1179,33 @@ class WeatherDataProcessor:
             'source': 'qweather'
         }
     
+    def _normalize_xiaomi_alert(self, alert: Dict[str, Any]) -> Dict[str, Any]:
+        """标准化小米天气预警数据"""
+        title = alert.get('title', '')
+        alert_type = alert.get('type', '')
+        alert_level = alert.get('level', '')
+        if not alert_type or not alert_level:
+            extracted_type, extracted_level = self._extract_alert_info_from_title(title)
+            alert_type = alert_type or extracted_type or '未知'
+            alert_level = alert_level or extracted_level or '未知'
+        level_map = {'蓝色': 1, '黄色': 2, '橙色': 3, '红色': 4, '蓝': 1, '黄': 2, '橙': 3, '红': 4}
+        severity = level_map.get(alert_level, 1)
+        display_text = f"{alert_type}{alert_level}预警" if alert_type and alert_level else f"{alert_type}预警" if alert_type else "天气预警"
+        return {
+            'type': alert_type,
+            'level': alert_level,
+            'color': alert_level,  # 小米天气用level作为颜色
+            'title': title,
+            'description': alert.get('detail', ''),
+            'severity': severity,
+            'display_text': display_text,
+            'start_time': alert.get('start_time', ''),
+            'end_time': alert.get('end_time', ''),
+            'source': 'xiaomi'
+        }
+    
     def _normalize_generic_alert(self, alert: Dict[str, Any]) -> Dict[str, Any]:
-        """标准化通用预警数据(小米天气等)"""
+        """标准化通用预警数据(其他天气API)"""
         title = alert.get('title', alert.get('name', ''))
         alert_type, alert_level = self._extract_alert_info_from_title(title)
         severity = 1
@@ -1126,7 +1231,6 @@ class WeatherDataProcessor:
     
     def _extract_alert_info_from_title(self, title: str) -> tuple:
         """从预警标题中提取预警类型和级别"""
-        import re
         pattern = r'发布(\w+)(蓝|黄|橙|红)色预警'
         match = re.search(pattern, title)
         
@@ -1313,7 +1417,6 @@ def get_weather_alert_url() -> Optional[str]:
 
 
 if __name__ == '__main__':
-    # 测试代码
     try:
         print("=== 测试 ===")
         cities = search_by_name('北京')
