@@ -11,7 +11,8 @@ from packaging.version import Version
 
 import conf
 import utils
-import weather_db as db
+import weather as db
+from weather import WeatherReportThread as weatherReportThread
 from conf import base_directory
 from file import config_center
 
@@ -419,65 +420,3 @@ def check_version(version):  # 检查更新
     logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
     if Version(server_version) > Version(local_version):
         utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
-
-class weatherReportThread(QThread):  # 获取最新天气信息
-    weather_signal = pyqtSignal(dict)
-
-    def __init__(self):
-        super().__init__()
-
-    def run(self):
-        try:
-            weather_data = self.get_weather_data()
-            self.weather_signal.emit(weather_data)
-        except Exception as e:
-            logger.error(f"触发天气信息失败: {e}")
-        # finally:
-        #     self.deleteLater()  # 暂时移除
-
-    @staticmethod
-    def get_weather_data():
-        location_key = config_center.read_conf('Weather', 'city')
-        if location_key == '0':
-            city_thread = getCity()
-            loop = QEventLoop()
-            city_thread.finished.connect(loop.quit)
-            city_thread.start()
-            loop.exec_()  # 阻塞到完成
-            location_key = config_center.read_conf('Weather', 'city')
-            if location_key == '0' or not location_key:
-                location_key = 101010100
-        days = 1
-        key = config_center.read_conf('Weather', 'api_key')
-        url = db.get_weather_url().format(location_key=location_key, days=days, key=key)
-        alert_url = db.get_weather_alert_url()
-        try:
-            data_group = {'now': {}, 'alert': {}}
-            response_now = requests.get(url, proxies=proxies)  # 禁用代理
-            if alert_url == 'NotSupported':
-                logger.warning(f"当前API不支持天气预警信息")
-            elif alert_url is None:
-                logger.warning(f"无单独天气预警信息API")
-            else:
-                alert_url = alert_url.format(location_key=location_key, key=key)
-                response_alert = requests.get(alert_url, proxies=proxies)
-
-                if response_alert.status_code == 200:
-                    data_alert = response_alert.json()
-                    data_group['alert'] = data_alert
-                else:
-                    logger.error(f"获取天气预警信息失败：{response_alert.status_code}")
-
-            if response_now.status_code == 200:
-                data = response_now.json()
-                data_group['now'] = data
-                return data_group
-            else:
-                logger.error(f"获取天气信息失败：{response_now.status_code}")
-                return {'error': {'info': {'value': '错误', 'unit': response_now.status_code}}}
-        except requests.exceptions.RequestException as e:  # 请求失败
-            logger.error(f"获取天气信息失败：{e}")
-            return {'error': {'info': {'value': '错误', 'unit': ''}}}
-        except Exception as e:
-            logger.error(f"获取天气信息失败：{e}")
-            return {'error': {'info': {'value': '错误', 'unit': ''}}}
