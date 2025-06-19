@@ -281,5 +281,34 @@ def get_str_length(text: str) -> int:
             length += 1
     return length
 
+def slice_str_by_length(text: str, max_length: int) -> str:
+    """
+    根据指定长度切割字符串，汉字计为2，英文和数字计为1
+    
+    Args:
+        text: 要切割的字符串
+        max_length: 最大长度
+    
+    Returns:
+        str: 切割后的字符串
+    """
+    if not text or max_length <= 0:
+        return ""
+    
+    if get_str_length(text) <= max_length:
+        return text
+
+    current_length = 0
+    result = []
+
+    for char in text:
+        char_length = 2 if ord(char) > 0x4e00 else 1
+        if current_length + char_length > max_length:
+            break
+        result.append(char)
+        current_length += char_length
+
+    return ''.join(result)
+
 tray_icon = None
 update_timer = UnionUpdateTimer()
