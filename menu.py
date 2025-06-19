@@ -294,13 +294,14 @@ class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
 class PluginCard(CardWidget):  # 插件卡片
     def __init__(
             self, icon, title='Unknown', content='Unknown', version='1.0.0', plugin_dir='', author=None, parent=None,
-            enable_settings=None
+            enable_settings=None, url=''
     ):
         super().__init__(parent)
         icon_radius = 5
         self.plugin_dir = plugin_dir
         self.title = title
         self.parent = parent
+        self.url = url
 
         self.iconWidget = ImageLabel(icon)  # 插件图标
         self.titleLabel = StrongBodyLabel(title, self)  # 插件名
@@ -313,20 +314,30 @@ class PluginCard(CardWidget):  # 插件卡片
         self.settingsBtn = TransparentToolButton()  # 设置按钮
         self.settingsBtn.hide()
 
-        self.hBoxLayout = QHBoxLayout(self)
-        self.hBoxLayout_Title = QHBoxLayout(self)
-        self.vBoxLayout = QVBoxLayout(self)
+        self.hBoxLayout = QHBoxLayout()
+        self.hBoxLayout_Title = QHBoxLayout()
+        self.vBoxLayout = QVBoxLayout()
 
-        self.moreMenu.addActions([
+        menu_actions = [
             Action(
                 fIcon.FOLDER, f'打开“{title}”插件文件夹',
                 triggered=lambda: open_dir(os.path.join(base_directory, conf.PLUGINS_DIR, self.plugin_dir))
-            ),
+            )
+        ]
+        if self.url:
+            menu_actions.append(
+                Action(
+                    fIcon.LINK, f'访问“{title}”插件页面',
+                    triggered=lambda: QDesktopServices.openUrl(QUrl(self.url))
+                )
+            )
+        menu_actions.append(
             Action(
                 fIcon.DELETE, f'卸载“{title}”插件',
                 triggered=self.remove_plugin
             )
-        ])
+        )
+        self.moreMenu.addActions(menu_actions)
 
         if plugin_dir in enabled_plugins['enabled_plugins']:  # 插件是否启用
             self.enableButton.setChecked(True)
@@ -374,6 +385,7 @@ class PluginCard(CardWidget):  # 插件卡片
         self.hBoxLayout.addWidget(self.settingsBtn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.enableButton, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.moreButton, 0, Qt.AlignmentFlag.AlignRight)
+        self.setLayout(self.hBoxLayout)
 
     def set_enable(self):
         global enabled_plugins
@@ -698,6 +710,7 @@ class SettingsMenu(FluentWindow):
                 plugin_dir=plugin,
                 content=plugin_dict[plugin]['description'],
                 enable_settings=plugin_dict[plugin]['settings'],
+                url=plugin_dict[plugin].get('url', ''),
                 parent=self
             )
             plugin_card_layout.addWidget(card)
