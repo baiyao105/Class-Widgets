@@ -30,11 +30,12 @@ import list_
 import tip_toast
 from tip_toast import active_windows
 import utils
+import menu
 import weather_db as db
 from conf import base_directory
 from extra_menu import ExtraMenu, open_settings
 from generate_speech import generate_speech_sync, list_pyttsx3_voices
-from menu import open_plaza
+from menu import open_plaza, I18nManager
 from network_thread import check_update, weatherReportThread
 from play_audio import play_audio
 from plugin import p_loader
@@ -2760,12 +2761,10 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-    
-    from menu import I18nManager
+
     global_i18n_manager = I18nManager()
     global_i18n_manager.init_from_config()
     logger.debug(f"i18n加载,界面: {global_i18n_manager.get_current_language_view_name()},组件: {global_i18n_manager.get_current_language_widgets_name()}")
-    import menu
     menu.global_i18n_manager = global_i18n_manager
     
     share.create(1)  # 创建共享内存
