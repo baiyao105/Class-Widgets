@@ -585,7 +585,7 @@ FluentLabelBase{color:#7d000000}</string>
               <item>
                <widget class="CaptionLabel" name="CaptionLabel_import">
                 <property name="text">
-                 <string>从本地文件导入插件包（支持 .zip 格式）</string>
+                 <string>从本地文件导入插件包 (支持.zip格式与解压后的插件)</string>
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>

@@ -841,45 +841,65 @@ class SettingsMenu(FluentWindow):
             self, 
             '选择插件文件', 
             '', 
-            'ZIP文件 (*.zip);;所有文件 (*)'
+            'ZIP文件 (*.zip);;JSON配置文件 (*.json);;所有文件 (*)'
         )
         if not file_path:
             return
         try:
-            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            if file_path.endswith('.json') and os.path.basename(file_path) == 'plugin.json':
+                self._import_from_plugin_json(file_path)
+            else:
+                self._import_from_zip(file_path)
+                
+        except Exception as e:
+            logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
+            self._show_error_dialog(f'导入插件时发生错误：{str(e)}')
+    
+    def _import_from_plugin_json(self, json_file_path):
+        try:
+            with open(json_file_path, 'r', encoding='utf-8') as f:
+                plugin_info = json.loads(f.read())
+            plugin_name = plugin_info.get('name', '未知插件')
+            source_dir = os.path.dirname(json_file_path)
+            plugin_dir_name = os.path.basename(source_dir)
+            target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
+            if os.path.exists(target_dir):
+                reply = MessageBox(
+                    '插件已存在', 
+                    f'插件 "{plugin_name}" 已存在，是否覆盖？', 
+                    self
+                ).exec_()
+                if reply != MessageBox.Yes:
+                    return
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_dir, target_dir)
+            self.refresh_plugin_list()
+            w = MessageBox(
+                '导入成功', 
+                f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。', 
+                self
+            )
+            w.yesButton.setText('好')
+            w.cancelButton.hide()
+            w.exec_()
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {json_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('插件配置文件格式错误')
+        except Exception as e:
+            logger.error(f"插件导入失败 - 文件夹复制错误: {json_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog(f'复制插件文件夹时发生错误：{str(e)}')
+    
+    def _import_from_zip(self, zip_file_path):
+        try:
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
                 if 'plugin.json' not in zip_ref.namelist():
-                    w = MessageBox('错误', '无效的插件文件：缺少 plugin.json 配置文件', self)
-                    w.yesButton.setText('好')
-                    w.yesButton.setStyleSheet("""
-                PushButton{
-                    border-radius: 5px;
-                    padding: 5px 12px 6px 12px;
-                    outline: none;
-                }
-                PrimaryPushButton{
-                    color: white;
-                    background-color: #FF6167;
-                    border: 1px solid #FF8585;
-                    border-bottom: 1px solid #943333;
-                }
-                PrimaryPushButton:hover{
-                    background-color: #FF7E83;
-                    border: 1px solid #FF8084;
-                    border-bottom: 1px solid #B13939;
-                }
-                PrimaryPushButton:pressed{
-                    color: rgba(255, 255, 255, 0.63);
-                    background-color: #DB5359;
-                    border: 1px solid #DB5359;
-                }
-            """)
-                    w.cancelButton.hide()
-                    w.exec_()
+                    self._show_error_dialog('无效的插件文件：缺少 plugin.json 配置文件')
                     return
                 with zip_ref.open('plugin.json') as f:
                     plugin_info = json.loads(f.read().decode('utf-8'))
                 plugin_name = plugin_info.get('name', '未知插件')
-                plugin_dir_name = os.path.splitext(os.path.basename(file_path))[0]
+                plugin_dir_name = os.path.splitext(os.path.basename(zip_file_path))[0]
                 target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
                 if os.path.exists(target_dir):
                     reply = MessageBox(
@@ -902,92 +922,40 @@ class SettingsMenu(FluentWindow):
                 w.exec_()
                 
         except zipfile.BadZipFile as e:
-            logger.error(f"插件导入失败 - 无效的ZIP文件: {file_path}, 错误详情: {str(e)}")
-            w = MessageBox('错误', '无效的ZIP文件', self)
-            w.yesButton.setText('好')
-            w.yesButton.setStyleSheet("""
-                PushButton{
-                    border-radius: 5px;
-                    padding: 5px 12px 6px 12px;
-                    outline: none;
-                }
-                PrimaryPushButton{
-                    color: white;
-                    background-color: #FF6167;
-                    border: 1px solid #FF8585;
-                    border-bottom: 1px solid #943333;
-                }
-                PrimaryPushButton:hover{
-                    background-color: #FF7E83;
-                    border: 1px solid #FF8084;
-                    border-bottom: 1px solid #B13939;
-                }
-                PrimaryPushButton:pressed{
-                    color: rgba(255, 255, 255, 0.63);
-                    background-color: #DB5359;
-                    border: 1px solid #DB5359;
-                }
-            """)
-            w.cancelButton.hide()
-            w.exec_()
+            logger.error(f"插件导入失败 - 无效的ZIP文件: {zip_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('无效的ZIP文件')
         except json.JSONDecodeError as e:
-            logger.error(f"插件导入失败 - JSON配置文件格式错误: {file_path}, 错误详情: {str(e)}")
-            w = MessageBox('错误', '插件配置文件格式错误', self)
-            w.yesButton.setText('好')
-            w.yesButton.setStyleSheet("""
-                PushButton{
-                    border-radius: 5px;
-                    padding: 5px 12px 6px 12px;
-                    outline: none;
-                }
-                PrimaryPushButton{
-                    color: white;
-                    background-color: #FF6167;
-                    border: 1px solid #FF8585;
-                    border-bottom: 1px solid #943333;
-                }
-                PrimaryPushButton:hover{
-                    background-color: #FF7E83;
-                    border: 1px solid #FF8084;
-                    border-bottom: 1px solid #B13939;
-                }
-                PrimaryPushButton:pressed{
-                    color: rgba(255, 255, 255, 0.63);
-                    background-color: #DB5359;
-                    border: 1px solid #DB5359;
-                }
-            """)
-            w.cancelButton.hide()
-            w.exec_()
-        except Exception as e:
-            logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
-            w = MessageBox('错误', f'导入插件时发生错误：{str(e)}', self)
-            w.yesButton.setText('好')
-            w.yesButton.setStyleSheet("""
-                PushButton{
-                    border-radius: 5px;
-                    padding: 5px 12px 6px 12px;
-                    outline: none;
-                }
-                PrimaryPushButton{
-                    color: white;
-                    background-color: #FF6167;
-                    border: 1px solid #FF8585;
-                    border-bottom: 1px solid #943333;
-                }
-                PrimaryPushButton:hover{
-                    background-color: #FF7E83;
-                    border: 1px solid #FF8084;
-                    border-bottom: 1px solid #B13939;
-                }
-                PrimaryPushButton:pressed{
-                    color: rgba(255, 255, 255, 0.63);
-                    background-color: #DB5359;
-                    border: 1px solid #DB5359;
-                }
-            """)
-            w.cancelButton.hide()
-            w.exec_()
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {zip_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('插件配置文件格式错误')
+
+    def _show_error_dialog(self, message):
+        w = MessageBox('错误', message, self)
+        w.yesButton.setText('好')
+        w.yesButton.setStyleSheet("""
+            PushButton{
+                border-radius: 5px;
+                padding: 5px 12px 6px 12px;
+                outline: none;
+            }
+            PrimaryPushButton{
+                color: white;
+                background-color: #FF6167;
+                border: 1px solid #FF8585;
+                border-bottom: 1px solid #943333;
+            }
+            PrimaryPushButton:hover{
+                background-color: #FF7E83;
+                border: 1px solid #FF8084;
+                border-bottom: 1px solid #B13939;
+            }
+            PrimaryPushButton:pressed{
+                color: rgba(255, 255, 255, 0.63);
+                background-color: #DB5359;
+                border: 1px solid #DB5359;
+            }
+        """)
+        w.cancelButton.hide()
+        w.exec_()
 
     def setup_help_interface(self):
         open_by_browser = self.findChild(PushButton, 'open_by_browser')

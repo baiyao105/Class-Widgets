@@ -159,8 +159,6 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         # self.download_thread = nt.DownloadAndExtract(TEST_DOWNLOAD_LINK, self.p_name)
         self.download_thread.progress_signal.connect(lambda progress: self.bar.setValue(int(progress)))  # 下载进度
         self.download_thread.status_signal.connect(self.detect_status)  # 判断状态
-        
-        # 通过父窗口的线程管理器管理线程
         if hasattr(self.parent(), 'thread_manager'):
             self.parent().thread_manager.add_thread(self.download_thread)
         
@@ -342,8 +340,6 @@ class PluginDetailPage(MessageBoxBase):  # 插件详情页面
         else:
             self.download_thread = nt.getReadme(f"{replace_to_file_server(self.url, self.data['branch'])}/README.md")
         self.download_thread.html_signal.connect(display_readme)
-        
-        # 通过父窗口的线程管理器管理线程
         if hasattr(self.parent, 'thread_manager'):
             self.parent.thread_manager.add_thread(self.download_thread)
         
@@ -479,7 +475,7 @@ class PluginPlaza(MSFluentWindow):
     def __init__(self):
         super().__init__()
         self.splashScreen = None
-        self.thread_manager = ThreadManager()  # 初始化线程管理器 ♪(´▽｀)
+        self.thread_manager = ThreadManager()
         global installed_plugins
         try:
             with open(CONF_PATH, 'r', encoding='utf-8') as file:
@@ -563,8 +559,6 @@ class PluginPlaza(MSFluentWindow):
                     image_thread = nt.getImg(f"{replace_to_file_server(data['url'], data['branch'])}/icon.png")
                     image_thread.repo_signal.connect(
                         lambda img_data, card=plugin_card: set_plugin_image(card, img_data))
-                    
-                    # 使用线程管理器管理图片加载线程
                     self.thread_manager.add_thread(image_thread)
                     image_thread.start()
 
@@ -696,8 +690,6 @@ class PluginPlaza(MSFluentWindow):
             # 启动线程加载图片
             image_thread = nt.getImg(f"{replace_to_file_server(data['url'], data['branch'])}/icon.png")
             image_thread.repo_signal.connect(lambda img_data, card=plugin_card: set_plugin_image(card, img_data))
-            
-            # 使用线程管理器管理图片加载线程
             self.thread_manager.add_thread(image_thread)
             image_thread.start()
 
@@ -742,8 +734,6 @@ class PluginPlaza(MSFluentWindow):
                         self.banner_thread = nt.getImg(self.img_links[index])
                         self.banner_thread.repo_signal.connect(lambda data: display_banner(data, index))
                         self.banner_thread.repo_signal.connect(lambda: start_next_banner(index + 1))  # 连接完成信号
-                        
-                        # 使用线程管理器管理Banner图片加载线程
                         self.thread_manager.add_thread(self.banner_thread)
                         self.banner_thread.start()
 
@@ -754,8 +744,6 @@ class PluginPlaza(MSFluentWindow):
 
         self.banner_list_thread = nt.getRepoFileList()
         self.banner_list_thread.repo_signal.connect(get_banner)
-        
-        # 使用线程管理器管理Banner列表获取线程
         self.thread_manager.add_thread(self.banner_list_thread)
         self.banner_list_thread.start()
 
@@ -786,21 +774,16 @@ class PluginPlaza(MSFluentWindow):
 
         self.get_plugin_list_thread = nt.getPluginInfo()
         self.get_plugin_list_thread.repo_signal.connect(callback)
-        
-        # 使用线程管理器管理插件信息获取线程
         self.thread_manager.add_thread(self.get_plugin_list_thread)
         self.get_plugin_list_thread.start()
 
     def get_tags_data(self):
         self.get_tags_list_thread = nt.getTags()
         self.get_tags_list_thread.repo_signal.connect(self.set_tags_data)
-        
-        # 使用线程管理器管理标签获取线程
         self.thread_manager.add_thread(self.get_tags_list_thread)
         self.get_tags_list_thread.start()
     
     def closeEvent(self, event):
-        """窗口关闭时停止所有线程 (◕‿◕)✨"""
         self.thread_manager.stop_all_threads()
         super().closeEvent(event)
 
