@@ -274,6 +274,9 @@ class licenseDialog(MessageBoxBase):  # 显示软件许可协议
 
 class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
     def __init__(self, plugin_dir=None, parent=None):
+        if plugin_dir not in p_loader.plugins_settings:
+            return
+            
         super().__init__(parent)
         self.plugin_widget = None
         self.plugin_dir = plugin_dir
@@ -347,7 +350,7 @@ class PluginCard(CardWidget):  # 插件卡片
         
         if plugin_dir in enabled_plugins['enabled_plugins']:  # 插件是否启用
             self.enableButton.setChecked(True)
-            if enable_settings:
+            if enable_settings and plugin_dir in p_loader.plugins_settings:
                 self.moreMenu.addSeparator()
                 self.moreMenu.addAction(Action(fIcon.SETTING, f'"{title}"插件设置', triggered=self.show_settings))
                 self.settingsBtn.show()
@@ -410,7 +413,8 @@ class PluginCard(CardWidget):  # 插件卡片
 
     def show_settings(self):
         w = PluginSettingsDialog(self.plugin_dir, self.parent)
-        w.exec()
+        if w:
+            w.exec()
 
     def remove_plugin(self):
         alert = MessageBox(f"您确定要删除插件“{self.title}”吗？", "删除此插件后，将无法恢复。", self.parent)
@@ -736,6 +740,9 @@ class SettingsMenu(FluentWindow):
     def load_plugin_cards(self):
         """加载插件卡片"""
         self.clear_plugin_cards()
+        container_widget = self.plugin_card_layout.parentWidget()
+        if container_widget:
+            container_widget.setUpdatesEnabled(False)
         
         for plugin in plugin_dict:
             if (Path(conf.PLUGINS_DIR) / plugin / 'icon.png').exists():  # 若插件目录存在icon.png
@@ -760,13 +767,21 @@ class SettingsMenu(FluentWindow):
             self.tips_plugin_empty.hide()
         else:
             self.tips_plugin_empty.show()
+        if container_widget:
+            container_widget.setUpdatesEnabled(True)
     
     def clear_plugin_cards(self):
         """清空插件卡片"""
+        container_widget = self.plugin_card_layout.parentWidget()
+        if container_widget:
+            container_widget.setUpdatesEnabled(False)
         for card in self.all_plugin_cards:
+            card.hide()
             self.plugin_card_layout.removeWidget(card)
             card.deleteLater()
         self.all_plugin_cards.clear()
+        if container_widget:
+            container_widget.setUpdatesEnabled(True)
     
     def update_plugin_count(self):
         """更新计数显示"""

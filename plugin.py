@@ -55,7 +55,7 @@ class PluginLoader:  # 插件加载器
 
                     logger.success(f"加载插件成功：{module_name}")
                 except (ImportError, FileNotFoundError) as e:
-                    logger.warning(f"加载插件 {folder.name} 失败: {e}. 可能缺少文件或依赖项。将禁用此插件。")
+                    logger.warning(f"加载插件 {folder.name} 失败: {e}. 将禁用此插件")
                     plugin_config = conf.load_plugin_config()
                     if folder.name in plugin_config['enabled_plugins']:
                         plugin_config['enabled_plugins'].remove(folder.name)
