@@ -88,6 +88,7 @@
   "Other": {
     "do_not_log": 0,
     "safe_mode": 0,
+    "safe_plugin": 1,
     "initialstartup": 1,
     "multiple_programs": 0
   }

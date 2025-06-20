@@ -342,12 +342,21 @@ class PluginCard(CardWidget):  # 插件卡片
         )
         self.moreMenu.addActions(menu_actions)
 
+        plugin_config = conf.load_plugin_config()
+        is_temp_disabled = plugin_dir in plugin_config.get('temp_disabled_plugins', [])
+        
         if plugin_dir in enabled_plugins['enabled_plugins']:  # 插件是否启用
             self.enableButton.setChecked(True)
             if enable_settings:
                 self.moreMenu.addSeparator()
-                self.moreMenu.addAction(Action(fIcon.SETTING, f'“{title}”插件设置', triggered=self.show_settings))
+                self.moreMenu.addAction(Action(fIcon.SETTING, f'"{title}"插件设置', triggered=self.show_settings))
                 self.settingsBtn.show()
+        if is_temp_disabled:
+            self.enableButton.setEnabled(False)
+            self.enableButton.setChecked(False)
+            self.enableButton.setToolTip('此插件被临时禁用,重启后将尝试重新加载')
+            self.titleLabel.setText(f'{title} (已临时禁用)')
+            self.titleLabel.setStyleSheet('color: #999999;')
 
         self.setFixedHeight(73)
         self.iconWidget.setFixedSize(48, 48)
@@ -711,6 +720,13 @@ class SettingsMenu(FluentWindow):
         open_plugin_folder = self.findChild(PushButton, 'open_plugin_folder')
         open_plugin_folder.clicked.connect(lambda: open_dir(os.path.join(base_directory, conf.PLUGINS_DIR)))  # 打开插件目录
 
+        # 安全插件加载开关
+        switch_safe_plugin = self.findChild(SwitchButton, 'switch_safe_plugin')
+        switch_safe_plugin.setChecked(int(config_center.read_conf('Other', 'safe_plugin')))
+        switch_safe_plugin.checkedChanged.connect(
+            lambda checked: switch_checked('Other', 'safe_plugin', checked)
+        )
+
         if not p_loader.plugins_settings:  # 若插件设置为空
             p_loader.load_plugins()  # 加载插件设置
 
@@ -764,6 +780,15 @@ class SettingsMenu(FluentWindow):
         filter_type = self.filter_combo.currentText()
         
         visible_count = 0
+        valid_cards = []
+        for card in self.all_plugin_cards:
+            try:
+                _ = card.title
+                valid_cards.append(card)
+            except RuntimeError:
+                continue
+        self.all_plugin_cards = valid_cards
+        
         for card in self.all_plugin_cards:
             should_show = True
             if search_text:
