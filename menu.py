@@ -419,7 +419,7 @@ class PluginCard(CardWidget):  # 插件卡片
 
     def show_settings(self):
         w = PluginSettingsDialog(self.plugin_dir, self.parent)
-        if w:  # 只有在成功创建对话框时才执行
+        if w:
             w.exec()
 
     def reload_plugin(self):
