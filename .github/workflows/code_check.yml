@@ -37,18 +37,36 @@ jobs:
       - name: Get Python file changes
         id: changes
         run: |
-          base_ref="origin/${{ github.event.pull_request.base.ref }}"
-          changed_files=$(git diff --name-only --diff-filter=ACMRT $base_ref...HEAD | grep '\.py$' | head -50 || true)
-          
-          echo "📁 变更的 Python 文件："
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            if [[ "${{ github.event.action }}" == "opened" ]]; then
+              base_ref="origin/${{ github.event.pull_request.base.ref }}"
+              head_ref="HEAD"
+              echo "📋 基准分支：${{ github.event.pull_request.base.ref }}"
+              echo "📋 目标分支：${{ github.event.pull_request.head.ref }}"
+            elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
+              base_ref="${{ github.event.before }}"
+              head_ref="${{ github.event.after }}"
+              echo "📋 上次提交：${{ github.event.before }}"
+              echo "📋 本次提交：${{ github.event.after }}"
+            fi
+          fi
+          changed_files=$(git diff --name-only --diff-filter=ACMRT $base_ref...$head_ref | grep '\.py$' | head -50 || true)
+          echo "变更的 Python 文件:"
           echo "$changed_files"
+          if [[ "${{ github.event_name }}" == "pull_request_target" && "${{ github.event.action }}" == "synchronize" && -n "$changed_files" ]]; then
+            all_pr_files=$(git diff --name-only --diff-filter=ACMRT origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.py$' | head -50 || true)
+            echo "$all_pr_files"
+            analysis_files="$all_pr_files"
+          else
+            analysis_files="$changed_files"
+          fi
 
           if [[ -n "$changed_files" ]]; then
             echo "has_python_changes=true" >> $GITHUB_OUTPUT
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-            echo "$changed_files" >> $GITHUB_OUTPUT
+            echo "$analysis_files" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "changed_files_json=$(echo "$changed_files" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
+            echo "changed_files_json=$(echo "$analysis_files" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
           else
             echo "has_python_changes=false" >> $GITHUB_OUTPUT
             echo "changed_files=" >> $GITHUB_OUTPUT
@@ -110,20 +128,17 @@ jobs:
             ${{ runner.os }}-uv-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-
             ${{ runner.os }}-uv-${{ env.CACHE_VERSION }}-
             ${{ runner.os }}-uv-
-
       - name: Create venv and install dependencies
         run: |
           uv venv .venv
           echo "UV_VENV_PATH=.venv" >> $GITHUB_ENV
           uv pip install -r requirements.txt
           uv pip install ruff pylint pyright mypy
-          echo "🔧 工具版本信息："
+          echo "工具版本信息:"
           .venv/bin/ruff --version || .venv/Scripts/ruff.exe --version
           .venv/bin/pylint --version || .venv/Scripts/pylint.exe --version
           .venv/bin/pyright --version || .venv/Scripts/pyright.exe --version
           .venv/bin/mypy --version || .venv/Scripts/mypy.exe --version
-
-
 
       - name: Run Ruff check
         uses: astral-sh/ruff-action@v3
@@ -148,14 +163,14 @@ jobs:
         if: needs.detect-changes.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
-          echo "🔍 运行 PyLint 检查..."
+          echo "运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           pylint_cmd=".venv/bin/pylint"
           if echo "$files" | xargs $pylint_cmd --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
-            echo "✅ PyLint 检查通过"
+            echo "PyLint 检查通过"
             echo "has_issues=false" >> $GITHUB_OUTPUT
           else
-            echo "❌ PyLint 发现问题"
+            echo "PyLint 发现问题"
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
 
@@ -164,14 +179,14 @@ jobs:
         if: needs.detect-changes.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
-          echo "🔍 运行 MyPy 检查..."
+          echo "运行 MyPy 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           mypy_cmd=".venv/bin/mypy"
           if echo "$files" | xargs $mypy_cmd --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
-            echo "✅ MyPy 检查通过"
+            echo "MyPy 检查通过"
             echo "has_issues=false" >> $GITHUB_OUTPUT
           else
-            echo "❌ MyPy 发现问题"
+            echo "MyPy 发现问题"
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
 
