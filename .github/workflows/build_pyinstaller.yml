@@ -32,43 +32,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  lint:
-    name: Python Syntax Check
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target'
-    permissions:
-      contents: read
-      pull-requests: write
-      actions: write
-
-    steps:
-      - name: Checkout PR (merge ref)
-        uses: actions/checkout@v4
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
-          fetch-depth: 0
-
-      - name: Trigger code quality check
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: code-check
-          client-payload: |
-            {
-              "pull_request": {
-                "number": ${{ github.event.pull_request.number }},
-                "head": {
-                  "ref": "${{ github.event.pull_request.head.ref }}",
-                  "sha": "${{ github.event.pull_request.head.sha }}"
-                },
-                "base": {
-                  "ref": "${{ github.event.pull_request.base.ref }}"
-                }
-              }
-            }
-
-
-
   build:
     strategy:
       fail-fast: false
