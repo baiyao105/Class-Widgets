@@ -2,7 +2,7 @@
 
 ## 反馈
 
-### 反馈 Bug 
+### 反馈 Bug
 
 如果您在使用 Class Widgets 时遇到问题，可以在 Issues 中提交 **Bug 反馈**。
 
