@@ -19,6 +19,17 @@ class PluginLoader:  # 插件加载器
         self.manager = p_mgr
 
     def load_plugins(self):
+        plugin_config = conf.load_plugin_config()
+        safe_plugin_enabled = plugin_config.get('safe_plugin', False)
+        if 'temp_disabled_plugins' in plugin_config:
+            temp_disabled = plugin_config['temp_disabled_plugins']
+            if temp_disabled:
+                for plugin_name in temp_disabled:
+                    if plugin_name not in plugin_config.get('enabled_plugins', []):
+                        plugin_config['enabled_plugins'].append(plugin_name)
+                plugin_config['temp_disabled_plugins'] = []
+                conf.save_plugin_config(plugin_config)
+        
         for folder in Path(conf.PLUGINS_DIR).iterdir():
             if folder.is_dir() and (folder / 'plugin.json').exists():
                 self.plugins_name.append(folder.name)  # 检测所有插件
@@ -44,19 +55,37 @@ class PluginLoader:  # 插件加载器
 
                     logger.success(f"加载插件成功：{module_name}")
                 except (ImportError, FileNotFoundError) as e:
-                    logger.warning(f"加载插件 {folder.name} 失败: {e}. 可能缺少文件或依赖项。将禁用此插件。")
+                    logger.warning(f"加载插件 {folder.name} 失败: {e}. 将禁用此插件")
                     plugin_config = conf.load_plugin_config()
                     if folder.name in plugin_config['enabled_plugins']:
                         plugin_config['enabled_plugins'].remove(folder.name)
                         conf.save_plugin_config(plugin_config)
                     if folder.name in self.plugins_name:
                         self.plugins_name.remove(folder.name)
+                    if safe_plugin_enabled:
+                        self._disable_plugin_safely(folder.name)
+                        logger.warning(f"已临时禁用插件 {folder.name}")
                     continue
                 except Exception as e:
                     logger.error(f"加载插件 {folder.name} 时发生未知错误: {e}")
+                    if safe_plugin_enabled:
+                        self._disable_plugin_safely(folder.name)
+                        logger.warning(f"已临时禁用插件 {folder.name}")
                     # 大部分情况一般不会影响运行
                     continue
         return self.plugins_name
+
+    def _disable_plugin_safely(self, plugin_name):
+        """安全禁用插件"""
+        plugin_config = conf.load_plugin_config()
+        if plugin_name in plugin_config.get('enabled_plugins', []):
+            plugin_config['enabled_plugins'].remove(plugin_name)
+            if 'temp_disabled_plugins' not in plugin_config:
+                plugin_config['temp_disabled_plugins'] = []
+            if plugin_name not in plugin_config['temp_disabled_plugins']:
+                plugin_config['temp_disabled_plugins'].append(plugin_name)
+            conf.save_plugin_config(plugin_config)
+            logger.info(f"插件 {plugin_name} 已被临时禁用")
 
     def run_plugins(self):
         for plugin in self.plugins_dict.values():

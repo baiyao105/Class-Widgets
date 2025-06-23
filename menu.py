@@ -7,6 +7,8 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+import zipfile
+import shutil
 import asyncio
 
 from PyQt5 import uic, QtCore
@@ -509,6 +511,9 @@ class licenseDialog(MessageBoxBase):  # 显示软件许可协议
 
 class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
     def __init__(self, plugin_dir=None, parent=None):
+        if plugin_dir not in p_loader.plugins_settings:
+            return
+            
         super().__init__(parent)
         self.plugin_widget = None
         self.plugin_dir = plugin_dir
@@ -531,13 +536,15 @@ class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
 class PluginCard(CardWidget):  # 插件卡片
     def __init__(
             self, icon, title='Unknown', content='Unknown', version='1.0.0', plugin_dir='', author=None, parent=None,
-            enable_settings=None
+            enable_settings=None, url=''
     ):
         super().__init__(parent)
         icon_radius = 5
         self.plugin_dir = plugin_dir
         self.title = title
         self.parent = parent
+        self.url = url
+        self.enable_settings = enable_settings
 
         self.iconWidget = ImageLabel(icon)  # 插件图标
         self.titleLabel = StrongBodyLabel(title, self)  # 插件名
@@ -550,27 +557,46 @@ class PluginCard(CardWidget):  # 插件卡片
         self.settingsBtn = TransparentToolButton()  # 设置按钮
         self.settingsBtn.hide()
 
-        self.hBoxLayout = QHBoxLayout(self)
-        self.hBoxLayout_Title = QHBoxLayout(self)
-        self.vBoxLayout = QVBoxLayout(self)
+        self.hBoxLayout = QHBoxLayout()
+        self.hBoxLayout_Title = QHBoxLayout()
+        self.vBoxLayout = QVBoxLayout()
 
-        self.moreMenu.addActions([
+        menu_actions = [
             Action(
                 fIcon.FOLDER, f'打开“{title}”插件文件夹',
                 triggered=lambda: open_dir(os.path.join(base_directory, conf.PLUGINS_DIR, self.plugin_dir))
-            ),
+            )
+        ]
+        if self.url:
+            menu_actions.append(
+                Action(
+                    fIcon.LINK, f'访问“{title}”插件页面',
+                    triggered=lambda: QDesktopServices.openUrl(QUrl(self.url))
+                )
+            )
+        menu_actions.append(
             Action(
                 fIcon.DELETE, f'卸载“{title}”插件',
                 triggered=self.remove_plugin
             )
-        ])
+        )
+        self.moreMenu.addActions(menu_actions)
 
+        plugin_config = conf.load_plugin_config()
+        is_temp_disabled = plugin_dir in plugin_config.get('temp_disabled_plugins', [])
+        
         if plugin_dir in enabled_plugins['enabled_plugins']:  # 插件是否启用
             self.enableButton.setChecked(True)
-            if enable_settings:
+            if enable_settings and plugin_dir in p_loader.plugins_settings:
                 self.moreMenu.addSeparator()
-                self.moreMenu.addAction(Action(fIcon.SETTING, f'“{title}”插件设置', triggered=self.show_settings))
+                self.moreMenu.addAction(Action(fIcon.SETTING, f'"{title}"插件设置', triggered=self.show_settings))
                 self.settingsBtn.show()
+        if is_temp_disabled:
+            self.enableButton.setEnabled(False)
+            self.enableButton.setChecked(False)
+            self.enableButton.setToolTip('此插件被临时禁用,重启后将尝试重新加载')
+            self.titleLabel.setText(f'{title} (已临时禁用)')
+            self.titleLabel.setStyleSheet('color: #999999;')
 
         self.setFixedHeight(73)
         self.iconWidget.setFixedSize(48, 48)
@@ -611,6 +637,7 @@ class PluginCard(CardWidget):  # 插件卡片
         self.hBoxLayout.addWidget(self.settingsBtn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.enableButton, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.moreButton, 0, Qt.AlignmentFlag.AlignRight)
+        self.setLayout(self.hBoxLayout)
 
     def set_enable(self):
         global enabled_plugins
@@ -623,7 +650,8 @@ class PluginCard(CardWidget):  # 插件卡片
 
     def show_settings(self):
         w = PluginSettingsDialog(self.plugin_dir, self.parent)
-        w.exec()
+        if w:
+            w.exec()
 
     def remove_plugin(self):
         alert = MessageBox(f"您确定要删除插件“{self.title}”吗？", "删除此插件后，将无法恢复。", self.parent)
@@ -913,6 +941,21 @@ class SettingsMenu(FluentWindow):
         enabled_plugins = conf.load_plugin_config()  # 加载启用的插件
         plugin_dict = (conf.load_plugins())  # 加载插件信息
 
+        self.plugin_search = self.findChild(SearchLineEdit, 'plugin_search')
+        self.filter_combo = self.findChild(ComboBox, 'filter_combo')
+        self.refresh_btn = self.findChild(ToolButton, 'refresh_btn')
+        self.import_plugin_btn = self.findChild(PushButton, 'import_plugin_btn')
+        self.plugin_count_label = self.findChild(CaptionLabel, 'plugin_count_label')
+        self.plugin_card_layout = self.findChild(QVBoxLayout, 'plugin_card_layout')
+        self.tips_plugin_empty = self.findChild(QLabel, 'tips_plugin_empty')
+        self.all_plugin_cards = []
+        self.filter_combo.addItems(['全部插件', '已启用', '已禁用', '有设置项', '无设置项'])
+        self.refresh_btn.setIcon(fIcon.SYNC)
+        self.plugin_search.textChanged.connect(self.filter_plugins)
+        self.filter_combo.currentTextChanged.connect(self.filter_plugins)
+        self.refresh_btn.clicked.connect(self.refresh_plugin_list)
+        self.import_plugin_btn.clicked.connect(self.import_plugin_from_file)
+
         open_pp = self.findChild(PushButton, 'open_plugin_plaza')
         open_pp.clicked.connect(open_plaza)  # 打开插件广场
 
@@ -925,13 +968,29 @@ class SettingsMenu(FluentWindow):
             lambda: config_center.write_conf('Plugin', 'auto_delay', str(auto_delay.value())))
         # 设置自动化延迟
 
-        plugin_card_layout = self.findChild(QVBoxLayout, 'plugin_card_layout')
         open_plugin_folder = self.findChild(PushButton, 'open_plugin_folder')
         open_plugin_folder.clicked.connect(lambda: open_dir(os.path.join(base_directory, conf.PLUGINS_DIR)))  # 打开插件目录
+
+        # 安全插件加载开关
+        switch_safe_plugin = self.findChild(SwitchButton, 'switch_safe_plugin')
+        switch_safe_plugin.setChecked(int(config_center.read_conf('Other', 'safe_plugin')))
+        switch_safe_plugin.checkedChanged.connect(
+            lambda checked: switch_checked('Other', 'safe_plugin', checked)
+        )
 
         if not p_loader.plugins_settings:  # 若插件设置为空
             p_loader.load_plugins()  # 加载插件设置
 
+        self.load_plugin_cards()
+        self.update_plugin_count()
+
+    def load_plugin_cards(self):
+        """加载插件卡片"""
+        self.clear_plugin_cards()
+        container_widget = self.plugin_card_layout.parentWidget()
+        if container_widget:
+            container_widget.setUpdatesEnabled(False)
+        
         for plugin in plugin_dict:
             if (Path(conf.PLUGINS_DIR) / plugin / 'icon.png').exists():  # 若插件目录存在icon.png
                 icon_path = f'{base_directory}/plugins/{plugin}/icon.png'
@@ -945,13 +1004,220 @@ class SettingsMenu(FluentWindow):
                 plugin_dir=plugin,
                 content=plugin_dict[plugin]['description'],
                 enable_settings=plugin_dict[plugin]['settings'],
+                url=plugin_dict[plugin].get('url', ''),
                 parent=self
             )
-            plugin_card_layout.addWidget(card)
+            self.all_plugin_cards.append(card)
+            self.plugin_card_layout.addWidget(card)
 
-        tips_plugin_empty = self.findChild(QLabel, 'tips_plugin_empty')
         if plugin_dict:
-            tips_plugin_empty.hide()
+            self.tips_plugin_empty.hide()
+        else:
+            self.tips_plugin_empty.show()
+        if container_widget:
+            container_widget.setUpdatesEnabled(True)
+    
+    def clear_plugin_cards(self):
+        """清空插件卡片"""
+        container_widget = self.plugin_card_layout.parentWidget()
+        if container_widget:
+            container_widget.setUpdatesEnabled(False)
+        for card in self.all_plugin_cards:
+            card.hide()
+            self.plugin_card_layout.removeWidget(card)
+            card.deleteLater()
+        self.all_plugin_cards.clear()
+        if container_widget:
+            container_widget.setUpdatesEnabled(True)
+    
+    def update_plugin_count(self):
+        """更新计数显示"""
+        total_count = len(plugin_dict)
+        enabled_count = len([p for p in plugin_dict if plugin_dict[p]['name'] in enabled_plugins])
+        self.plugin_count_label.setText(f'已安装 {total_count} 个插件，已启用 {enabled_count} 个')
+    
+    def filter_plugins(self):
+        """根据搜索条件和过滤器过滤插件"""
+        search_text = self.plugin_search.text().lower()
+        filter_type = self.filter_combo.currentText()
+        
+        visible_count = 0
+        valid_cards = []
+        for card in self.all_plugin_cards:
+            try:
+                _ = card.title
+                valid_cards.append(card)
+            except RuntimeError:
+                continue
+        self.all_plugin_cards = valid_cards
+        
+        for card in self.all_plugin_cards:
+            should_show = True
+            if search_text:
+                plugin_name = card.title.lower()
+                plugin_author = card.authorLabel.text().lower() if card.authorLabel.text() else ''
+                plugin_desc = card.contentLabel.text().lower()
+                if not (search_text in plugin_name or search_text in plugin_author or search_text in plugin_desc):
+                    should_show = False
+            if should_show and filter_type != '全部插件':
+                is_enabled = card.plugin_dir in enabled_plugins.get('enabled_plugins', [])
+                has_settings = bool(card.enable_settings)
+                if filter_type == '已启用' and not is_enabled:
+                    should_show = False
+                elif filter_type == '已禁用' and is_enabled:
+                    should_show = False
+                elif filter_type == '有设置项' and not has_settings:
+                    should_show = False
+                elif filter_type == '无设置项' and has_settings:
+                    should_show = False
+            card.setVisible(should_show)
+            if should_show:
+                visible_count += 1
+        if visible_count == 0:
+            self.tips_plugin_empty.setText('没有找到匹配的插件')
+            self.tips_plugin_empty.show()
+        else:
+            self.tips_plugin_empty.hide()
+    
+    def refresh_plugin_list(self):
+        """刷新插件列表"""
+        global plugin_dict, enabled_plugins
+        enabled_plugins = conf.load_plugin_config()
+        plugin_dict = conf.load_plugins()
+        self.load_plugin_cards()
+        self.update_plugin_count()
+        self.filter_plugins()
+        InfoBar.success(
+            title='刷新完成',
+            content='插件列表已刷新',
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.BOTTOM_RIGHT,
+            duration=3000,
+            parent=self.window()
+        )
+    
+    def import_plugin_from_file(self):
+        """从文件导入插件"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            '选择插件文件', 
+            '', 
+            'ZIP文件 (*.zip);;JSON配置文件 (*.json);;所有文件 (*)'
+        )
+        if not file_path:
+            return
+        try:
+            if file_path.endswith('.json') and os.path.basename(file_path) == 'plugin.json':
+                self._import_from_plugin_json(file_path)
+            else:
+                self._import_from_zip(file_path)
+                
+        except Exception as e:
+            logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
+            self._show_error_dialog(f'导入插件时发生错误：{str(e)}')
+    
+    def _import_from_plugin_json(self, json_file_path):
+        try:
+            with open(json_file_path, 'r', encoding='utf-8') as f:
+                plugin_info = json.loads(f.read())
+            plugin_name = plugin_info.get('name', '未知插件')
+            source_dir = os.path.dirname(json_file_path)
+            plugin_dir_name = os.path.basename(source_dir)
+            target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
+            if os.path.exists(target_dir):
+                reply = MessageBox(
+                    '插件已存在', 
+                    f'插件 "{plugin_name}" 已存在，是否覆盖？', 
+                    self
+                ).exec_()
+                if reply != MessageBox.Yes:
+                    return
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_dir, target_dir)
+            self.refresh_plugin_list()
+            w = MessageBox(
+                '导入成功', 
+                f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。', 
+                self
+            )
+            w.yesButton.setText('好')
+            w.cancelButton.hide()
+            w.exec_()
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {json_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('插件配置文件格式错误')
+        except Exception as e:
+            logger.error(f"插件导入失败 - 文件夹复制错误: {json_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog(f'复制插件文件夹时发生错误：{str(e)}')
+    
+    def _import_from_zip(self, zip_file_path):
+        try:
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                if 'plugin.json' not in zip_ref.namelist():
+                    self._show_error_dialog('无效的插件文件：缺少 plugin.json 配置文件')
+                    return
+                with zip_ref.open('plugin.json') as f:
+                    plugin_info = json.loads(f.read().decode('utf-8'))
+                plugin_name = plugin_info.get('name', '未知插件')
+                plugin_dir_name = os.path.splitext(os.path.basename(zip_file_path))[0]
+                target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
+                if os.path.exists(target_dir):
+                    reply = MessageBox(
+                        '插件已存在', 
+                        f'插件 "{plugin_name}" 已存在，是否覆盖？', 
+                        self
+                    ).exec_()
+                    if reply != MessageBox.Yes:
+                        return
+                    shutil.rmtree(target_dir)
+                zip_ref.extractall(target_dir)
+                self.refresh_plugin_list()
+                w = MessageBox(
+                    '导入成功', 
+                    f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。', 
+                    self
+                )
+                w.yesButton.setText('好')
+                w.cancelButton.hide()
+                w.exec_()
+                
+        except zipfile.BadZipFile as e:
+            logger.error(f"插件导入失败 - 无效的ZIP文件: {zip_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('无效的ZIP文件')
+        except json.JSONDecodeError as e:
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {zip_file_path}, 错误详情: {str(e)}")
+            self._show_error_dialog('插件配置文件格式错误')
+
+    def _show_error_dialog(self, message):
+        w = MessageBox('错误', message, self)
+        w.yesButton.setText('好')
+        w.yesButton.setStyleSheet("""
+            PushButton{
+                border-radius: 5px;
+                padding: 5px 12px 6px 12px;
+                outline: none;
+            }
+            PrimaryPushButton{
+                color: white;
+                background-color: #FF6167;
+                border: 1px solid #FF8585;
+                border-bottom: 1px solid #943333;
+            }
+            PrimaryPushButton:hover{
+                background-color: #FF7E83;
+                border: 1px solid #FF8084;
+                border-bottom: 1px solid #B13939;
+            }
+            PrimaryPushButton:pressed{
+                color: rgba(255, 255, 255, 0.63);
+                background-color: #DB5359;
+                border: 1px solid #DB5359;
+            }
+        """)
+        w.cancelButton.hide()
+        w.exec_()
 
     def setup_help_interface(self):
         open_by_browser = self.findChild(PushButton, 'open_by_browser')
@@ -1817,6 +2083,13 @@ class SettingsMenu(FluentWindow):
         te_name_edit = self.findChild(EditableComboBox, 'name_part_combo')  # 名称
         te_name_edit.addItems(list_.time)
 
+        te_edit_part_button = self.findChild(ToolButton, 'edit_part_button')  # 编辑节点开始时间
+        te_edit_part_button.setIcon(fIcon.EDIT)
+        te_edit_part_button.setToolTip('编辑节点开始时间')
+        te_edit_part_button.installEventFilter(
+            ToolTipFilter(te_edit_part_button, showDelay=300, position=ToolTipPosition.TOP))
+        te_edit_part_button.clicked.connect(self.te_edit_part_time)
+
         te_delete_part_button = self.findChild(ToolButton, 'delete_part_button')  # 删除节点
         te_delete_part_button.setIcon(fIcon.DELETE)
         te_delete_part_button.setToolTip('删除节点')
@@ -1865,7 +2138,54 @@ class SettingsMenu(FluentWindow):
         QScroller.grabGesture(te_timeline_list.viewport(), QScroller.LeftMouseButtonGesture)  # 触摸屏适配
         QScroller.grabGesture(part_list.viewport(), QScroller.LeftMouseButtonGesture)  # 触摸屏适配
         self.te_detect_item()
-        self.te_update_parts_name()  # 修复在启动时无法添加时段到下拉框的问题
+        self.te_update_parts_name()
+
+    def te_edit_part_time(self):
+        """编辑选中节点的开始时间"""
+        te_part_list = self.findChild(ListWidget, 'part_list')
+        te_part_time = self.findChild(TimeEdit, 'part_time')
+        selected_items = te_part_list.selectedItems()
+        if not selected_items:
+            Flyout.create(
+                icon=InfoBarIcon.WARNING,
+                title='请先选择一个节点 o(TヘTo)',
+                content='在编辑节点时间前，请先在左侧列表中选择要编辑的节点',
+                target=self.findChild(ToolButton, 'edit_part_button'),
+                parent=self,
+                isClosable=True,
+                aniType=FlyoutAnimationType.PULL_UP
+            )
+            return
+        selected_item = selected_items[0]
+        item_text = selected_item.text()
+        item_info = item_text.split(' - ')
+        if len(item_info) >= 3:
+            part_name = item_info[0]
+            part_type = item_info[2]
+            new_time = te_part_time.time().toString("h:mm")
+            new_text = f'{part_name} - {new_time} - {part_type}'
+            selected_item.setText(new_text)
+            self.te_detect_item()
+            self.te_update_parts_name()
+            Flyout.create(
+                icon=InfoBarIcon.SUCCESS,
+                title='节点时间已更新 ヾ(≧▽≦*)o',
+                content=f'节点 "{part_name}" 的开始时间已更新为 {new_time}',
+                target=self.findChild(ToolButton, 'edit_part_button'),
+                parent=self,
+                isClosable=True,
+                aniType=FlyoutAnimationType.PULL_UP
+            )
+        else:
+            Flyout.create(
+                icon=InfoBarIcon.ERROR,
+                title='节点格式异常 (╥﹏╥)',
+                content='选中的节点格式不正确，无法编辑',
+                target=self.findChild(ToolButton, 'edit_part_button'),
+                parent=self,
+                isClosable=True,
+                aniType=FlyoutAnimationType.PULL_UP
+            )
 
     def setup_schedule_preview(self):
         subtitle = self.findChild(SubtitleLabel, 'subtitle_file')

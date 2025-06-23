@@ -1,7 +1,7 @@
 name: 临时构建(pyinstaller)
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
     paths-ignore:      
     - '**/*.md'
@@ -32,122 +32,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  lint:
-    name: Python Syntax Check
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target'
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Checkout PR (merge ref)
-        uses: actions/checkout@v4
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
-          fetch-depth: 0
-          path: .
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.8"
-
-      - name: Cache Python dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-python-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-python-
-
-      - name: Install project dependencies
-        run: |
-          pip install -r requirements.txt
-  
-      - name: Install linters and tools
-        run: |
-          pip install ruff pylint pyright
-
-      - name: Detect changed Python files
-        id: changed
-        run: |
-          echo "🔍 获取改动 Python 文件..."
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.py$' || true)
-          echo "$changed_files" > changed_files.txt
-          echo "changed_files_json=$(echo "$changed_files" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
-          if [ -z "$changed_files" ]; then
-            echo "has_changed_files=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_changed_files=true" >> $GITHUB_OUTPUT
-          fi
-          echo "$changed_files"
-
-      - name: Skip if no Python files changed
-        id: skip_lint_check
-        if: steps.changed.outputs.has_changed_files == 'false'
-        run: |
-          echo "✅ 没有 Python 文件改动，跳过检查"
-          echo "::set-output name=should_skip_lint::true"
-
-      - name: Run Ruff
-        if: steps.changed.outputs.has_changed_files == 'true'
-        uses: astral-sh/ruff-action@v3
-        continue-on-error: true
-        with:
-          args: check --select=E,F ${{ join(fromJson(steps.changed.outputs.changed_files_json), ' ') }}
-
-      - name: Run Pyright
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        uses: jakebailey/pyright-action@v2
-        continue-on-error: true
-        with:
-          annotate: errors
-          pylance-version: latest-release
-          args: ${{ join(fromJson(steps.changed.outputs.changed_files_json), ' ') }}
-
-      - name: Run PyLint
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        continue-on-error: true
-        run: |
-          if [ -s changed_files.txt ]; then
-            pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606 $(cat changed_files.txt) > pylint_output.txt || true
-          else
-            echo "没有需要检查的Python文件" > pylint_output.txt
-          fi
-
-      - name: Read PyLint Output
-        id: pylint_output_read
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        run: |
-          echo '::group::读取 PyLint 输出内容'
-          if [ -f pylint_output.txt ] && [ -s pylint_output.txt ]; then
-            echo "output<<EOF" >> $GITHUB_OUTPUT
-            cat pylint_output.txt >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "output=没有需要检查的Python文件" >> $GITHUB_OUTPUT
-          fi
-          echo '::endgroup::'
-
-      - name: Post PyLint comment to PR
-        if: steps.skip_lint_check.outputs.should_skip_lint != 'true'
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            **🧪 PyLint 检查结果**
-            <details><summary>查看详情</summary>
-
-            ```
-            ${{ steps.changed.outputs.changed_files_json }}
-            ```
-            ```text
-            ${{ steps.pylint_output_read.outputs.output }}
-            ```
-
-            </details>
-
   build:
     strategy:
       fail-fast: false
@@ -265,7 +149,6 @@ jobs:
             --add-data font:font `
             --add-data view:view `
             --add-data LICENSE:. `
-            --add-data plugins:plugins `
             --hidden-import darkdetect
           ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 

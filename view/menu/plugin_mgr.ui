@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>791</width>
-    <height>1388</height>
+    <height>982</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,7 +50,7 @@
         <x>0</x>
         <y>0</y>
         <width>743</width>
-        <height>1283</height>
+        <height>876</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_9">
@@ -64,7 +64,31 @@
            <item>
             <widget class="SubtitleLabel" name="SubtitleLabel">
              <property name="text">
-              <string>插件管理器</string>
+              <string>插件管理</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="CaptionLabel" name="plugin_count_label">
+             <property name="text">
+              <string>已安装 0 个插件</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <property name="lightColor" stdset="0">
+              <color>
+               <red>96</red>
+               <green>96</green>
+               <blue>96</blue>
+              </color>
+             </property>
+             <property name="darkColor" stdset="0">
+              <color>
+               <red>210</red>
+               <green>210</green>
+               <blue>210</blue>
+              </color>
              </property>
             </widget>
            </item>
@@ -173,9 +197,94 @@
           </widget>
          </item>
          <item>
+          <spacer name="verticalSpacer_for_note_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>5</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="CardWidget" name="CardWidget_search">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>70</height>
+            </size>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_search">
+            <property name="leftMargin">
+             <number>16</number>
+            </property>
+            <property name="topMargin">
+             <number>16</number>
+            </property>
+            <property name="rightMargin">
+             <number>16</number>
+            </property>
+            <property name="bottomMargin">
+             <number>16</number>
+            </property>
+            <item>
+             <widget class="SearchLineEdit" name="plugin_search">
+              <property name="placeholderText">
+               <string>搜索插件名称、作者或描述...</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="ComboBox" name="filter_combo">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>120</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="ToolButton" name="refresh_btn">
+              <property name="toolTip">
+               <string>刷新插件列表</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
           <layout class="QVBoxLayout" name="plugin_card_layout">
            <property name="spacing">
             <number>3</number>
+           </property>
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <property name="minimumSize" stdset="0">
+            <size>
+             <width>0</width>
+             <height>200</height>
+            </size>
            </property>
            <item>
             <widget class="CaptionLabel" name="tips_plugin_empty">
@@ -192,33 +301,60 @@
               </size>
              </property>
              <property name="styleSheet">
-              <string notr="true">FluentLabelBase {
-    color: black;
-}
-
-HyperlinkLabel {
-    color: #009faa;
-    border: none;
-    background-color: transparent;
-    text-align: left;
-    padding: 0;
-    margin: 0;
-}
-
-HyperlinkLabel[underline=true] {
-    text-decoration: underline;
-}
-
-HyperlinkLabel[underline=false] {
-    text-decoration: none;
-}
-
-HyperlinkLabel:hover {
-    color: #007780;
-}
-
-HyperlinkLabel:pressed {
-    color: #00a7b3;
+              <string notr="true">FluentLabelBase {
+
+    color: black;
+
+}
+
+
+
+HyperlinkLabel {
+
+    color: #009faa;
+
+    border: none;
+
+    background-color: transparent;
+
+    text-align: left;
+
+    padding: 0;
+
+    margin: 0;
+
+}
+
+
+
+HyperlinkLabel[underline=true] {
+
+    text-decoration: underline;
+
+}
+
+
+
+HyperlinkLabel[underline=false] {
+
+    text-decoration: none;
+
+}
+
+
+
+HyperlinkLabel:hover {
+
+    color: #007780;
+
+}
+
+
+
+HyperlinkLabel:pressed {
+
+    color: #00a7b3;
+
 }
 FluentLabelBase{color:#7d000000}</string>
              </property>
@@ -413,6 +549,81 @@ FluentLabelBase{color:#7d000000}</string>
            </layout>
           </widget>
          </item>
+         <item>
+          <widget class="CardWidget" name="CardWidget_import">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>70</height>
+            </size>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_import">
+            <property name="leftMargin">
+             <number>16</number>
+            </property>
+            <property name="topMargin">
+             <number>16</number>
+            </property>
+            <property name="rightMargin">
+             <number>16</number>
+            </property>
+            <property name="bottomMargin">
+             <number>16</number>
+            </property>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_import">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="StrongBodyLabel" name="StrongBodyLabel_import">
+                <property name="text">
+                 <string>导入本地插件</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="CaptionLabel" name="CaptionLabel_import">
+                <property name="text">
+                 <string>从本地文件导入插件包 (支持.zip格式与解压后的插件)</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+                <property name="lightColor" stdset="0">
+                 <color alpha="150">
+                  <red>0</red>
+                  <green>0</green>
+                  <blue>0</blue>
+                 </color>
+                </property>
+                <property name="darkColor" stdset="0">
+                 <color alpha="200">
+                  <red>255</red>
+                  <green>255</green>
+                  <blue>255</blue>
+                 </color>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="PushButton" name="import_plugin_btn">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>选择文件导入</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>
@@ -423,8 +634,86 @@ FluentLabelBase{color:#7d000000}</string>
          <item>
           <widget class="SubtitleLabel" name="SubtitleLabel_3">
            <property name="text">
-            <string>自动化</string>
+            <string>其他</string>
            </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="CardWidget" name="CardWidget_2">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>70</height>
+            </size>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_6">
+            <property name="leftMargin">
+             <number>16</number>
+            </property>
+            <property name="topMargin">
+             <number>16</number>
+            </property>
+            <property name="rightMargin">
+             <number>16</number>
+            </property>
+            <property name="bottomMargin">
+             <number>16</number>
+            </property>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="StrongBodyLabel" name="StrongBodyLabel_2">
+                <property name="text">
+                 <string>安全模式加载插件</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="CaptionLabel" name="CaptionLabel_4">
+                <property name="text">
+                 <string>当插件出现错误时自动禁用插件加载</string>
+                </property>
+                <property name="lightColor" stdset="0">
+                 <color alpha="150">
+                  <red>0</red>
+                  <green>0</green>
+                  <blue>0</blue>
+                 </color>
+                </property>
+                <property name="darkColor" stdset="0">
+                 <color alpha="200">
+                  <red>255</red>
+                  <green>255</green>
+                  <blue>255</blue>
+                 </color>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="SwitchButton" name="switch_safe_plugin">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>关</string>
+              </property>
+              <property name="onText">
+               <string>开</string>
+              </property>
+              <property name="offText">
+               <string>关</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </item>
          <item>
@@ -508,8 +797,8 @@ FluentLabelBase{color:#7d000000}</string>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>20</width>
-           <height>40</height>
+           <width>5</width>
+           <height>5</height>
           </size>
          </property>
         </spacer>
@@ -522,8 +811,23 @@ FluentLabelBase{color:#7d000000}</string>
  </widget>
  <customwidgets>
   <customwidget>
+   <class>ComboBox</class>
+   <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
    <class>PushButton</class>
    <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>ToolButton</class>
+   <extends>QToolButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SwitchButton</class>
+   <extends>QWidget</extends>
    <header>qfluentwidgets</header>
   </customwidget>
   <customwidget>
@@ -556,6 +860,16 @@ FluentLabelBase{color:#7d000000}</string>
   <customwidget>
    <class>TitleLabel</class>
    <extends>QLabel</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>LineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SearchLineEdit</class>
+   <extends>LineEdit</extends>
    <header>qfluentwidgets</header>
   </customwidget>
   <customwidget>

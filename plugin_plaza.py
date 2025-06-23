@@ -2,9 +2,10 @@ import json
 import sys
 from datetime import datetime
 from random import shuffle
+from typing import List
 
 from PyQt5 import uic
-from PyQt5.QtCore import QSize, Qt, QTimer, QUrl, QStringListModel, pyqtSignal
+from PyQt5.QtCore import QSize, Qt, QTimer, QUrl, QStringListModel, pyqtSignal, QThread
 from PyQt5.QtGui import QIcon, QPixmap, QDesktopServices
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QGridLayout, QSpacerItem, QSizePolicy, QWidget, \
     QScroller, QCompleter
@@ -25,6 +26,59 @@ from plugin import p_loader
 from utils import restart, calculate_size
 import platform
 from loguru import logger
+
+
+class ThreadManager:
+    """线程管理器"""
+    
+    def __init__(self):
+        self.active_threads: List[QThread] = []
+        self.logger = logger
+    
+    def add_thread(self, thread: QThread) -> QThread:
+        """添加线程到管理器"""
+        if thread not in self.active_threads:
+            self.active_threads.append(thread)
+            thread.finished.connect(lambda: self._remove_thread(thread))
+        return thread
+    
+    def _remove_thread(self, thread: QThread):
+        """从管理器中移除线程"""
+        if thread in self.active_threads:
+            self.active_threads.remove(thread)
+    
+    def stop_all_threads(self):
+        """停止所有活跃线程"""
+        for thread in self.active_threads.copy():
+            try:
+                if thread.isRunning():
+                    if hasattr(thread, 'stop'):
+                        thread.stop()
+                    if not thread.wait(1000):
+                        # self.logger.warning(f"线程 {thread.__class__.__name__} 未能在1秒内停止，强制终止")
+                        thread.terminate()
+                        thread.wait(500)
+                    # self.logger.debug(f"线程已停止: {thread.__class__.__name__}")
+                thread.deleteLater()
+            except Exception as e:
+                self.logger.error(f"停止线程时发生错误: {e}")
+        self.active_threads.clear()
+    
+    def get_active_count(self) -> int:
+        """获取活跃线程数量"""
+        return len([t for t in self.active_threads if t.isRunning()])
+    
+    def get_thread_status(self) -> dict:
+        """获取线程状态信息"""
+        running = [t.__class__.__name__ for t in self.active_threads if t.isRunning()]
+        finished = [t.__class__.__name__ for t in self.active_threads if t.isFinished()]
+        return {
+            'total': len(self.active_threads),
+            'running': len(running),
+            'finished': len(finished),
+            'running_threads': running,
+            'finished_threads': finished
+        }
 
 # 适配高DPI缩放
 if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
@@ -105,6 +159,9 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         # self.download_thread = nt.DownloadAndExtract(TEST_DOWNLOAD_LINK, self.p_name)
         self.download_thread.progress_signal.connect(lambda progress: self.bar.setValue(int(progress)))  # 下载进度
         self.download_thread.status_signal.connect(self.detect_status)  # 判断状态
+        if hasattr(self.parent(), 'thread_manager'):
+            self.parent().thread_manager.add_thread(self.download_thread)
+        
         self.download_thread.start()
 
     def cancelDownload(self):
@@ -283,6 +340,9 @@ class PluginDetailPage(MessageBoxBase):  # 插件详情页面
         else:
             self.download_thread = nt.getReadme(f"{replace_to_file_server(self.url, self.data['branch'])}/README.md")
         self.download_thread.html_signal.connect(display_readme)
+        if hasattr(self.parent, 'thread_manager'):
+            self.parent.thread_manager.add_thread(self.download_thread)
+        
         self.download_thread.start()
 
     def init_ui(self):
@@ -415,6 +475,7 @@ class PluginPlaza(MSFluentWindow):
     def __init__(self):
         super().__init__()
         self.splashScreen = None
+        self.thread_manager = ThreadManager()
         global installed_plugins
         try:
             with open(CONF_PATH, 'r', encoding='utf-8') as file:
@@ -498,6 +559,7 @@ class PluginPlaza(MSFluentWindow):
                     image_thread = nt.getImg(f"{replace_to_file_server(data['url'], data['branch'])}/icon.png")
                     image_thread.repo_signal.connect(
                         lambda img_data, card=plugin_card: set_plugin_image(card, img_data))
+                    self.thread_manager.add_thread(image_thread)
                     image_thread.start()
 
                     self.search_plugin_grid.addWidget(plugin_card, plugin_num // 2, plugin_num % 2)  # 排列
@@ -628,6 +690,7 @@ class PluginPlaza(MSFluentWindow):
             # 启动线程加载图片
             image_thread = nt.getImg(f"{replace_to_file_server(data['url'], data['branch'])}/icon.png")
             image_thread.repo_signal.connect(lambda img_data, card=plugin_card: set_plugin_image(card, img_data))
+            self.thread_manager.add_thread(image_thread)
             image_thread.start()
 
             self.plugin_grid.addWidget(plugin_card, plugin_num // 2, plugin_num % 2)  # 排列
@@ -671,6 +734,7 @@ class PluginPlaza(MSFluentWindow):
                         self.banner_thread = nt.getImg(self.img_links[index])
                         self.banner_thread.repo_signal.connect(lambda data: display_banner(data, index))
                         self.banner_thread.repo_signal.connect(lambda: start_next_banner(index + 1))  # 连接完成信号
+                        self.thread_manager.add_thread(self.banner_thread)
                         self.banner_thread.start()
 
                 start_next_banner(0)  # 启动第一个线程
@@ -680,6 +744,7 @@ class PluginPlaza(MSFluentWindow):
 
         self.banner_list_thread = nt.getRepoFileList()
         self.banner_list_thread.repo_signal.connect(get_banner)
+        self.thread_manager.add_thread(self.banner_list_thread)
         self.banner_list_thread.start()
 
     def restart_tips(self):
@@ -709,12 +774,18 @@ class PluginPlaza(MSFluentWindow):
 
         self.get_plugin_list_thread = nt.getPluginInfo()
         self.get_plugin_list_thread.repo_signal.connect(callback)
+        self.thread_manager.add_thread(self.get_plugin_list_thread)
         self.get_plugin_list_thread.start()
 
     def get_tags_data(self):
         self.get_tags_list_thread = nt.getTags()
         self.get_tags_list_thread.repo_signal.connect(self.set_tags_data)
+        self.thread_manager.add_thread(self.get_tags_list_thread)
         self.get_tags_list_thread.start()
+    
+    def closeEvent(self, event):
+        self.thread_manager.stop_all_threads()
+        super().closeEvent(event)
 
     def switch_banners(self):  # 切换Banner
         if self.banner_view.currentIndex() == len(self.img_list) - 1:
