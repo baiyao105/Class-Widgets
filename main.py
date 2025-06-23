@@ -2840,8 +2840,7 @@ if __name__ == '__main__':
         dlg.buttonLayout.insertStretch(0, 1)
         dlg.setFixedWidth(550)
         dlg.exec()
-        sys.exit(0) 
-        ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss
+        sys.exit(0) 咩咩咩咩咩咩咩咩咩咩咩咩咩咩咩咩咩咩咩
     if not share.create(1):
         print(f'无法创建共享内存: {share.errorString()}') # logger 可能还没准备好
         sys.exit(1)
