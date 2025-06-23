@@ -197,11 +197,13 @@ jobs:
           report="## 🧪 静态检查结果\n\n"
           report+="> 检查已完成,以下为结果~喵~\n\n"
           report+="🕒 **检查时间**：$(date '+%Y-%m-%d %H:%M:%S UTC')\n"
-          report+="📁 **检查的文件数**：$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length') 个\n\n"
+          file_count=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length')
+          file_list=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq -r '.[] | "`" + . + "`"' | paste -sd ',' - | sed 's/,/, /g')
+          report+="📁 检查的文件数：${file_count} 个 [${file_list}]\n\n"
           all_passed=true
           has_any_issues=false
+          report+="---\n"
           if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
-            report+="---\n\n"
             report+="<details>\n"
             report+="<summary>🔍 PyLint结果（点我展开）</summary>\n\n"
             report+="\`\`\`\n"
@@ -212,7 +214,6 @@ jobs:
             has_any_issues=true
           fi
           if [[ "${{ steps.mypy.outputs.has_issues }}" == "true" ]]; then
-            report+="---\n\n"
             report+="<details>\n"
             report+="<summary>🔍 MyPy结果（点我展开）</summary>\n\n"
             report+="\`\`\`\n"
