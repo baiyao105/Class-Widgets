@@ -1,0 +1,257 @@
+name: Python Syntax Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+concurrency:
+  group: code-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  PYTHON_VERSION: '3.8'
+  CACHE_VERSION: 'v1'
+
+jobs:
+  detect-changes:
+    name: Get File Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_python_changes: ${{ steps.changes.outputs.has_python_changes }}
+      changed_files: ${{ steps.changes.outputs.changed_files }}
+      changed_files_json: ${{ steps.changes.outputs.changed_files_json }}
+      files_exist: ${{ steps.files.outputs.files_exist }}
+      should_run: ${{ steps.decision.outputs.should_run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Get Python file changes
+        id: changes
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            if [[ "${{ github.event.action }}" == "opened" ]]; then
+              base_ref="origin/${{ github.event.pull_request.base.ref }}"
+              head_ref="HEAD"
+              echo "📋 基准分支：${{ github.event.pull_request.base.ref }}"
+              echo "📋 目标分支：${{ github.event.pull_request.head.ref }}"
+            elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
+              base_ref="${{ github.event.before }}"
+              head_ref="${{ github.event.after }}"
+              echo "📋 上次提交：${{ github.event.before }}"
+              echo "📋 本次提交：${{ github.event.after }}"
+            fi
+          fi
+          changed_files=$(git diff --name-only --diff-filter=ACMRT $base_ref...$head_ref | grep '\.py$' | head -50 || true)
+          echo "变更的 Python 文件:"
+          echo "$changed_files"
+          if [[ "${{ github.event_name }}" == "pull_request_target" && "${{ github.event.action }}" == "synchronize" && -n "$changed_files" ]]; then
+            all_pr_files=$(git diff --name-only --diff-filter=ACMRT origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.py$' | head -50 || true)
+            echo "$all_pr_files"
+            analysis_files="$all_pr_files"
+          else
+            analysis_files="$changed_files"
+          fi
+
+          if [[ -n "$changed_files" ]]; then
+            echo "has_python_changes=true" >> $GITHUB_OUTPUT
+            echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$analysis_files" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "changed_files_json=$(echo "$analysis_files" | jq -R -s -c 'split("\n") | map(select(. != ""))')" >> $GITHUB_OUTPUT
+          else
+            echo "has_python_changes=false" >> $GITHUB_OUTPUT
+            echo "changed_files=" >> $GITHUB_OUTPUT
+            echo "changed_files_json=[]" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare file list
+        id: files
+        run: |
+          files="${{ steps.changes.outputs.changed_files }}"
+          if [[ -z "$files" ]]; then
+            echo "没有 Python 文件需要检查"
+            echo "files_exist=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "files_exist=true" >> $GITHUB_OUTPUT
+            echo "检查文件列表:"
+            echo "$files"
+          fi
+
+      - name: Decide whether to run checks
+        id: decision
+        run: |
+          if [[ "${{ steps.files.outputs.files_exist }}" == "true" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+  code-quality:
+    name: Code Check
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_run == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-uv-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-uv-
+      - name: Create venv and install dependencies
+        run: |
+          uv venv .venv
+          echo "UV_VENV_PATH=.venv" >> $GITHUB_ENV
+          uv pip install -r requirements.txt
+          uv pip install ruff pylint pyright mypy
+          echo "工具版本信息:"
+          .venv/bin/ruff --version || .venv/Scripts/ruff.exe --version
+          .venv/bin/pylint --version || .venv/Scripts/pylint.exe --version
+          .venv/bin/pyright --version || .venv/Scripts/pyright.exe --version
+          .venv/bin/mypy --version || .venv/Scripts/mypy.exe --version
+
+      - name: Run Ruff check
+        uses: astral-sh/ruff-action@v3
+        id: ruff
+        if: needs.detect-changes.outputs.files_exist == 'true'
+        with:
+          args: check ${{ needs.detect-changes.outputs.changed_files }}
+        continue-on-error: true
+
+      - name: Run Pyright check
+        uses: jakebailey/pyright-action@v2
+        id: pyright
+        if: needs.detect-changes.outputs.files_exist == 'true'
+        with:
+          annotate: errors
+          pylance-version: latest-release
+          extra-args: ${{ needs.detect-changes.outputs.changed_files }}
+        continue-on-error: true
+
+      - name: Run PyLint check
+        id: pylint
+        if: needs.detect-changes.outputs.files_exist == 'true'
+        continue-on-error: true
+        run: |
+          echo "运行 PyLint 检查..."
+          files="${{ needs.detect-changes.outputs.changed_files }}"
+          pylint_cmd=".venv/bin/pylint"
+          if echo "$files" | xargs $pylint_cmd --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
+            echo "PyLint 检查通过"
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          else
+            echo "PyLint 发现问题"
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run MyPy check
+        id: mypy
+        if: needs.detect-changes.outputs.files_exist == 'true'
+        continue-on-error: true
+        run: |
+          echo "运行 MyPy 检查..."
+          files="${{ needs.detect-changes.outputs.changed_files }}"
+          mypy_cmd=".venv/bin/mypy"
+          if echo "$files" | xargs $mypy_cmd --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
+            echo "MyPy 检查通过"
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          else
+            echo "MyPy 发现问题"
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate report
+        id: code-quality
+        if: always() && needs.detect-changes.outputs.files_exist == 'true'
+        run: |
+          report="## 🧪 静态检查结果\n\n"
+          report+="> 检查已完成,以下为结果~喵~\n\n"
+          report+="🕒 **检查时间**：$(date '+%Y-%m-%d %H:%M:%S UTC')\n"
+          file_count=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length')
+          file_list=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq -r '.[] | "`" + . + "`"' | paste -sd ',' - | sed 's/,/, /g')
+          report+="📁 检查的文件数：${file_count} 个 [${file_list}]\n\n"
+          all_passed=true
+          has_any_issues=false
+          report+="---\n"
+          if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
+            report+="<details>\n"
+            report+="<summary>🔍 PyLint结果（点我展开）</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat pylint_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+            has_any_issues=true
+          fi
+          if [[ "${{ steps.mypy.outputs.has_issues }}" == "true" ]]; then
+            report+="<details>\n"
+            report+="<summary>🔍 MyPy结果（点我展开）</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat mypy_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+            has_any_issues=true
+          fi
+          if [[ "$has_any_issues" == "true" ]]; then
+            report+="---\n"
+          fi
+          report+="**喵**"
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$report" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "all_passed=$all_passed" >> $GITHUB_OUTPUT
+
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '静态检查结果'
+
+      - name: Post or update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          body: ${{ steps.code-quality.outputs.report }}
+          edit-mode: replace
+          
+      - name: Set check status(x)
+        run: |
+          if [[ "${{ steps.code-quality.outputs.all_passed }}" == "true" ]]; then
+            exit 0
+          else
+            exit 0
+          fi
