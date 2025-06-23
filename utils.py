@@ -1,13 +1,19 @@
 import os
 import sys
+import subprocess
+import time
+from pathlib import Path
+from typing import Dict, Any, Optional, Union, List, Callable
 import psutil
 
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QAction
 from loguru import logger
-from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal, QThread
+from PyQt5 import QtCore
 import darkdetect
 import datetime as dt
+import winreg
 
 from file import base_directory, config_center
 import signal
@@ -15,7 +21,7 @@ import signal
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
 
-def restart():
+def restart() -> None:
     logger.debug('重启程序')
     app = QApplication.instance()
     if app:
@@ -31,7 +37,7 @@ def restart():
         share.detach()  # 释放共享内存
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-def stop(status=0):
+def stop(status: int = 0) -> None:
     global share, update_timer, _stop_in_progress
     if _stop_in_progress:
         return
@@ -101,7 +107,7 @@ def stop(status=0):
     if not app:
         os._exit(status)
 
-def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
+def calculate_size(p_w: float = 0.6, p_h: float = 0.7) -> tuple:  # 计算尺寸
     screen_geometry = QApplication.primaryScreen().geometry()
     screen_width = screen_geometry.width()
     screen_height = screen_geometry.height()
@@ -111,7 +117,7 @@ def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
 
     return (width, height), (int(screen_width / 2 - width / 2), 150)
 
-def update_tray_tooltip():
+def update_tray_tooltip() -> None:
     """更新托盘文字"""
     if hasattr(sys.modules[__name__], 'tray_icon'):
         tray_instance = getattr(sys.modules[__name__], 'tray_icon')
@@ -132,28 +138,28 @@ def update_tray_tooltip():
 
 class DarkModeWatcher(QObject):
     darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号
-    def __init__(self, interval=500, parent=None):
+    def __init__(self, interval: int = 500, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._isDarkMode = darkdetect.isDark()  # 初始状态
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._checkTheme)
         self._timer.start(interval)  # 轮询间隔（毫秒）
 
-    def _checkTheme(self):
+    def _checkTheme(self) -> None:
         currentMode = darkdetect.isDark()
         if currentMode != self._isDarkMode:
             self._isDarkMode = currentMode
             self.darkModeChanged.emit(currentMode)  # 发出变化信号
 
-    def isDark(self):
+    def isDark(self) -> bool:
         """返回当前是否暗黑模式"""
         return self._isDarkMode
 
-    def stop(self):
+    def stop(self) -> None:
         """停止监听"""
         self._timer.stop()
 
-    def start(self, interval=None):
+    def start(self, interval: Optional[int] = None) -> None:
         """开始监听"""
         if interval:
             self._timer.setInterval(interval)
@@ -161,11 +167,11 @@ class DarkModeWatcher(QObject):
 
 
 class TrayIcon(QSystemTrayIcon):
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon.png"))
 
-    def push_update_notification(self, text=''):
+    def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
             "发现 Class Widgets 新版本！",
@@ -174,7 +180,7 @@ class TrayIcon(QSystemTrayIcon):
             5000
         )
 
-    def push_error_notification(self, title='检查更新失败！', text=''):
+    def push_error_notification(self, title: str = '检查更新失败！', text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
             title,
@@ -189,14 +195,14 @@ class UnionUpdateTimer(QObject):
     统一更新计时器
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timeout)
         self.callbacks = []  # 存储所有的回调函数
         self._is_running = False
 
-    def _on_timeout(self):  # 超时
+    def _on_timeout(self) -> None:  # 超时
         app = QApplication.instance()
         if not app or app.closingDown():
             if self.timer.isActive():
@@ -226,13 +232,13 @@ class UnionUpdateTimer(QObject):
         delay = max(0, int((next_tick - now).total_seconds() * 1000))
         self.timer.start(delay)
 
-    def add_callback(self, callback):
+    def add_callback(self, callback: Callable) -> None:
         if callback not in self.callbacks:
             self.callbacks.append(callback)
             if not self._is_running:
                 self.start()
 
-    def remove_callback(self, callback):
+    def remove_callback(self, callback: Callable) -> None:
         try:
             self.callbacks.remove(callback)
         except ValueError:
@@ -244,13 +250,13 @@ class UnionUpdateTimer(QObject):
         self.callbacks = []
         # self.stop() # 删除定时器
 
-    def start(self):
+    def start(self) -> None:
         if not self._is_running:
             logger.debug("启动 UnionUpdateTimer...")
             self._is_running = True
             self._schedule_next()
 
-    def stop(self):
+    def stop(self) -> None:
         self._is_running = False
         if self.timer:
             try:

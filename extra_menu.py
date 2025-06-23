@@ -1,6 +1,7 @@
 import datetime as dt
 import sys
 from shutil import copy
+from typing import Optional, List
 
 from PyQt5 import uic
 from PyQt5.QtCore import Qt
@@ -35,7 +36,7 @@ current_week = dt.datetime.today().weekday()
 temp_schedule = {'schedule': {}, 'schedule_even': {}}
 
 
-def open_settings():
+def open_settings() -> None:
     global settings
     if settings is None or not settings.isVisible():
         settings = SettingsMenu()
@@ -47,7 +48,7 @@ def open_settings():
         settings.activateWindow()
 
 
-def cleanup_settings():
+def cleanup_settings() -> None:
     global settings
     logger.info('关闭“设置”')
     del settings
@@ -55,14 +56,14 @@ def cleanup_settings():
 
 
 class ExtraMenu(FluentWindow):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.menu = None
         self.interface = uic.loadUi(f'{base_directory}/view/extra_menu.ui')
         self.initUI()
         self.init_interface()
 
-    def init_interface(self):
+    def init_interface(self) -> None:
         ex_scroll = self.findChild(SmoothScrollArea, 'ex_scroll')
         QScroller.grabGesture(ex_scroll, QScroller.LeftMouseButtonGesture)
         select_temp_week = self.findChild(ComboBox, 'select_temp_week')  # 选择替换日期
@@ -93,13 +94,13 @@ class ExtraMenu(FluentWindow):
         redirect_to_settings.clicked.connect(open_settings)
 
     @staticmethod
-    def load_schedule():
+    def load_schedule() -> List[str]:
         if conf.get_week_type():
             return schedule_center.schedule_data['schedule_even'][str(current_week)]
         else:
             return schedule_center.schedule_data['schedule'][str(current_week)]
 
-    def save_temp_conf(self):
+    def save_temp_conf(self) -> None:
         try:
             temp_week = self.findChild(ComboBox, 'select_temp_week')
             temp_schedule_set = self.findChild(ComboBox, 'select_temp_schedule')
@@ -151,7 +152,7 @@ class ExtraMenu(FluentWindow):
                 aniType=FlyoutAnimationType.PULL_UP
             )
 
-    def refresh_schedule_list(self):
+    def refresh_schedule_list(self) -> None:
         global current_week
         current_week = self.findChild(ComboBox, 'select_temp_week').currentIndex()
         current_schedule = self.findChild(ComboBox, 'select_temp_schedule').currentIndex()
@@ -174,7 +175,7 @@ class ExtraMenu(FluentWindow):
             else:
                 tmp_schedule_list.addItems(file.load_from_json('backup.json')['schedule'][str(current_week)])
 
-    def upload_item(self):
+    def upload_item(self) -> None:
         global temp_schedule
         se_schedule_list = self.findChild(ListWidget, 'schedule_list')
         cache_list = []
@@ -186,7 +187,7 @@ class ExtraMenu(FluentWindow):
         else:
             temp_schedule['schedule'][str(current_week)] = cache_list
 
-    def edit_item(self):
+    def edit_item(self) -> None:
         tmp_schedule_list = self.findChild(ListWidget, 'schedule_list')
         class_combo = self.findChild(ComboBox, 'class_combo')
         custom_class = self.findChild(LineEdit, 'custom_class')
@@ -200,7 +201,7 @@ class ExtraMenu(FluentWindow):
                 if custom_class.text() != '':
                     selected_item.setText(custom_class.text())
 
-    def initUI(self):
+    def initUI(self) -> None:
         # 修复设置窗口在各个屏幕分辨率DPI下的窗口大小
         screen_geometry = QApplication.primaryScreen().geometry()
         screen_width = screen_geometry.width()
@@ -217,7 +218,7 @@ class ExtraMenu(FluentWindow):
 
         self.addSubInterface(self.interface, fIcon.INFO, '更多设置')
 
-    def closeEvent(self, e):
+    def closeEvent(self, e) -> None:
         self.deleteLater()
         return super().closeEvent(e)
 

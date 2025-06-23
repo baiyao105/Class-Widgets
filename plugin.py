@@ -2,6 +2,8 @@ import importlib
 import json
 from pathlib import Path
 import shutil
+import importlib
+from typing import Dict, List, Optional, Any
 
 from loguru import logger
 
@@ -9,16 +11,16 @@ import conf
 
 
 class PluginLoader:  # 插件加载器
-    def __init__(self, p_mgr=None):
-        self.plugins_settings = {}
-        self.plugins_name = []
-        self.plugins_dict = {}
+    def __init__(self, p_mgr: Optional[Any] = None) -> None:
+        self.plugins_settings: Dict[str, Any] = {}
+        self.plugins_name: List[str] = []
+        self.plugins_dict: Dict[str, Any] = {}
         self.manager = p_mgr
 
-    def set_manager(self, p_mgr):
+    def set_manager(self, p_mgr: Any) -> None:
         self.manager = p_mgr
 
-    def load_plugins(self):
+    def load_plugins(self) -> List[str]:
         plugin_config = conf.load_plugin_config()
         safe_plugin_enabled = plugin_config.get('safe_plugin', False)
         if 'temp_disabled_plugins' in plugin_config:
@@ -75,7 +77,7 @@ class PluginLoader:  # 插件加载器
                     continue
         return self.plugins_name
 
-    def _disable_plugin_safely(self, plugin_name):
+    def _disable_plugin_safely(self, plugin_name: str) -> None:
         """安全禁用插件"""
         plugin_config = conf.load_plugin_config()
         if plugin_name in plugin_config.get('enabled_plugins', []):
@@ -87,16 +89,16 @@ class PluginLoader:  # 插件加载器
             conf.save_plugin_config(plugin_config)
             logger.info(f"插件 {plugin_name} 已被临时禁用")
 
-    def run_plugins(self):
+    def run_plugins(self) -> None:
         for plugin in self.plugins_dict.values():
             plugin.execute()
 
-    def update_plugins(self):
+    def update_plugins(self) -> None:
         for plugin in self.plugins_dict.values():
             if hasattr(plugin, 'update'):
                 plugin.update(self.manager.get_app_contexts())
 
-    def delete_plugin(self, plugin_name):
+    def delete_plugin(self, plugin_name: str) -> bool:
         plugin_dir = Path(conf.PLUGINS_DIR) / plugin_name
         if not plugin_dir.is_dir():
             logger.warning(f"插件目录 {plugin_dir} 不存在，无法删除。")
