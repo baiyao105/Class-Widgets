@@ -71,7 +71,7 @@ def save_plugin_config(data):
         return False
 
 
-def save_installed_plugin(data):
+def save_installed_plugin(data): 
     data = {"plugins": data}
     try:
         with open(base_directory / 'plugins' / 'plugins_from_pp.json', 'w', encoding='utf-8') as file:
