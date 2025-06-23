@@ -81,7 +81,6 @@ def save_installed_plugin(data):
         logger.error(f"保存已安装插件数据时出错: {e}")
         return False
 
-
 def load_theme_width(theme):
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
