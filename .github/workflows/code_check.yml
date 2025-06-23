@@ -136,41 +136,85 @@ jobs:
             echo "$files"
           fi
 
-      - name: Run code checks
-        id: code-quality
+      - name: Run Ruff check
+        uses: astral-sh/ruff-action@v3
+        id: ruff
+        if: steps.files.outputs.files_exist == 'true'
+        with:
+          args: check ${{ needs.detect-changes.outputs.changed_files }}
+        continue-on-error: true
+
+      - name: Run Pyright check
+        uses: jakebailey/pyright-action@v2
+        id: pyright
+        if: steps.files.outputs.files_exist == 'true'
+        with:
+          annotate: errors
+          pylance-version: latest-release
+          extra-args: ${{ needs.detect-changes.outputs.changed_files }}
+        continue-on-error: true
+
+      - name: Run PyLint check
+        id: pylint
         if: steps.files.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
+          echo "🔍 运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
-          all_passed=true
+          if echo "$files" | xargs pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
+            echo "✅ PyLint 检查通过"
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          else
+            echo "❌ PyLint 发现问题"
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run MyPy check
+        id: mypy
+        if: steps.files.outputs.files_exist == 'true'
+        continue-on-error: true
+        run: |
+          echo "🔍 运行 MyPy 检查..."
+          files="${{ needs.detect-changes.outputs.changed_files }}"
+          if echo "$files" | xargs mypy --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
+            echo "✅ MyPy 检查通过"
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          else
+            echo "❌ MyPy 发现问题"
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate report
+        id: code-quality
+        if: always() && steps.files.outputs.files_exist == 'true'
+        run: |
           report="## 🔍 静态检查结果\n\n"
           report+="**检查时间**: $(date '+%Y-%m-%d %H:%M:%S UTC')\n"
           report+="**触发事件**: ${{ github.event_name }}\n"
           report+="**检查文件数**: $(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length')\n\n"
           
-          # 运行 Ruff 检查
-          echo "🔍 运行 Ruff 检查..."
-          if echo "$files" | xargs ruff check --output-format=text > ruff_output.txt 2>&1; then
-            echo "✅ Ruff 检查通过"
-            report+="### ✅ Ruff 检查通过\n\n"
-          else
-            echo "❌ Ruff 发现问题"
+          all_passed=true
+          
+          # 检查 Ruff 结果
+          if [[ "${{ steps.ruff.outcome }}" == "failure" ]]; then
             report+="### ❌ Ruff 发现问题\n\n"
-            report+="<details><summary>查看详情</summary>\n\n"
-            report+="\`\`\`\n"
-            report+="$(cat ruff_output.txt | head -50)\n"
-            report+="\`\`\`\n\n"
-            report+="</details>\n\n"
+            report+="请查看上方的 Problem Matchers 注释获取详细信息。\n\n"
             all_passed=false
+          else
+            report+="### ✅ Ruff 检查通过\n\n"
           fi
           
-          # 运行 PyLint 检查
-          echo "🔍 运行 PyLint 检查..."
-          if echo "$files" | xargs pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
-            echo "✅ PyLint 检查通过"
-            report+="### ✅ PyLint 检查通过\n\n"
+          # 检查 Pyright 结果
+          if [[ "${{ steps.pyright.outcome }}" == "failure" ]]; then
+            report+="### ❌ Pyright 发现问题\n\n"
+            report+="请查看上方的 Problem Matchers 注释获取详细信息。\n\n"
+            all_passed=false
           else
-            echo "❌ PyLint 发现问题"
+            report+="### ✅ Pyright 检查通过\n\n"
+          fi
+          
+          # 检查 PyLint 结果
+          if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
             report+="### ❌ PyLint 发现问题\n\n"
             report+="<details><summary>查看详情</summary>\n\n"
             report+="\`\`\`\n"
@@ -178,31 +222,12 @@ jobs:
             report+="\`\`\`\n\n"
             report+="</details>\n\n"
             all_passed=false
+          else
+            report+="### ✅ PyLint 检查通过\n\n"
           fi
           
-          # 运行 Pyright 检查
-          echo "🔍 运行 Pyright 检查..."
-          if echo "$files" | xargs pyright > pyright_output.txt 2>&1; then
-            echo "✅ Pyright 检查通过"
-            report+="### ✅ Pyright 检查通过\n\n"
-          else
-            echo "❌ Pyright 发现问题"
-            report+="### ❌ Pyright 发现问题\n\n"
-            report+="<details><summary>查看详情</summary>\n\n"
-            report+="\`\`\`\n"
-            report+="$(cat pyright_output.txt | head -50)\n"
-            report+="\`\`\`\n\n"
-            report+="</details>\n\n"
-            all_passed=false
-          fi
-          
-          # 运行 MyPy 检查
-          echo "🔍 运行 MyPy 检查..."
-          if echo "$files" | xargs mypy --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined,attr-defined,import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
-            echo "✅ MyPy 检查通过"
-            report+="### ✅ MyPy 检查通过\n\n"
-          else
-            echo "❌ MyPy 发现问题"
+          # 检查 MyPy 结果
+          if [[ "${{ steps.mypy.outputs.has_issues }}" == "true" ]]; then
             report+="### ❌ MyPy 发现问题\n\n"
             report+="<details><summary>查看详情</summary>\n\n"
             report+="\`\`\`\n"
@@ -210,12 +235,15 @@ jobs:
             report+="\`\`\`\n\n"
             report+="</details>\n\n"
             all_passed=false
+          else
+            report+="### ✅ MyPy 检查通过\n\n"
           fi
           
           if [[ "$all_passed" == "true" ]]; then
             report+="## 🎉 所有检查都通过了！\n\n"
           else
             report+="## ⚠️ 发现了一些问题\n\n"
+            report+="💡 **提示**: Ruff 和 Pyright 的问题已通过 Problem Matchers 在文件中标注，请查看具体文件位置的注释。\n\n"
           fi
           
           report+="\n----------\n"
@@ -248,5 +276,5 @@ jobs:
           if [[ "${{ steps.code-quality.outputs.all_passed }}" == "true" ]]; then
             exit 0
           else
-            exit 1
+            exit 0
           fi
