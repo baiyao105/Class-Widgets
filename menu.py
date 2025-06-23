@@ -1535,7 +1535,7 @@ class SettingsMenu(FluentWindow):
         te_name_edit = self.findChild(EditableComboBox, 'name_part_combo')  # 名称
         te_name_edit.addItems(list_.time)
 
-        te_edit_part_button = self.findChild(ToolButton, 'edit_button_2')  # 编辑节点开始时间
+        te_edit_part_button = self.findChild(ToolButton, 'edit_part_button')  # 编辑节点开始时间
         te_edit_part_button.setIcon(fIcon.EDIT)
         te_edit_part_button.setToolTip('编辑节点开始时间')
         te_edit_part_button.installEventFilter(
@@ -1602,7 +1602,7 @@ class SettingsMenu(FluentWindow):
                 icon=InfoBarIcon.WARNING,
                 title='请先选择一个节点 o(TヘTo)',
                 content='在编辑节点时间前，请先在左侧列表中选择要编辑的节点',
-                target=self.findChild(ToolButton, 'edit_button_2'),
+                target=self.findChild(ToolButton, 'edit_part_button'),
                 parent=self,
                 isClosable=True,
                 aniType=FlyoutAnimationType.PULL_UP
@@ -1623,7 +1623,7 @@ class SettingsMenu(FluentWindow):
                 icon=InfoBarIcon.SUCCESS,
                 title='节点时间已更新 ヾ(≧▽≦*)o',
                 content=f'节点 "{part_name}" 的开始时间已更新为 {new_time}',
-                target=self.findChild(ToolButton, 'edit_button_2'),
+                target=self.findChild(ToolButton, 'edit_part_button'),
                 parent=self,
                 isClosable=True,
                 aniType=FlyoutAnimationType.PULL_UP
@@ -1633,7 +1633,7 @@ class SettingsMenu(FluentWindow):
                 icon=InfoBarIcon.ERROR,
                 title='节点格式异常 (╥﹏╥)',
                 content='选中的节点格式不正确，无法编辑',
-                target=self.findChild(ToolButton, 'edit_button_2'),
+                target=self.findChild(ToolButton, 'edit_part_button'),
                 parent=self,
                 isClosable=True,
                 aniType=FlyoutAnimationType.PULL_UP

@@ -252,7 +252,7 @@ FluentLabelBase{color:#7d000000}</string>
           <widget class="ToolButton" name="add_part_button"/>
          </item>
          <item>
-          <widget class="ToolButton" name="edit_button_2"/>
+          <widget class="ToolButton" name="edit_part_button"/>
          </item>
          <item>
           <widget class="ToolButton" name="delete_part_button"/>
