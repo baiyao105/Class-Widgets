@@ -3,8 +3,6 @@ name: Python Syntax Check
 on:
   pull_request_target:
     types: [opened, synchronize]
-    paths:
-      - '**.py'
 
 concurrency:
   group: code-quality-${{ github.ref }}
@@ -27,6 +25,7 @@ jobs:
       has_python_changes: ${{ steps.changes.outputs.has_python_changes }}
       changed_files: ${{ steps.changes.outputs.changed_files }}
       changed_files_json: ${{ steps.changes.outputs.changed_files_json }}
+      files_exist: ${{ steps.files.outputs.files_exist }}
       should_run: ${{ steps.decision.outputs.should_run }}
     steps:
       - name: Checkout code
@@ -40,7 +39,8 @@ jobs:
         run: |
           base_ref="origin/${{ github.event.pull_request.base.ref }}"
           changed_files=$(git diff --name-only --diff-filter=ACMRT $base_ref...HEAD | grep '\.py$' | head -50 || true)
-          echo "变更的文件："
+          
+          echo "📁 变更的 Python 文件："
           echo "$changed_files"
 
           if [[ -n "$changed_files" ]]; then
@@ -55,10 +55,24 @@ jobs:
             echo "changed_files_json=[]" >> $GITHUB_OUTPUT
           fi
 
+      - name: Prepare file list
+        id: files
+        run: |
+          files="${{ steps.changes.outputs.changed_files }}"
+          if [[ -z "$files" ]]; then
+            echo "没有 Python 文件需要检查"
+            echo "files_exist=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "files_exist=true" >> $GITHUB_OUTPUT
+            echo "检查文件列表:"
+            echo "$files"
+          fi
+
       - name: Decide whether to run checks
         id: decision
         run: |
-          if [[ "${{ steps.changes.outputs.has_python_changes }}" == "true" ]]; then
+          if [[ "${{ steps.files.outputs.files_exist }}" == "true" ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -109,23 +123,12 @@ jobs:
           .venv/bin/pyright --version || .venv/Scripts/pyright.exe --version
           .venv/bin/mypy --version || .venv/Scripts/mypy.exe --version
 
-      - name: Prepare file list
-        id: files
-        run: |
-          files="${{ needs.detect-changes.outputs.changed_files }}"
-          if [[ -z "$files" ]]; then
-            echo "没有文件需要检查"
-            echo "files_exist=false" >> $GITHUB_OUTPUT
-          else
-            echo "files_exist=true" >> $GITHUB_OUTPUT
-            echo "检查文件列表:"
-            echo "$files"
-          fi
+
 
       - name: Run Ruff check
         uses: astral-sh/ruff-action@v3
         id: ruff
-        if: steps.files.outputs.files_exist == 'true'
+        if: needs.detect-changes.outputs.files_exist == 'true'
         with:
           args: check ${{ needs.detect-changes.outputs.changed_files }}
         continue-on-error: true
@@ -133,7 +136,7 @@ jobs:
       - name: Run Pyright check
         uses: jakebailey/pyright-action@v2
         id: pyright
-        if: steps.files.outputs.files_exist == 'true'
+        if: needs.detect-changes.outputs.files_exist == 'true'
         with:
           annotate: errors
           pylance-version: latest-release
@@ -142,15 +145,12 @@ jobs:
 
       - name: Run PyLint check
         id: pylint
-        if: steps.files.outputs.files_exist == 'true'
+        if: needs.detect-changes.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
           echo "🔍 运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           pylint_cmd=".venv/bin/pylint"
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            pylint_cmd=".venv/Scripts/pylint.exe"
-          fi
           if echo "$files" | xargs $pylint_cmd --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
             echo "✅ PyLint 检查通过"
             echo "has_issues=false" >> $GITHUB_OUTPUT
@@ -161,15 +161,12 @@ jobs:
 
       - name: Run MyPy check
         id: mypy
-        if: steps.files.outputs.files_exist == 'true'
+        if: needs.detect-changes.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
           echo "🔍 运行 MyPy 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           mypy_cmd=".venv/bin/mypy"
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            mypy_cmd=".venv/Scripts/mypy.exe"
-          fi
           if echo "$files" | xargs $mypy_cmd --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
             echo "✅ MyPy 检查通过"
             echo "has_issues=false" >> $GITHUB_OUTPUT
@@ -180,39 +177,14 @@ jobs:
 
       - name: Generate report
         id: code-quality
-        if: always() && steps.files.outputs.files_exist == 'true'
+        if: always() && needs.detect-changes.outputs.files_exist == 'true'
         run: |
           report="## 🧪 静态检查结果\n\n"
           report+="> 检查已完成,以下为结果~喵~\n\n"
           report+="🕒 **检查时间**：$(date '+%Y-%m-%d %H:%M:%S UTC')\n"
           report+="📁 **检查的文件数**：$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length') 个\n\n"
-          
           all_passed=true
           has_any_issues=false
-          
-          # 检查 Ruff 结果
-          if [[ "${{ steps.ruff.outcome }}" == "failure" ]]; then
-            report+="---\n\n"
-            report+="<details>\n"
-            report+="<summary>🔍 Ruff结果（点我展开）</summary>\n\n"
-            report+="请查看上方的 Problem Matchers 注释获取详细信息。\n\n"
-            report+="</details>\n\n"
-            all_passed=false
-            has_any_issues=true
-          fi
-          
-          # 检查 Pyright 结果
-          if [[ "${{ steps.pyright.outcome }}" == "failure" ]]; then
-            report+="---\n\n"
-            report+="<details>\n"
-            report+="<summary>🔍 Pyright结果（点我展开）</summary>\n\n"
-            report+="请查看上方的 Problem Matchers 注释获取详细信息。\n\n"
-            report+="</details>\n\n"
-            all_passed=false
-            has_any_issues=true
-          fi
-          
-          # 检查 PyLint 结果
           if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
             report+="---\n\n"
             report+="<details>\n"
@@ -235,17 +207,13 @@ jobs:
             all_passed=false
             has_any_issues=true
           fi
-          
           if [[ "$has_any_issues" == "true" ]]; then
             report+="---\n"
           fi
-          
           report+="**喵**"
-          
           echo "report<<EOF" >> $GITHUB_OUTPUT
           echo -e "$report" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
           echo "all_passed=$all_passed" >> $GITHUB_OUTPUT
 
       - name: Find existing comment
