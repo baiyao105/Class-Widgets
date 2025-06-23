@@ -69,10 +69,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.should_run == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        tool: [ruff, pylint, pyright, mypy]
     
     steps:
       - name: Checkout code
@@ -86,36 +82,46 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache dependencies
+      - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
+            ~/.local/lib/python*/site-packages
+          key: ${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-pip-
+
+      - name: Cache code quality tools
+        uses: actions/cache@v4
+        with:
+          path: |
             ~/.cache/pyright
             ~/.mypy_cache
-          key: ${{ runner.os }}-${{ env.CACHE_VERSION }}-${{ matrix.tool }}-${{ hashFiles('**/requirements.txt') }}
+            ~/.cache/ruff
+            ~/.cache/pylint
+          key: ${{ runner.os }}-tools-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.CACHE_VERSION }}-${{ matrix.tool }}-
-            ${{ runner.os }}-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-tools-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-tools-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-tools-
 
-      - name: Install dependencies
+      - name: Install dependencies and tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          case "${{ matrix.tool }}" in
-            "ruff")
-              pip install ruff
-              ;;
-            "pylint")
-              pip install pylint
-              ;;
-            "pyright")
-              pip install pyright
-              ;;
-            "mypy")
-              pip install mypy
-              ;;
-          esac
+          pip install --cache-dir ~/.cache/pip -r requirements.txt
+          tools=("ruff" "pylint" "pyright" "mypy")
+          for tool in "${tools[@]}"; do
+            if ! pip show "$tool" > /dev/null 2>&1; then
+              pip install --cache-dir ~/.cache/pip "$tool"
+            fi
+          done
+          echo "tool version："
+          ruff --version
+          pylint --version
+          pyright --version
+          mypy --version
 
       - name: Prepare file list
         id: files
@@ -130,179 +136,86 @@ jobs:
             echo "$files"
           fi
 
-      - name: Run Ruff
-        if: matrix.tool == 'ruff' && steps.files.outputs.files_exist == 'true'
-        uses: astral-sh/ruff-action@v3
-        with:
-          args: check --output-format=github ${{ needs.detect-changes.outputs.changed_files }}
-        continue-on-error: true
-        id: ruff
-
-      - name: Store Ruff Results
-        if: matrix.tool == 'ruff' && steps.files.outputs.files_exist == 'true'
-        run: |
-          if [ "${{ steps.ruff.outcome }}" = "failure" ]; then
-            echo "RUFF_ISSUES=true" >> $GITHUB_ENV
-            echo "ruff_issues=发现问题" >> ruff_result.txt
-            echo "has_issues=true" >> $GITHUB_OUTPUT
-          else
-            echo "RUFF_ISSUES=false" >> $GITHUB_ENV
-            echo "ruff_issues=0" >> ruff_result.txt
-            echo "has_issues=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run PyLint
-        if: matrix.tool == 'pylint' && steps.files.outputs.files_exist == 'true'
-        id: pylint
+      - name: Run code checks
+        id: code-quality
+        if: steps.files.outputs.files_exist == 'true'
         continue-on-error: true
         run: |
-          echo "🔍 运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
-          if [[ -n "$files" ]]; then
-            echo "$files" | xargs pylint \
-              --errors-only \
-              --disable=no-member,no-name-in-module,E0601,E0606,import-error,no-name-in-module \
-              --output-format=text \
-              --reports=no > pylint_output.txt 2>&1 || true
-            
-            if [[ -s pylint_output.txt ]]; then
-              echo "发现问题："
-              cat pylint_output.txt
-              echo "has_issues=true" >> $GITHUB_OUTPUT
-            else
-              echo "✅ PyLint 检查通过"
-              echo "has_issues=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Run Pyright
-        if: matrix.tool == 'pyright' && steps.files.outputs.files_exist == 'true'
-        uses: jakebailey/pyright-action@v2
-        with:
-          annotate: errors
-          pylance-version: latest-release
-          extra-args: ${{ needs.detect-changes.outputs.changed_files }}
-        continue-on-error: true
-        id: pyright
-
-      - name: Store Pyright Results
-        if: matrix.tool == 'pyright' && steps.files.outputs.files_exist == 'true'
-        run: |
-          if [ "${{ steps.pyright.outcome }}" = "failure" ]; then
-            echo "PYRIGHT_ISSUES=true" >> $GITHUB_ENV
-            echo "pyright_issues=发现问题" >> pyright_result.txt
-            echo "has_issues=true" >> $GITHUB_OUTPUT
-          else
-            echo "PYRIGHT_ISSUES=false" >> $GITHUB_ENV
-            echo "pyright_issues=0" >> pyright_result.txt
-            echo "has_issues=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run MyPy
-        if: matrix.tool == 'mypy' && steps.files.outputs.files_exist == 'true'
-        id: mypy
-        continue-on-error: true
-        run: |
-          echo "🔍 运行 MyPy 检查..."
-          files="${{ needs.detect-changes.outputs.changed_files }}"
-          if [[ -n "$files" ]]; then
-            echo "$files" | xargs mypy \
-              --ignore-missing-imports \
-              --no-strict-optional \
-              --show-error-codes \
-              --disable-error-code=name-defined,attr-defined,import > mypy_output.txt 2>&1 || true
-            
-            if [[ -s mypy_output.txt ]] && ! grep -q "Success: no issues found" mypy_output.txt; then
-              echo "发现问题："
-              cat mypy_output.txt
-              echo "has_issues=true" >> $GITHUB_OUTPUT
-            else
-              echo "✅ MyPy 检查通过"
-              echo "has_issues=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Upload check results
-        if: always() && steps.files.outputs.files_exist == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.tool }}-results
-          path: ${{ matrix.tool }}_output.txt
-          retention-days: 7
-
-  report:
-    name: Generate Check Report
-    runs-on: ubuntu-latest
-    needs: [detect-changes, code-quality]
-    if: always() && needs.detect-changes.outputs.should_run == 'true'
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: results
-
-      - name: Generate comprehensive report
-        id: report
-        run: |
-          echo "生成评论..."
-          
+          all_passed=true
           report="## 🔍 静态检查结果\n\n"
           report+="**检查时间**: $(date '+%Y-%m-%d %H:%M:%S UTC')\n"
           report+="**触发事件**: ${{ github.event_name }}\n"
           report+="**检查文件数**: $(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length')\n\n"
           
-          # 检查各工具结果
-          tools=("ruff" "pylint" "pyright" "mypy")
-          all_passed=true
+          # 运行 Ruff 检查
+          echo "🔍 运行 Ruff 检查..."
+          if echo "$files" | xargs ruff check --output-format=text > ruff_output.txt 2>&1; then
+            echo "✅ Ruff 检查通过"
+            report+="### ✅ Ruff 检查通过\n\n"
+          else
+            echo "❌ Ruff 发现问题"
+            report+="### ❌ Ruff 发现问题\n\n"
+            report+="<details><summary>查看详情</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat ruff_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+          fi
           
-          for tool in "${tools[@]}"; do
-            case "$tool" in
-              "ruff")
-                if [[ -f "ruff_result.txt" ]]; then
-                  ruff_issues=$(grep "ruff_issues=" ruff_result.txt | cut -d'=' -f2 || echo "0")
-                  if [[ "$ruff_issues" != "0" ]]; then
-                    all_passed=false
-                  else
-                    report+="### ✅ Ruff 检查通过\n\n"
-                  fi
-                else
-                  report+="### ⏭️ Ruff 跳过检查\n\n"
-                fi
-                ;;
-              "pyright")
-                if [[ -f "pyright_result.txt" ]]; then
-                  pyright_issues=$(grep "pyright_issues=" pyright_result.txt | cut -d'=' -f2 || echo "0")
-                  if [[ "$pyright_issues" != "0" ]]; then
-                    all_passed=false
-                  else
-                    report+="### ✅ Pyright 检查通过\n\n"
-                  fi
-                else
-                  report+="### ⏭️ Pyright 跳过检查\n\n"
-                fi
-                ;;
-              *)
-                if [[ -f "results/${tool}-results/${tool}_output.txt" ]]; then
-                  if [[ -s "results/${tool}-results/${tool}_output.txt" ]]; then
-                    report+="### ❌ ${tool^} 发现问题\n\n"
-                    report+="<details><summary>查看详情</summary>\n\n"
-                    report+="\`\`\`\n"
-                    report+="$(cat "results/${tool}-results/${tool}_output.txt" | head -50)\n"
-                    report+="\`\`\`\n\n"
-                    report+="</details>\n\n"
-                    all_passed=false
-                  else
-                    report+="### ✅ ${tool^} 检查通过\n\n"
-                  fi
-                else
-                  report+="### ⏭️ ${tool^} 跳过检查\n\n"
-                fi
-                ;;
-            esac
-          done
+          # 运行 PyLint 检查
+          echo "🔍 运行 PyLint 检查..."
+          if echo "$files" | xargs pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
+            echo "✅ PyLint 检查通过"
+            report+="### ✅ PyLint 检查通过\n\n"
+          else
+            echo "❌ PyLint 发现问题"
+            report+="### ❌ PyLint 发现问题\n\n"
+            report+="<details><summary>查看详情</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat pylint_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+          fi
+          
+          # 运行 Pyright 检查
+          echo "🔍 运行 Pyright 检查..."
+          if echo "$files" | xargs pyright > pyright_output.txt 2>&1; then
+            echo "✅ Pyright 检查通过"
+            report+="### ✅ Pyright 检查通过\n\n"
+          else
+            echo "❌ Pyright 发现问题"
+            report+="### ❌ Pyright 发现问题\n\n"
+            report+="<details><summary>查看详情</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat pyright_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+          fi
+          
+          # 运行 MyPy 检查
+          echo "🔍 运行 MyPy 检查..."
+          if echo "$files" | xargs mypy --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined,attr-defined,import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
+            echo "✅ MyPy 检查通过"
+            report+="### ✅ MyPy 检查通过\n\n"
+          else
+            echo "❌ MyPy 发现问题"
+            report+="### ❌ MyPy 发现问题\n\n"
+            report+="<details><summary>查看详情</summary>\n\n"
+            report+="\`\`\`\n"
+            report+="$(cat mypy_output.txt | head -50)\n"
+            report+="\`\`\`\n\n"
+            report+="</details>\n\n"
+            all_passed=false
+          fi
           
           if [[ "$all_passed" == "true" ]]; then
             report+="## 🎉 所有检查都通过了！\n\n"
+          else
+            report+="## ⚠️ 发现了一些问题\n\n"
           fi
           
           report+="\n----------\n"
@@ -327,12 +240,12 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
-          body: ${{ steps.report.outputs.report }}
+          body: ${{ steps.code-quality.outputs.report }}
           edit-mode: replace
           
       - name: Set check status
         run: |
-          if [[ "${{ steps.report.outputs.all_passed }}" == "true" ]]; then
+          if [[ "${{ steps.code-quality.outputs.all_passed }}" == "true" ]]; then
             exit 0
           else
             exit 1
