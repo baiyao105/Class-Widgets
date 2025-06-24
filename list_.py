@@ -238,7 +238,7 @@ def create_new_profile(filename: str) -> None:
     copy(f'{base_directory}/config/default.json', f'{base_directory}/config/schedule/{filename}')
 
 
-def import_schedule(filepath: str, filename: str) -> Union[bool, Exception]:  # 导入课表
+def import_schedule(filepath: str, filename: str) -> bool:  # 导入课表
     try:
         with open(filepath, 'r', encoding='utf-8') as file:
             check_data = json.load(file)
@@ -256,7 +256,7 @@ def import_schedule(filepath: str, filename: str) -> Union[bool, Exception]:  # 
         return True
     except Exception as e:
         logger.error(f"保存数据时出错: {e}")
-        return e
+        return False
 
 
 def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课表
@@ -314,7 +314,7 @@ def export_schedule(filepath: str, filename: str) -> bool:  # 导出课表
         return True
     except Exception as e:
         logger.error(f"导出文件时出错: {e}")
-        return e
+        return False
 
 
 def get_widget_config() -> Dict[str, Any]:

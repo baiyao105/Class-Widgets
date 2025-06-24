@@ -187,7 +187,7 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f'更新配置文件时出错: {e}')
 
-    def read_conf(self, section: str = 'General', key: str = '', fallback: Any = None) -> Any:
+    def read_conf(self, section: str = 'General', key: str = '', fallback: Any = None) -> Union[str, Any]:
         """读取配置项，并根据默认配置中的类型信息进行转换"""
         if section not in self.config and section not in self.default_data:
             logger.warning(f"配置节未找到: Section='{section}'")

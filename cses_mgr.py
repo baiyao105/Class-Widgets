@@ -37,7 +37,7 @@ class CSES_Converter:
         self.parser = None
         self.path = path
 
-    def load_parser(self) -> Union[str, Any]:
+    def load_parser(self) -> Union[str, cses.CSESParser]:
         if not cses.CSESParser.is_cses_file(self.path):
             return "Error: Not a CSES file"  # 判定格式
 
@@ -47,7 +47,7 @@ class CSES_Converter:
     def load_generator(self) -> None:
         self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Version', 'cses_version')))
 
-    def convert_to_cw(self) -> Union[Dict[str, Any], bool]:
+    def convert_to_cw(self) -> Union[Dict, bool]:
         """
         将CSES文件转换为Class Widgets格式
         """

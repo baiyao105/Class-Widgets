@@ -863,7 +863,7 @@ def generate_speech_sync(
     )
 
 
-def list_pyttsx3_voices():
+def list_pyttsx3_voices() -> List[str]:
     """列出所有可用的 Pyttsx3 语音."""
     try:
         try:

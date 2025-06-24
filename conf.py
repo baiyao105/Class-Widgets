@@ -31,17 +31,16 @@ app_icon = base_directory / 'img' / (
 update_countdown_custom_last = 0
 countdown_cnt = 0
 
-def load_theme_config(theme: str) -> Optional[Union[Dict[str, Any], str]]:
+def load_theme_config(theme: str) -> Dict[str, Any]:
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
             return data
-    except FileNotFoundError:
-        logger.warning(f"主题配置文件 {theme} 不存在，返回默认配置")
-        return str(base_directory / 'ui' / 'default' / 'theme.json')
     except Exception as e:
-        logger.error(f"加载主题数据时出错: {e}")
-        return None
+        logger.error(f"加载主题数据时出错: {e}，返回默认主题")
+        with open(base_directory / 'ui' / 'default' / 'theme.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            return data
 
 
 def load_plugin_config() -> Optional[Dict[str, Any]]:
@@ -83,7 +82,7 @@ def save_installed_plugin(data: List[Any]) -> bool:
         return False
 
 
-def load_theme_width(theme: str) -> Union[int, Dict[str, int]]:
+def load_theme_width(theme: str) -> int:
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
@@ -100,15 +99,9 @@ def is_temp_week() -> Union[bool, str]:
         return config_center.read_conf('Temp', 'set_week')
 
 
-def is_temp_schedule() -> Union[bool, str]:
-    if (
-        config_center.read_conf('Temp', 'temp_schedule') is None
-        or config_center.read_conf('Temp', 'temp_schedule') == ''
-    ):
-        return False
-    else:
-        return config_center.read_conf('Temp', 'temp_schedule')
-
+def is_temp_schedule() -> bool:
+    return not (config_center.read_conf('Temp', 'temp_schedule') in [None, ''])
+    
 
 def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
     if os.name != 'nt':
@@ -244,7 +237,7 @@ def get_custom_countdown() -> str:
             # )
 
 
-def get_week_type() -> str: 
+def get_week_type() -> int: 
     if (temp_schedule := config_center.read_conf('Temp', 'set_schedule')) not in ('', None):  # 获取单双周
         return int(temp_schedule)
     start_date_str = config_center.read_conf('Date', 'start_date')
@@ -266,33 +259,30 @@ def get_week_type() -> str:
 
 def get_is_widget_in(widget: str = 'example.ui') -> bool:
     widgets_list = list_.get_widget_config()
-    if widget in widgets_list:
-        return True
-    else:
-        return False
+    return widget in widgets_list
 
 
-def save_widget_conf_to_json(new_data: Dict[str, Any]) -> None:
+def save_widget_conf_to_json(new_data: Dict[str, Any]) -> bool:
     # 初始化 data_dict 为一个空字典
     data_dict = {}
-    if os.path.exists(f'{base_directory}/config/widget.json'):
+    if os.path.exists(base_directory / 'config' / 'widget.json'):
         try:
-            with open(f'{base_directory}/config/widget.json', 'r', encoding='utf-8') as file:
+            with open(base_directory / 'config' / 'widget.json', 'r', encoding='utf-8') as file:
                 data_dict = json.load(file)
         except Exception as e:
             print(f"读取现有数据时出错: {e}")
-            return e
+            return False
     data_dict.update(new_data)
     try:
-        with open(f'{base_directory}/config/widget.json', 'w', encoding='utf-8') as file:
+        with open(base_directory / 'config' / 'widget.json', 'w', encoding='utf-8') as file:
             json.dump(data_dict, file, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
         print(f"保存数据时出错: {e}")
-        return e
+        return False
 
 
-def load_plugins() -> List[str]:  # 加载插件配置文件
+def load_plugins() -> Dict[Dict[str, str]]:  # 加载插件配置文件
     plugin_dict = {}
     for folder in Path(PLUGINS_DIR).iterdir():
         if folder.is_dir() and (folder / 'plugin.json').exists():

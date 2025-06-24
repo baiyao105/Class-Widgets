@@ -25,6 +25,8 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
     Dialog, ProgressRing, PlainTextEdit, ImageLabel, PushButton, InfoBarIcon, Flyout, FlyoutAnimationType, CheckBox, \
     PrimaryPushButton, IconWidget
 
+from PyQt5.QtGui import QCloseEvent, QShowEvent, QHideEvent, QMouseEvent, QFocusEvent
+
 import conf
 import list_
 import tip_toast
@@ -258,7 +260,7 @@ def get_start_time() -> None:
             logger.error(f'加载课程表文件[课程数据]出错：{e}')
 
 
-def get_part() -> Optional[Tuple[Any, ...]]:
+def get_part() -> Optional[Tuple[dt.datetime, int]]:
     if not parts_start_time:
         return None
 

@@ -18,6 +18,8 @@ import winreg
 from file import base_directory, config_center
 import signal
 
+from typing import Tuple
+
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
 
@@ -107,7 +109,7 @@ def stop(status: int = 0) -> None:
     if not app:
         os._exit(status)
 
-def calculate_size(p_w: float = 0.6, p_h: float = 0.7) -> tuple:  # 计算尺寸
+def calculate_size(p_w: float = 0.6, p_h: float = 0.7) -> Tuple[Tuple[int,int], Tuple[int,int]]:  # 计算尺寸
     screen_geometry = QApplication.primaryScreen().geometry()
     screen_width = screen_geometry.width()
     screen_height = screen_geometry.height()
