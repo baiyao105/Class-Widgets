@@ -5,7 +5,7 @@ import platform
 import re
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Tuple, Any
 from contextlib import contextmanager
 
 import edge_tts
@@ -27,7 +27,7 @@ MIN_VALID_FILE_SIZE = 10
 CACHE_MAX_AGE = 86400  # 缓存最大保存时间(秒)
 
 
-async def _get_edge_voices_async():
+async def _get_edge_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]:
     """获取Edge TTS语音列表,优先大陆"""
     try:
         edge_voices = await edge_tts.list_voices()
@@ -55,7 +55,7 @@ async def _get_edge_voices_async():
         return [], error_message
 
 
-async def _get_pyttsx3_voices_async():
+async def _get_pyttsx3_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]:
     """获取Pyttsx3语音列表"""
     try:
         with _pyttsx3_context() as engine:
@@ -99,7 +99,7 @@ def _is_zh_pyttsx3_voice(voice: Voice) -> bool:
 ENGINE_EDGE = "edge"
 ENGINE_PYTTSX3 = "pyttsx3"
 
-def get_available_engines():
+def get_available_engines() -> Dict[str, str]:
     """获取可用的TTS引擎及其显示名称."""
     engines = {
         ENGINE_EDGE: "Edge TTS",
@@ -131,12 +131,12 @@ def _pyttsx3_context():
             pass
 
 
-def filter_zh_voices(voices: list) -> list:
+def filter_zh_voices(voices: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """筛选中文语音"""
     return [v for v in voices if "zh" in v.get("id", "").lower()]
 
 
-def log_voices_summary(voices: list):
+def log_voices_summary(voices: List[Dict[str, str]]) -> None:
     """记录语音统计信息"""
     edge_count = len([v for v in voices if v["id"].startswith("edge:")])
     pyttsx3_count = len([v for v in voices if v["id"].startswith("pyttsx3:")])
@@ -153,7 +153,7 @@ _tts_voices_cache = {
     "pyttsx3": {"voices": [], "timestamp": 0},
 }
 
-async def get_tts_voices(engine_filter: Optional[str] = None):
+async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
     """异步获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3.
     Args:
         engine_filter (Optional[str], optional): 指定引擎 ("edge" or "pyttsx3"). Defaults to None (获取所有).
@@ -210,7 +210,7 @@ async def get_tts_voices(engine_filter: Optional[str] = None):
     return voices, overall_error
 
 
-def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None):
+def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None) -> Optional[str]:
     """
     根据语音名称查找语音ID
     参数：
@@ -227,7 +227,7 @@ def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None):
 
 
 def get_voice_name_by_id(
-    voice_id: str, available_voices: Optional[list] = None
+    voice_id: str, available_voices: Optional[List[Dict[str, str]]] = None
 ) -> Optional[str]:
     """
     根据语音ID查找语音名称
@@ -255,7 +255,7 @@ DEFAULT_DELETE_DELAY = 1.0
 class TTSEngine:
     """支持多平台和智能语音选择的多引擎TTS工具类"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         初始化TTS引擎实例
         属性：
@@ -272,7 +272,7 @@ class TTSEngine:
         }
 
     @staticmethod
-    def _get_platform_voices():
+    def _get_platform_voices() -> Dict[str, str]:
         """
         获取当前平台的默认语音配置
 
@@ -301,7 +301,7 @@ class TTSEngine:
         }
         return platform_voices.get(current_os, platform_voices["Linux"])
 
-    def _ensure_cache_dir(self):
+    def _ensure_cache_dir(self) -> None:
         Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -423,7 +423,7 @@ class TTSEngine:
                     com_initialized = False
 
     @staticmethod
-    def _sync_pyttsx3(text: str, voice: str, file_path: str):
+    def _sync_pyttsx3(text: str, voice: str, file_path: str) -> str:
         """同步生成语音文件(pyttsx3)"""
         temp_dir = os.path.dirname(file_path)
         temp_filename = f"temp_{int(time.time())}_{os.getpid()}_{hash(text) % 10000}.mp3"
@@ -863,7 +863,7 @@ def generate_speech_sync(
     )
 
 
-def list_pyttsx3_voices():
+def list_pyttsx3_voices() -> List[str]:
     """列出所有可用的 Pyttsx3 语音."""
     try:
         try:

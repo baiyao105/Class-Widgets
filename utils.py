@@ -1,18 +1,26 @@
 import os
 import sys
+import subprocess
+import time
+from pathlib import Path
+from typing import Dict, Any, Optional, Union, List, Callable
 import psutil
 import threading
 from typing import Dict, Callable, Any, Optional, Union
 
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QAction
 from loguru import logger
-from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal, QThread
+from PyQt5 import QtCore
 import darkdetect
 import datetime as dt
+import winreg
 
 from file import base_directory, config_center
 import signal
+
+from typing import Tuple
 
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
@@ -68,7 +76,7 @@ def _terminate_child_processes():
     except Exception as e:
         logger.error(f"终止子进程时出现意外错误: {e}")
 
-def restart():
+def restart() -> None:
     """重启程序"""
     logger.debug('重启程序')
     
@@ -87,7 +95,6 @@ def stop(status: int = 0):
     :param status: 退出状态码,0=正常退出,!=0表示异常退出
     """
     global update_timer, _stop_in_progress
-    
     if _stop_in_progress:
         return
     _stop_in_progress = True
@@ -110,7 +117,7 @@ def stop(status: int = 0):
     if not app:
         os._exit(status)
 
-def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
+def calculate_size(p_w: float = 0.6, p_h: float = 0.7) -> Tuple[Tuple[int,int], Tuple[int,int]]:  # 计算尺寸
     """计算尺寸"""
     screen_geometry = QApplication.primaryScreen().geometry()
     screen_width = screen_geometry.width()
@@ -127,28 +134,28 @@ class DarkModeWatcher(QObject):
     颜色(暗黑)模式监听器
     """
     darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号
-    def __init__(self, interval=500, parent=None):
+    def __init__(self, interval: int = 500, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._isDarkMode = darkdetect.isDark()  # 初始状态
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._checkTheme)
         self._timer.start(interval)  # 轮询间隔（毫秒）
 
-    def _checkTheme(self):
+    def _checkTheme(self) -> None:
         currentMode = darkdetect.isDark()
         if currentMode != self._isDarkMode:
             self._isDarkMode = currentMode
             self.darkModeChanged.emit(currentMode)  # 发出变化信号
 
-    def isDark(self):
+    def isDark(self) -> bool:
         """返回当前是否暗黑模式"""
         return self._isDarkMode
 
-    def stop(self):
+    def stop(self) -> None:
         """停止监听"""
         self._timer.stop()
 
-    def start(self, interval=None):
+    def start(self, interval: Optional[int] = None) -> None:
         """开始监听"""
         if interval:
             self._timer.setInterval(interval)
@@ -176,7 +183,7 @@ class TrayIcon(QSystemTrayIcon):
         else:
             self.setToolTip("Class Widgets - 未加载课表")
             logger.debug(f'托盘文字更新: "Class Widgets - 未加载课表"')
-
+            
     def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
@@ -210,7 +217,7 @@ class UnionUpdateTimer(QObject):
         self._base_interval: float = max(0.05, base_interval)  # 基础间隔,最小50ms
         self._lock: threading.Lock = threading.Lock()
 
-    def _on_timeout(self) -> None:  # 超时处理
+    def _on_timeout(self) -> None:  # 超时
         app = QApplication.instance()
         if not app or app.closingDown():
             self._safe_stop_timer()
@@ -256,7 +263,7 @@ class UnionUpdateTimer(QObject):
         """调度下一次执行"""
         delay: int = int(self._base_interval * 1000)
         self.timer.start(delay)
-    
+        
     def _safe_stop_timer(self) -> None:
         """安全停止定时器"""
         if self.timer and self.timer.isActive():

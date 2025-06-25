@@ -2,6 +2,7 @@ import sys
 
 import os
 from collections import defaultdict
+from typing import Optional, Union, List, Tuple, Dict, Any
 from PyQt5 import uic
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QPoint, pyqtProperty, QThread
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPixmap
@@ -42,12 +43,12 @@ tts_is_playing = False  # TTS播放状态标志
 
 class TTSAudioThread(QThread):
     """TTS线程"""
-    def __init__(self, text, voice_id):
+    def __init__(self, text: str, voice_id: str) -> None:
         super().__init__()
         self.text = text
         self.voice_id = voice_id
 
-    def run(self):
+    def run(self) -> None:
         self.setPriority(QThread.Priority.LowPriority) # TTS优先级可以低一些
         global tts_is_playing
         if tts_is_playing:
@@ -74,7 +75,7 @@ class TTSAudioThread(QThread):
 
 
 class tip_toast(QWidget):
-    def __init__(self, pos, width, state=1, lesson_name=None, title=None, subtitle=None, content=None, icon=None, duration=2000):
+    def __init__(self, pos: Tuple[int, int], width: int, state: int = 1, lesson_name: Optional[str] = None, title: Optional[str] = None, subtitle: Optional[str] = None, content: Optional[str] = None, icon: Optional[str] = None, duration: int = 2000) -> None:
         super().__init__()
         for w in active_windows[:]:
             w.close()
@@ -291,7 +292,7 @@ class tip_toast(QWidget):
         self.opacity_animation.start()
         self.blur_animation.start()
 
-    def close_window(self):
+    def close_window(self) -> None:
         try:
             dpr = self.screen().devicePixelRatio() if self.screen() else QApplication.primaryScreen().devicePixelRatio()
         except AttributeError:
@@ -324,7 +325,7 @@ class tip_toast(QWidget):
         self.blur_animation_close.start()
         self.opacity_animation_close.finished.connect(self.close)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         if self.audio_thread and self.audio_thread.isRunning():
             try:
                 self.audio_thread.quit()
@@ -346,7 +347,7 @@ class tip_toast(QWidget):
         self.deleteLater()
         event.ignore()
 
-    def playsound(self, filename):
+    def playsound(self, filename: str) -> None:
         try:
             file_path = os.path.join(base_directory, 'audio', filename)
             if self.audio_thread and self.audio_thread.isRunning():
@@ -360,7 +361,7 @@ class tip_toast(QWidget):
 
 
 class wave_Effect(QWidget):
-    def __init__(self, state=1):
+    def __init__(self, state: int = 1) -> None:
         super().__init__()
 
         if config_center.read_conf('Toast', 'pin_on_top') == '1':
@@ -399,15 +400,15 @@ class wave_Effect(QWidget):
         self.timer.start()
 
     @pyqtProperty(int)
-    def radius(self):
+    def radius(self) -> int:
         return self._radius
 
     @radius.setter
-    def radius(self, value):
+    def radius(self, value: int) -> None:
         self._radius = value
         self.update()
 
-    def showAnimation(self):
+    def showAnimation(self) -> None:
         self.animation = QPropertyAnimation(self, b'radius')
         self.animation.setDuration(self.duration)
         self.animation.setStartValue(50)
@@ -434,7 +435,7 @@ class wave_Effect(QWidget):
         self.fade_animation.finished.connect(self.close)
         self.fade_animation.start()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(QBrush(self.color))
@@ -443,7 +444,7 @@ class wave_Effect(QWidget):
         loc = QPoint(center.x(), self.rect().top() + start_y + 50)
         painter.drawEllipse(loc, self._radius, self._radius)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         if self in active_windows:
             active_windows.remove(self)
         global window_list
@@ -453,8 +454,8 @@ class wave_Effect(QWidget):
         event.ignore()
 
 
-def generate_gradient_color(theme_color):  # 计算渐变色
-    def adjust_color(color, factor):
+def generate_gradient_color(theme_color: str) -> List[str]:  # 计算渐变色
+    def adjust_color(color: QColor, factor: float) -> str:
         r = max(0, min(255, int(color.red() * (1 + factor))))
         g = max(0, min(255, int(color.green() * (1 + factor))))
         b = max(0, min(255, int(color.blue() * (1 + factor))))
@@ -466,8 +467,8 @@ def generate_gradient_color(theme_color):  # 计算渐变色
     return gradient
 
 
-def main(state=1, lesson_name='', title='通知示例', subtitle='副标题',
-         content='这是一条通知示例', icon=None, duration=2000):  # 0:下课铃声 1:上课铃声 2:放学铃声 3:预备铃 4:其他
+def main(state: int = 1, lesson_name: str = '', title: str = '通知示例', subtitle: str = '副标题',
+         content: str = '这是一条通知示例', icon: Optional[str] = None, duration: int = 2000) -> None:  # 0:下课铃声 1:上课铃声 2:放学铃声 3:预备铃 4:其他
     if detect_enable_toast(state):
         return
 
@@ -533,7 +534,7 @@ def main(state=1, lesson_name='', title='通知示例', subtitle='副标题',
         window_list.append(wave)
 
 
-def detect_enable_toast(state=0):
+def detect_enable_toast(state: int = 0) -> bool:
     if config_center.read_conf('Toast', 'attend_class') != '1' and state == 1:
         return True
     if (config_center.read_conf('Toast', 'finish_class') != '1') and (state in [0, 2]):
@@ -544,8 +545,8 @@ def detect_enable_toast(state=0):
         return False
 
 
-def push_notification(state=1, lesson_name='', title=None, subtitle=None,
-                      content=None, icon=None, duration=2000):  # 推送通知
+def push_notification(state: int = 1, lesson_name: str = '', title: Optional[str] = None, subtitle: Optional[str] = None,
+                      content: Optional[str] = None, icon: Optional[str] = None, duration: int = 2000) -> Dict[str, Any]:  # 推送通知
     global pushed_notification, notification_contents
     pushed_notification = True
     notification_contents = {

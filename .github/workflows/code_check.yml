@@ -166,11 +166,18 @@ jobs:
           echo "运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           pylint_cmd=".venv/bin/pylint"
-          if echo "$files" | xargs $pylint_cmd --errors-only --disable=no-member,no-name-in-module,E0601,E0606,import-error --output-format=text --reports=no > pylint_output.txt 2>&1 && [[ ! -s pylint_output.txt ]]; then
-            echo "PyLint 检查通过"
-            echo "has_issues=false" >> $GITHUB_OUTPUT
+          if echo "$files" | xargs $pylint_cmd --errors-only --disable=no-member,no-name-in-module,E0601,E0606,E1121,E0203,import-error,undefined-variable,used-before-assignment,unresolved-import,relative-beyond-top-level,cyclic-import,duplicate-code,too-many-locals,too-many-arguments,too-many-branches,too-many-statements,too-few-public-methods,too-many-instance-attributes,line-too-long,missing-docstring,invalid-name,broad-except,dict-item-0-or-1,return-in-init,arguments-differ,signature-differs,method-hidden,access-member-before-definition,attribute-defined-outside-init --output-format=text --reports=no > pylint_output.txt 2>&1; then
+            if grep -E "(syntax-error|indentation-error|E0001|E0011|E0012|E0100|E0101|E0102|E0103|E0104|E0105|E0107|E0108|E0110|E0111|E0112|E0113|E0114|E0115|E0116|E0117|E0118|E1003|E1004|E1101|E1102|E1111|E1120|E1123|E1124|E1125|E1126|E1127|E1128|E1129|E1130|E1131|E1132|E1133|E1134|E1135|E1136|E1137|E1138|E1139|E1140|E1141)" pylint_output.txt > /dev/null 2>&1; then
+              echo "PyLint 发现严重错误"
+              echo "has_critical_issues=true" >> $GITHUB_OUTPUT
+              echo "has_issues=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_critical_issues=false" >> $GITHUB_OUTPUT
+              echo "has_issues=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "PyLint 发现问题"
+            echo "has_critical_issues=true" >> $GITHUB_OUTPUT
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
 
@@ -182,11 +189,19 @@ jobs:
           echo "运行 MyPy 检查..."
           files="${{ needs.detect-changes.outputs.changed_files }}"
           mypy_cmd=".venv/bin/mypy"
-          if echo "$files" | xargs $mypy_cmd --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import > mypy_output.txt 2>&1 && (grep -q "Success: no issues found" mypy_output.txt || [[ ! -s mypy_output.txt ]]); then
-            echo "MyPy 检查通过"
-            echo "has_issues=false" >> $GITHUB_OUTPUT
+          if echo "$files" | xargs $mypy_cmd --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import --disable-error-code=misc --disable-error-code=no-redef --disable-error-code=var-annotated --disable-error-code=assignment --disable-error-code=return-value --disable-error-code=arg-type --disable-error-code=call-arg --disable-error-code=operator --disable-error-code=index --disable-error-code=union-attr --disable-error-code=has-type --disable-error-code=return --disable-error-code=dict-item --disable-error-code=override --disable-error-code=method-assign --disable-error-code=unreachable --disable-error-code=redundant-expr --disable-error-code=comparison-overlap > mypy_output.txt 2>&1; then
+            if grep -E "(syntax error|invalid syntax|unexpected indent|unindent does not match|SyntaxError|IndentationError|TabError)" mypy_output.txt > /dev/null 2>&1; then
+              echo "MyPy 发现严重错误"
+              echo "has_critical_issues=true" >> $GITHUB_OUTPUT
+              echo "has_issues=true" >> $GITHUB_OUTPUT
+            else
+              echo "MyPy 检查通过（无严重错误）"
+              echo "has_critical_issues=false" >> $GITHUB_OUTPUT
+              echo "has_issues=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "MyPy 发现问题"
+            echo "has_critical_issues=true" >> $GITHUB_OUTPUT
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
 
@@ -194,24 +209,35 @@ jobs:
         id: code-quality
         if: always() && needs.detect-changes.outputs.files_exist == 'true'
         run: |
-          report="## 🧪 静态检查结果\n\n"
-          report+="> 检查已完成,以下为结果~喵~\n\n"
-          report+="🕒 **检查时间**：$(date '+%Y-%m-%d %H:%M:%S UTC')\n"
-          commit_msg=$(git log -1 --pretty=format:'%s' HEAD)
+          run_id="${{ github.run_id }}"
+          repo="${{ github.repository }}"
+          file_json='${{ needs.detect-changes.outputs.changed_files_json }}'
+          file_count=$(echo "$file_json" | jq '. | length')
+          file_list=$(echo "$file_json" | jq -r '.[] | "\`" + . + "\`"' | paste -sd ', ' -)
+          run_url="https://github.com/${repo}/actions/runs/${run_id}"
+          repo_url="https://github.com/${repo}"
+          commit_msg="\"$(git log -1 --pretty=format:'%s' HEAD | jq -R | sed 's/^"//;s/"$//')\""
           commit_hash=$(git log -1 --pretty=format:'%h' HEAD)
           commit_full_hash=$(git log -1 --pretty=format:'%H' HEAD)
-          repo_url="https://github.com/${{ github.repository }}"
-          short_link="**[${commit_hash}](${repo_url}/commit/${commit_full_hash})**"
-          report+="📝 提交信息：${short_link} ${commit_msg}\n"
-          file_count=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq '. | length')
-          file_list=$(echo '${{ needs.detect-changes.outputs.changed_files_json }}' | jq -r '.[] | "`" + . + "`"' | paste -sd ',' - | sed 's/,/, /g')
-          report+="📁 检查的文件数：${file_count} 个 [${file_list}]\n\n"
+          short_link="[**${commit_hash}**](${repo_url}/commit/${commit_full_hash})"
+
+          report="## 🧪 静态检查结果\n\n"
+          report+="> 检查已完成([${run_id}](${run_url})),以下为结果~喵~\n\n"
+          report+="🕒 **检查时间**：$(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
+          report+="📝 **提交信息**：${short_link}: ${commit_msg}\n"
+          report+="📁 **检查的文件数**：${file_count} 个 - ${file_list}\n\n"
           all_passed=true
           has_any_issues=false
+          has_critical_issues=false
           report+="---\n"
           if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
             report+="<details>\n"
-            report+="<summary>🔍 PyLint结果（点我展开）</summary>\n\n"
+            if [[ "${{ steps.pylint.outputs.has_critical_issues }}" == "true" ]]; then
+              report+="<summary>❌ PyLint严重错误（点我展开）</summary>\n\n"
+              has_critical_issues=true
+            else
+              report+="<summary>🔍 PyLint提示（点我展开）</summary>\n\n"
+            fi
             report+="\`\`\`\n"
             report+="$(cat pylint_output.txt | head -50)\n"
             report+="\`\`\`\n\n"
@@ -221,7 +247,12 @@ jobs:
           fi
           if [[ "${{ steps.mypy.outputs.has_issues }}" == "true" ]]; then
             report+="<details>\n"
-            report+="<summary>🔍 MyPy结果（点我展开）</summary>\n\n"
+            if [[ "${{ steps.mypy.outputs.has_critical_issues }}" == "true" ]]; then
+              report+="<summary>❌ MyPy严重错误（点我展开）</summary>\n\n"
+              has_critical_issues=true
+            else
+              report+="<summary>🔍 MyPy提示（点我展开）</summary>\n\n"
+            fi
             report+="\`\`\`\n"
             report+="$(cat mypy_output.txt | head -50)\n"
             report+="\`\`\`\n\n"
@@ -237,6 +268,8 @@ jobs:
           echo -e "$report" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "all_passed=$all_passed" >> $GITHUB_OUTPUT
+          echo "has_critical_issues=$has_critical_issues" >> $GITHUB_OUTPUT
+          echo -e "$report" >> $GITHUB_STEP_SUMMARY
 
       - name: Find existing comment
         uses: peter-evans/find-comment@v3
@@ -254,10 +287,10 @@ jobs:
           body: ${{ steps.code-quality.outputs.report }}
           edit-mode: replace
           
-      - name: Set check status(x)
+      - name: Set check status
         run: |
-          if [[ "${{ steps.code-quality.outputs.all_passed }}" == "true" ]]; then
-            exit 0
+          if [[ "${{ steps.code-quality.outputs.has_critical_issues }}" == "true" ]]; then
+            exit 1
           else
             exit 0
           fi

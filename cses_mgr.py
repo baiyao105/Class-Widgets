@@ -4,6 +4,7 @@ what is CSES: https://github.com/CSES-org/CSES
 """
 import json
 import typing
+from typing import Union, Optional, Dict, Any, List
 import cses
 from datetime import datetime, timedelta
 from loguru import logger
@@ -31,22 +32,22 @@ class CSES_Converter:
     集成导入/导出CSES文件的功能
     """
 
-    def __init__(self, path='./'):
+    def __init__(self, path: str = './') -> None:
         self.generator = None
         self.parser = None
         self.path = path
 
-    def load_parser(self):
+    def load_parser(self) -> Union[str, cses.CSESParser]:
         if not cses.CSESParser.is_cses_file(self.path):
             return "Error: Not a CSES file"  # 判定格式
 
         self.parser = cses.CSESParser(self.path)
         return self.parser
 
-    def load_generator(self):
+    def load_generator(self) -> None:
         self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Version', 'cses_version')))
 
-    def convert_to_cw(self):
+    def convert_to_cw(self) -> Union[Dict, bool]:
         """
         将CSES文件转换为Class Widgets格式
         """
@@ -122,14 +123,14 @@ class CSES_Converter:
         print(cw_format)
         return cw_format
 
-    def convert_to_cses(self, cw_data=None, cw_path='./'):
+    def convert_to_cses(self, cw_data: Optional[Dict[str, Any]] = None, cw_path: str = './') -> bool:
         """
         将Class Widgets格式转换为CSES文件，需提供保存路径和Class Widgets数据/路径
         Args:
             cw_data: Class Widgets格式数据 (Optional)
             cw_path: Class Widgets文件路径(Optional)
         """
-        def convert(schedules, type_='odd'):
+        def convert(schedules: Dict[str, List[str]], type_: str = 'odd') -> None:
             class_counter_dict = {}  # 记录一个节点当天的课程数
             for part in parts:  # 节点循环
                 name = part_names[part]
@@ -191,7 +192,7 @@ class CSES_Converter:
                         classes=[timelines_part[str(day)][i] for i in range(len(timelines_part[str(day)]))]
                     )
 
-        def check_subjects(schedule):  # 检查课表是否有未正式设定的科目
+        def check_subjects(schedule: Dict[str, List[str]]) -> List[str]:  # 检查课表是否有未正式设定的科目
             unset_subjects = []
             for _, classes in schedule.items():
                 for class_ in classes:

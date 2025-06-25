@@ -1,6 +1,8 @@
+import sys
 import os
 import time
 import pathlib
+from typing import Optional, Dict, Any
 
 import pygame
 import pygame.mixer
@@ -11,7 +13,7 @@ import conf
 from file import config_center
 from generate_speech import TTSEngine, on_audio_played
 
-sound_cache = {}
+sound_cache: Dict[str, Any] = {}
 
 
 class PlayAudio(QThread):
@@ -22,12 +24,12 @@ class PlayAudio(QThread):
         self.file_path = file_path
         self.tts_delete_after = tts_delete_after
 
-    def run(self):
+    def run(self) -> None:
         play_audio(self.file_path, self.tts_delete_after)
         self.play_back_signal.emit(True)
 
 
-def play_audio(file_path: str, tts_delete_after: bool = False):
+def play_audio(file_path: str, tts_delete_after: bool = False) -> None:
     sound = None
     channel = None
     relative_path = os.path.relpath(file_path, conf.base_directory)
