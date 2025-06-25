@@ -17,95 +17,95 @@ import signal
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
 
+def _reset_signal_handlers():
+    """重置信号处理器为默认状态"""
+    try:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+    except (AttributeError, ValueError):
+        pass
+
+def _cleanup_shared_memory():
+    """清理共享内存"""
+    global share
+    if share and share.isAttached():
+        try:
+            share.detach()
+            logger.debug("共享内存已分离")
+        except Exception as e:
+            logger.error(f"分离共享内存时出错: {e}")
+
+def _terminate_child_processes():
+    """终止所有子进程"""
+    try:
+        parent = psutil.Process(os.getpid())
+        children = parent.children(recursive=True)
+        if not children:
+            return
+        logger.debug(f"尝试终止 {len(children)} 个子进程...")
+        for child in children:
+            try:
+                logger.debug(f"终止子进程 {child.pid}...")
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                logger.debug(f"子进程 {child.pid}: {e}")
+            except Exception as e:
+                logger.warning(f"终止子进程 {child.pid} 时出错: {e}")
+        gone, alive = psutil.wait_procs(children, timeout=1.5)
+        if alive:
+            logger.warning(f"{len(alive)} 个子进程未在规定时间内终止,将强制终止...")
+            for p in alive:
+                try:
+                    logger.debug(f"强制终止子进程 {p.pid}...")
+                    p.kill()
+                except psutil.NoSuchProcess:
+                    logger.debug(f"子进程 {p.pid} 在强制终止前已消失.")
+                except Exception as e:
+                    logger.error(f"强制终止子进程 {p.pid} 失败: {e}")
+                    
+    except psutil.NoSuchProcess:
+        logger.warning("无法获取当前进程信息,跳过子进程终止。")
+    except Exception as e:
+        logger.error(f"终止子进程时出现意外错误: {e}")
+
 def restart():
-    """
-    重启程序
-    """
+    """重启程序"""
     logger.debug('重启程序')
+    
     app = QApplication.instance()
     if app:
-        try:
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-        except (AttributeError, ValueError):
-            pass
+        _reset_signal_handlers()
         app.quit()
         app.processEvents()
-
-    if share.isAttached():
-        share.detach()  # 释放共享内存
+    
+    _cleanup_shared_memory()
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-def stop(status=0):
+def stop(status: int = 0):
     """
     退出程序
     :param status: 退出状态码,0=正常退出,!=0表示异常退出
     """
-    global share, update_timer, _stop_in_progress
+    global update_timer, _stop_in_progress
+    
     if _stop_in_progress:
         return
     _stop_in_progress = True
-
+    
     logger.debug('退出程序...')
-
     if 'update_timer' in globals() and update_timer:
         try:
             update_timer.stop()
             update_timer = None
         except Exception as e:
             logger.warning(f"停止全局更新定时器时出错: {e}")
-
     app = QApplication.instance()
     if app:
-        try:
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-        except (AttributeError, ValueError):
-            pass
+        _reset_signal_handlers()
         app.quit()
-    try:
-        current_pid = os.getpid()
-        parent = psutil.Process(current_pid)
-        children = parent.children(recursive=True)
-        if children:
-            logger.debug(f"尝试终止 {len(children)} 个子进程...")
-            for child in children:
-                try:
-                    logger.debug(f"终止子进程 {child.pid}...")
-                    child.terminate()
-                except psutil.NoSuchProcess:
-                    logger.debug(f"子进程 {child.pid} 已不存在.")
-                    continue
-                except psutil.AccessDenied:
-                    logger.warning(f"无权限终止子进程 {child.pid}.")
-                    continue
-                except Exception as e:
-                    logger.warning(f"终止子进程 {child.pid} 时出错: {e}")
 
-            gone, alive = psutil.wait_procs(children, timeout=1.5)
-            if alive:
-                logger.warning(f"{len(alive)} 个子进程未在规定时间内终止,将强制终止...")
-                for p in alive:
-                    try:
-                        logger.debug(f"强制终止子进程 {p.pid}...")
-                        p.kill()
-                    except psutil.NoSuchProcess:
-                        logger.debug(f"子进程 {p.pid} 在强制终止前已消失.")
-                    except Exception as e:
-                        logger.error(f"强制终止子进程 {p.pid} 失败: {e}")
-    except psutil.NoSuchProcess:
-        logger.warning("无法获取当前进程信息,跳过子进程终止。")
-    except Exception as e:
-        logger.error(f"终止子进程时出现意外错误: {e}")
-
-    if 'share' in globals() and share:
-        try:
-            if share.isAttached():
-                share.detach()
-                logger.debug("共享内存已分离")
-        except Exception as e:
-            logger.error(f"分离共享内存时出错: {e}")
-
+    _terminate_child_processes()
+    _cleanup_shared_memory()
     logger.debug(f"程序退出({status})")
     if not app:
         os._exit(status)
