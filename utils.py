@@ -84,7 +84,7 @@ def stop(status=0):
 
             gone, alive = psutil.wait_procs(children, timeout=1.5)
             if alive:
-                logger.warning(f"{len(alive)} 个子进程未在规定时间内终止，将强制终止...")
+                logger.warning(f"{len(alive)} 个子进程未在规定时间内终止,将强制终止...")
                 for p in alive:
                     try:
                         logger.debug(f"强制终止子进程 {p.pid}...")
@@ -94,7 +94,7 @@ def stop(status=0):
                     except Exception as e:
                         logger.error(f"强制终止子进程 {p.pid} 失败: {e}")
     except psutil.NoSuchProcess:
-        logger.warning("无法获取当前进程信息，跳过子进程终止。")
+        logger.warning("无法获取当前进程信息,跳过子进程终止。")
     except Exception as e:
         logger.error(f"终止子进程时出现意外错误: {e}")
 
@@ -170,12 +170,12 @@ class TrayIcon(QSystemTrayIcon):
                 if schedule_display_name.endswith('.json'):
                     schedule_display_name = schedule_display_name[:-5]
                 self.setToolTip(f'Class Widgets - "{schedule_display_name}"')
-                logger.info(f'托盘文字更新: "Class Widgets - {schedule_display_name}"')
+                logger.debug(f'托盘文字更新: "Class Widgets - {schedule_display_name}"')
             except Exception as e:
                 logger.error(f"更新托盘提示时发生错误: {e}")
         else:
             self.setToolTip("Class Widgets - 未加载课表")
-            logger.info(f'托盘文字更新: "Class Widgets - 未加载课表"')
+            logger.debug(f'托盘文字更新: "Class Widgets - 未加载课表"')
 
     def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
@@ -244,7 +244,6 @@ class UnionUpdateTimer(QObject):
             except Exception as e:
                 logger.error(f"执行回调时发生未知错误: {e}")
                 # 其他异常可能是临时错误,不移除
-        # 移除无效的回调函数
         if invalid_callbacks:
             with self._lock:
                 for callback in invalid_callbacks:
@@ -273,7 +272,7 @@ class UnionUpdateTimer(QObject):
         
         Args:
             callback: 回调函数
-            interval: 刷新间隔（秒），默认1秒
+            interval: 刷新间隔(s),默认1秒
         """
         if not callable(callback):
             raise TypeError("回调必须是可调用对象")
@@ -299,15 +298,15 @@ class UnionUpdateTimer(QObject):
         """移除回调函数"""
         with self._lock:
             removed: Optional[Dict[str, Union[float, dt.datetime]]] = self.callback_info.pop(callback, None)
-        #if removed:
-            #logger.debug(f"移除回调函数,原间隔: {removed['interval']}s")
+        if removed:
+            logger.debug(f"移除回调函数,原间隔: {removed['interval']}s")
     def remove_all_callbacks(self) -> None:
         """移除所有回调函数"""
         # 意义不明
         with self._lock:
-            count: int = len(self.callback_info)
+            # count: int = len(self.callback_info)
             self.callback_info = {}
-        #logger.debug(f"移除所有回调函数，共 {count} 个")
+        # logger.debug(f"移除所有回调函数,共 {count} 个")
 
     def start(self) -> None:
         """启动定时器"""
@@ -387,7 +386,7 @@ class UnionUpdateTimer(QObject):
 
 def get_str_length(text: str) -> int:
     """
-    计算字符串长度，汉字计为2，英文和数字计为1
+    计算字符串长度,汉字计为2,英文和数字计为1
     
     Args:
         text: 要计算的字符串
@@ -398,7 +397,7 @@ def get_str_length(text: str) -> int:
     length = 0
     for char in text:
         # 使用 ord() 获取字符的 Unicode 码点
-        # 如果大于 0x4e00 (中文范围开始) 就是汉字，计为2
+        # 如果大于 0x4e00 (中文范围开始) 就是汉字,计为2
         if ord(char) > 0x4e00:
             length += 2
         else:
@@ -407,7 +406,7 @@ def get_str_length(text: str) -> int:
 
 def slice_str_by_length(text: str, max_length: int) -> str:
     """
-    根据指定长度切割字符串，汉字计为2，英文和数字计为1
+    根据指定长度切割字符串,汉字计为2,英文和数字计为1
     
     Args:
         text: 要切割的字符串
