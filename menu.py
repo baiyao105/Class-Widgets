@@ -32,7 +32,6 @@ import conf
 import list_ as list_
 import tip_toast
 import utils
-from utils import update_tray_tooltip
 import weather
 import weather as wd
 from conf import base_directory
@@ -2298,13 +2297,13 @@ class SettingsMenu(FluentWindow):
                 self.conf_combo.setCurrentIndex(
                     list_.get_schedule_config().index(config_center.read_conf('General', 'schedule')))
                 conf_name.setText(new_name)
-                update_tray_tooltip()
+                utils.tray_icon.update_tooltip()
 
             elif self.conf_combo.currentText().endswith('.json'):
                 new_name = self.conf_combo.currentText()
                 config_center.write_conf('General', 'schedule', new_name)
                 conf_name.setText(new_name[:-5])
-                update_tray_tooltip()
+                utils.tray_icon.update_tooltip()
 
             else:
                 logger.error(f'切换课程文件时列表选择异常：{self.conf_combo.currentText()}')

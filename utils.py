@@ -121,24 +121,6 @@ def calculate_size(p_w=0.6, p_h=0.7):  # 计算尺寸
 
     return (width, height), (int(screen_width / 2 - width / 2), 150)
 
-def update_tray_tooltip():
-    """更新托盘文字"""
-    if hasattr(sys.modules[__name__], 'tray_icon'):
-        tray_instance = getattr(sys.modules[__name__], 'tray_icon')
-        if tray_instance is not None:
-            schedule_name_from_conf = config_center.read_conf('General', 'schedule')
-            if schedule_name_from_conf:
-                try:
-                    schedule_display_name = schedule_name_from_conf
-                    if schedule_display_name.endswith('.json'):
-                        schedule_display_name = schedule_display_name[:-5]
-                    tray_instance.setToolTip(f'Class Widgets - "{schedule_display_name}"')
-                    logger.info(f'托盘文字更新: "Class Widgets - {schedule_display_name}"')
-                except Exception as e:
-                    logger.error(f"更新托盘提示时发生错误: {e}")
-            else:
-                tray_instance.setToolTip("Class Widgets - 未加载课表")
-                logger.info(f'托盘文字更新: "Class Widgets - 未加载课表"')
 
 class DarkModeWatcher(QObject):
     """
@@ -175,11 +157,27 @@ class DarkModeWatcher(QObject):
 
 class TrayIcon(QSystemTrayIcon):
     """托盘图标"""
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon.png"))
 
-    def push_update_notification(self, text=''):
+    def update_tooltip(self) -> None:
+        """更新托盘文字"""
+        schedule_name_from_conf = config_center.read_conf('General', 'schedule')
+        if schedule_name_from_conf:
+            try:
+                schedule_display_name = schedule_name_from_conf
+                if schedule_display_name.endswith('.json'):
+                    schedule_display_name = schedule_display_name[:-5]
+                self.setToolTip(f'Class Widgets - "{schedule_display_name}"')
+                logger.info(f'托盘文字更新: "Class Widgets - {schedule_display_name}"')
+            except Exception as e:
+                logger.error(f"更新托盘提示时发生错误: {e}")
+        else:
+            self.setToolTip("Class Widgets - 未加载课表")
+            logger.info(f'托盘文字更新: "Class Widgets - 未加载课表"')
+
+    def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
             "发现 Class Widgets 新版本！",
@@ -188,7 +186,7 @@ class TrayIcon(QSystemTrayIcon):
             5000
         )
 
-    def push_error_notification(self, title='检查更新失败！', text=''):
+    def push_error_notification(self, title: str = '检查更新失败！', text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
             title,
