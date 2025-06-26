@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 from shutil import copy
+from typing import Dict, Any, Optional, Union, Callable
 
 from loguru import logger
 import configparser
@@ -22,7 +23,7 @@ class ConfigCenter:
     """
     Config中心
     """
-    def __init__(self, base_directory: Path, schedule_update_callback=None):
+    def __init__(self, base_directory: Path, schedule_update_callback: Optional[Callable] = None) -> None:
         self.base_directory = base_directory
         self.config_version = 1
         self.config_file_name = 'config.ini'
@@ -39,7 +40,7 @@ class ConfigCenter:
         self.schedule_name = self.read_conf('General', 'schedule')
         self.old_schedule_name = self.schedule_name
 
-    def _load_default_config(self):
+    def _load_default_config(self) -> None:
         """加载默认配置文件"""
         try:
             with open(self.default_config_path, encoding="utf-8") as default:
@@ -63,14 +64,14 @@ class ConfigCenter:
             import utils
             utils.stop(0)
 
-    def _load_user_config(self):
+    def _load_user_config(self) -> None:
         """加载用户配置文件"""
         try:
             self.config.read(self.user_config_path, encoding='utf-8')
         except Exception as e:
             logger.error(f"加载配置文件失败: {e}")
 
-    def _initialize_config(self):
+    def _initialize_config(self) -> None:
         """初始化配置文件（当配置文件不存在时）"""
         logger.info("配置文件不存在，已创建并写入默认配置。")
         self.config.read_dict(self.default_data)
@@ -80,7 +81,7 @@ class ConfigCenter:
             self._write_config_to_file()
         copy(base_directory / 'config' / 'default.json', base_directory / 'config' / 'schedule' / '新课表 - 1.json')
 
-    def _migrate_config(self):
+    def _migrate_config(self) -> None:
         """迁移配置文件（当配置文件版本不一致时）"""
         logger.warning(f"配置文件版本不同,重新适配")
         try:
@@ -104,7 +105,7 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f"配置文件更新失败: {e}")
 
-    def _check_schedule_config(self):
+    def _check_schedule_config(self) -> None:
         """检查课程表配置文件"""
         schedule_dir = base_directory / 'config' / 'schedule'
         schedule_name = self.read_conf('General', 'schedule', '新课表 - 1.json')
@@ -123,7 +124,7 @@ class ConfigCenter:
                 self.write_conf('General', 'schedule', schedule_config[0])
         print(Path.cwd() / 'config' / 'schedule')
 
-    def _check_plugins_directory(self):
+    def _check_plugins_directory(self) -> None:
         """检查插件目录和文件"""
         plugins_dir = base_directory / 'plugins'
         if not plugins_dir.exists():
@@ -136,12 +137,12 @@ class ConfigCenter:
                 json.dump({"plugins": []}, file, ensure_ascii=False, indent=4)
             logger.info("plugins_from_pp.json 文件不存在，已创建。")
 
-    def _write_config_to_file(self):
+    def _write_config_to_file(self) -> None:
         """将当前配置写入文件"""
         with open(self.user_config_path, 'w', encoding='utf-8') as configfile:
             self.config.write(configfile)
 
-    def _check_and_migrate_config(self):
+    def _check_and_migrate_config(self) -> None:
         """检查并迁移配置文件"""
         if not self.user_config_path.exists():
             self._initialize_config()
@@ -173,7 +174,7 @@ class ConfigCenter:
         self._check_schedule_config()
         self._check_plugins_directory()
 
-    def update_conf(self):
+    def update_conf(self) -> None:
         """重新加载配置文件并更新相关状态"""
         try:
             self._load_user_config()
@@ -186,7 +187,7 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f'更新配置文件时出错: {e}')
 
-    def read_conf(self, section='General', key='', fallback=None):
+    def read_conf(self, section: str = 'General', key: str = '', fallback: Any = None) -> Union[str, Any]:
         """读取配置项，并根据默认配置中的类型信息进行转换"""
         if section not in self.config and section not in self.default_data:
             logger.warning(f"配置节未找到: Section='{section}'")
@@ -221,7 +222,7 @@ class ConfigCenter:
         logger.warning(f"配置项未找到: Section='{section}', Key='{key}'")
         return fallback
 
-    def _convert_value(self, value, value_type):
+    def _convert_value(self, value: Any, value_type: str) -> Any:
         """根据指定的类型转换值"""
         if value_type == "int":
             return int(value)
@@ -236,7 +237,7 @@ class ConfigCenter:
         else:
             return str(value)
 
-    def write_conf(self, section, key, value):
+    def write_conf(self, section: str, key: str, value: Any) -> None:
         """写入配置项"""
         if section not in self.config:
             self.config.add_section(section)
@@ -249,12 +250,12 @@ class ScheduleCenter:
     """
     课程表中心
     """
-    def __init__(self, config_center_instance: ConfigCenter):
+    def __init__(self, config_center_instance: ConfigCenter) -> None:
         self.config_center = config_center_instance
         self.schedule_data = None
         self.update_schedule()
 
-    def update_schedule(self):
+    def update_schedule(self) -> None:
         """
         更新课程表
         """
@@ -262,7 +263,7 @@ class ScheduleCenter:
         if 'timeline' not in self.schedule_data:
             self.schedule_data['timeline'] = {}
 
-    def save_data(self, new_data, filename):
+    def save_data(self, new_data: Dict[str, Any], filename: str) -> Optional[str]:
         if 'timeline' in new_data and isinstance(new_data['timeline'], dict):
             if 'timeline' in self.schedule_data and isinstance(self.schedule_data['timeline'], dict):
                 self.schedule_data['timeline'].update(new_data['timeline'])
@@ -283,7 +284,7 @@ class ScheduleCenter:
             logger.error(f"保存数据时出错: {e}")
 
 
-def load_from_json(filename):
+def load_from_json(filename: str) -> Dict[str, Any]:
     """
     从 JSON 文件中加载数据。
     :param filename: 要加载的文件
@@ -304,7 +305,7 @@ def load_from_json(filename):
         return {}
 
 
-def save_data_to_json(data, filename):
+def save_data_to_json(data: Dict[str, Any], filename: str) -> None:
     """
     将数据保存到 JSON 文件中。
     :param data: 要保存的数据字典

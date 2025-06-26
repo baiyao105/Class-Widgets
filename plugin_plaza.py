@@ -2,7 +2,7 @@ import json
 import sys
 from datetime import datetime
 from random import shuffle
-from typing import List
+from typing import List, Dict, Optional, Any
 
 from PyQt5 import uic
 from PyQt5.QtCore import QSize, Qt, QTimer, QUrl, QStringListModel, pyqtSignal, QThread
@@ -31,7 +31,7 @@ from loguru import logger
 class ThreadManager:
     """线程管理器"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_threads: List[QThread] = []
         self.logger = logger
     
@@ -42,12 +42,12 @@ class ThreadManager:
             thread.finished.connect(lambda: self._remove_thread(thread))
         return thread
     
-    def _remove_thread(self, thread: QThread):
+    def _remove_thread(self, thread: QThread) -> None:
         """从管理器中移除线程"""
         if thread in self.active_threads:
             self.active_threads.remove(thread)
     
-    def stop_all_threads(self):
+    def stop_all_threads(self) -> None:
         """停止所有活跃线程"""
         for thread in self.active_threads.copy():
             try:
@@ -68,7 +68,7 @@ class ThreadManager:
         """获取活跃线程数量"""
         return len([t for t in self.active_threads if t.isRunning()])
     
-    def get_thread_status(self) -> dict:
+    def get_thread_status(self) -> Dict[str, Any]:
         """获取线程状态信息"""
         running = [t.__class__.__name__ for t in self.active_threads if t.isRunning()]
         finished = [t.__class__.__name__ for t in self.active_threads if t.isFinished()]
@@ -108,7 +108,7 @@ SEARCH_FIELDS = ["name", "description", "tag", "author"]  # 搜索字段
 
 
 class TagLink(HyperlinkButton):  # 标签链接
-    def __init__(self, text, parent=None):
+    def __init__(self, text: str, parent: Optional[Any] = None) -> None:
         super().__init__(parent)
         self.parent = parent
         self.tag = text
@@ -118,13 +118,13 @@ class TagLink(HyperlinkButton):  # 标签链接
         self.setFixedHeight(30)
         self.clicked.connect(self.search_tag)
 
-    def search_tag(self):
+    def search_tag(self) -> None:
         self.parent.search_plugin.setText(self.tag)
         self.parent.search_plugin.searchSignal.emit(self.tag)  # 发射搜索信号
 
 
 class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
-    def __init__(self, url=TEST_DOWNLOAD_LINK, branch='main', name="Test", parent=None):
+    def __init__(self, url: str = TEST_DOWNLOAD_LINK, branch: str = 'main', name: str = "Test", parent: Optional[Any] = None) -> None:
         global download_progress
         self.p_name = url.split('/')[4]  # repo
         # user = url.split('/')[3]
@@ -154,7 +154,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         download_progress.append(self.p_name)
         self.download(self.url)
 
-    def download(self, url):  # 接受下载连接并开始任务
+    def download(self, url: str) -> None:  # 接受下载连接并开始任务
         self.download_thread = nt.DownloadAndExtract(url, self.p_name)
         # self.download_thread = nt.DownloadAndExtract(TEST_DOWNLOAD_LINK, self.p_name)
         self.download_thread.progress_signal.connect(lambda progress: self.bar.setValue(int(progress)))  # 下载进度
@@ -164,14 +164,14 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         
         self.download_thread.start()
 
-    def cancelDownload(self):
+    def cancelDownload(self) -> None:
         global download_progress
         download_progress.remove(self.p_name)
         self.download_thread.stop()
         self.download_thread.deleteLater()
         self.close()
 
-    def detect_status(self, status):
+    def detect_status(self, status: str) -> None:
         if status == "DOWNLOADING":
             self.content = f"正在下载 {self.name} (～￣▽￣)～)"
         elif status == "EXTRACTING":
@@ -183,7 +183,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         else:
             pass
 
-    def download_finished(self):
+    def download_finished(self) -> None:
         global download_progress
         download_progress.remove(self.p_name)
         add2save_plugin(self.p_name)  # 保存到配置
@@ -203,7 +203,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
             self.parent().restart_tips()
         self.close()
 
-    def download_error(self, error_info):
+    def download_error(self, error_info: str) -> None:
         global download_progress
         download_progress.remove(self.p_name)
         InfoBar.error(
@@ -218,7 +218,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         self.close()
 
 
-def install_plugin(parent, p_name, data):
+def install_plugin(parent: Any, p_name: str, data: Dict[str, Any]) -> bool:
     plugin_ver = str(data.get('plugin_ver'))
     if plugin_ver != SELF_PLUGIN_VERSION:  # 插件版本不匹配
         if plugin_ver > SELF_PLUGIN_VERSION:
@@ -255,7 +255,7 @@ def install_plugin(parent, p_name, data):
 
 
 class PluginDetailPage(MessageBoxBase):  # 插件详情页面
-    def __init__(self, icon, title, content, tag, version, author, url, data=None, parent=None):
+    def __init__(self, icon: str, title: str, content: str, tag: str, version: str, author: str, url: str, data: Optional[Dict[str, Any]] = None, parent: Optional[Any] = None) -> None:
         super().__init__(parent)
         self.data = data
         self.branch = data.get("branch")
@@ -326,12 +326,12 @@ class PluginDetailPage(MessageBoxBase):  # 插件详情页面
         self.readmePage.setReadOnly(True)
         scroll_area_widget.addWidget(self.readmePage)
 
-    def install(self):
+    def install(self) -> None:
         if install_plugin(self.parent, self.p_name, self.data):
             self.installButton.setText("  安装中  ")
             self.installButton.setEnabled(False)
 
-    def download_readme(self):
+    def download_readme(self) -> None:
         def display_readme(markdown_text):
             self.readmePage.setMarkdown(markdown_text)
 
@@ -345,7 +345,7 @@ class PluginDetailPage(MessageBoxBase):  # 插件详情页面
         
         self.download_thread.start()
 
-    def init_ui(self):
+    def init_ui(self) -> None:
         # 加载ui文件
         self.temp_widget = QWidget()
         uic.loadUi(f'{base_directory}/view/pp/plugin_detail.ui', self.temp_widget)
@@ -367,9 +367,9 @@ class PluginDetailPage(MessageBoxBase):  # 插件详情页面
 
 class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
     def __init__(
-            self, icon='img/plaza/plugin_pre.png', title='Plugin Name', content='Description...', tag='Unknown',
-            version='1.0.0', author="CW Support",
-            url="https://github.com/RinLit-233-shiroko/cw-example-plugin", data=None, parent=None):
+            self, icon: str = 'img/plaza/plugin_pre.png', title: str = 'Plugin Name', content: str = 'Description...', tag: str = 'Unknown',
+            version: str = '1.0.0', author: str = "CW Support",
+            url: str = "https://github.com/RinLit-233-shiroko/cw-example-plugin", data: Optional[Dict[str, Any]] = None, parent: Optional[Any] = None) -> None:
         super().__init__(parent)
         self.icon = icon
         self.title = title
@@ -783,7 +783,7 @@ class PluginPlaza(MSFluentWindow):
         self.thread_manager.add_thread(self.get_tags_list_thread)
         self.get_tags_list_thread.start()
     
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         self.thread_manager.stop_all_threads()
         super().closeEvent(event)
 
@@ -805,7 +805,7 @@ class PluginPlaza(MSFluentWindow):
             self.settingsInterface, fIcon.SETTING, '设置', fIcon.SETTING, position=NavigationItemPosition.BOTTOM
         )
 
-    def init_window(self):
+    def init_window(self) -> None:
         self.load_all_interface()
         self.init_font()
 
@@ -825,7 +825,7 @@ class PluginPlaza(MSFluentWindow):
         self.splashScreen.setIconSize(QSize(102, 102))
         self.show()
 
-    def init_font(self):  # 设置字体
+    def init_font(self) -> None:  # 设置字体
         self.setStyleSheet("""QLabel {
                     font-family: 'Microsoft YaHei';
                 }""")
@@ -835,7 +835,7 @@ class PluginPlaza(MSFluentWindow):
         event.accept()
 
 
-def add2save_plugin(p_name):  # 保存已安装插件
+def add2save_plugin(p_name: str) -> None:  # 保存已安装插件
     global installed_plugins
     installed_plugins.append(p_name)
     try:
@@ -848,12 +848,12 @@ def add2save_plugin(p_name):  # 保存已安装插件
         logger.error(f"保存已安装插件失败：{e}")
 
 
-def replace_to_file_server(url, branch='main'):
+def replace_to_file_server(url: str, branch: str = 'main') -> str:
     return (f'{url.replace("https://github.com/", "https://raw.githubusercontent.com/")}'
             f'/{branch}')
 
 
-def load_local_plugins_version():
+def load_local_plugins_version() -> None:
     global local_plugins_version
     for plugin in installed_plugins:
         try:
