@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from shutil import copy
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Dict, Any, Optional, Union, Callable, TypedDict, List
 
 from loguru import logger
 import configparser
@@ -18,6 +18,15 @@ if str(base_directory).endswith('MacOS'):
     base_directory = (base_directory.parent / 'Resources').resolve()
 '''
 config_path = base_directory / 'config.ini'
+
+
+class MigrationRule(TypedDict):
+    old_section: str  # 原配置节名
+    old_key: str  # 原配置键名
+    new_section: str  # 新配置节名
+    new_key: str  # 新配置键名
+    transform_func: Optional[Callable[[Any], Any]]  # 转换函数(旧->新)
+    remove_old: bool  # 是否移除旧配置项
 
 
 class ConfigCenter:
@@ -109,22 +118,23 @@ class ConfigCenter:
 
     def _perform_specific_migrations(self) -> None:
         """执行特定的配置迁移规则"""
-        # General.time_offset -> Time.time_offset
-        self.migrate_config_item(
-            old_section='General',
-            old_key='time_offset', 
-            new_section='Time',
-            new_key='time_offset',
-            remove_old=True
-        )
-        # Other.auto_check_update -> Version.auto_check_update
-        self.migrate_config_item(
-            old_section='Other',
-            old_key='auto_check_update',
-            new_section='Version', 
-            new_key='auto_check_update',
-            remove_old=True
-        )
+        migration_rules = [
+            {
+                'old_section': 'General',
+                'old_key': 'time_offset',
+                'new_section': 'Time', 
+                'new_key': 'time_offset',
+                'remove_old': True
+            },
+            {
+                'old_section': 'Other',
+                'old_key': 'auto_check_update',
+                'new_section': 'Version',
+                'new_key': 'auto_check_update', 
+                'remove_old': True
+            }
+        ]
+        self.migrate_config(migration_rules=migration_rules)
 
     def _check_schedule_config(self) -> None:
         """检查课程表配置文件"""
@@ -201,10 +211,21 @@ class ConfigCenter:
             logger.error(f"配置项迁移失败 {old_section}.{old_key} -> {new_section}.{new_key}: {e}")
             return False
     
-    def batch_migrate_config_items(self, migration_rules: list) -> Dict[str, bool]:
-        """批量配置项迁移
-        
+    def migrate_config(self, old_section: str = None, old_key: str = None, 
+                      new_section: str = None, new_key: str = None,
+                      transform_func: Optional[Callable[[Any], Any]] = None,
+                      remove_old: bool = True, migration_rules: Optional[List[MigrationRule]] = None) -> Union[bool, Dict[str, bool]]:
+        """配置迁移
+
         Args:
+            # 单个配置项迁移参数
+            old_section: 原配置节名
+            old_key: 原配置键名
+            new_section: 新配置节名
+            new_key: 新配置键名
+            transform_func: 值转换函数，可选
+            remove_old: 是否删除原配置项，默认True
+            # 批量迁移参数
             migration_rules: 迁移规则列表，每个规则为字典，包含:
                 - old_section: 原配置节
                 - old_key: 原配置键
@@ -214,13 +235,27 @@ class ConfigCenter:
                 - remove_old: 是否删除原配置（可选，默认True）
                 
         Returns:
-            Dict[str, bool]: 每个迁移规则的执行结果
+            Union[bool, Dict[str, bool]]: 单个迁移返回bool，批量迁移返回Dict[str, bool]
+            
+        Raises:
+            ValueError: 当参数不正确时抛出异常
         """
+        if migration_rules is not None:
+            if not isinstance(migration_rules, list):
+                raise ValueError("migration_rules 必须是列表类型")
+            return self._batch_migrate_internal(migration_rules)
+        if not all([old_section, old_key, new_section, new_key]):
+            raise ValueError("需提供完整参数")
+        result = self.migrate_config_item(old_section, old_key, new_section, new_key, 
+                                         transform_func, remove_old)
+        if result:
+            self._write_config_to_file()
+        return result
+    
+    def _batch_migrate_internal(self, migration_rules: List[MigrationRule]) -> Dict[str, bool]:
         results = {}
-        
         for i, rule in enumerate(migration_rules):
             rule_name = f"{rule['old_section']}.{rule['old_key']}->{rule['new_section']}.{rule['new_key']}"
-            
             try:
                 success = self.migrate_config_item(
                     old_section=rule['old_section'],
