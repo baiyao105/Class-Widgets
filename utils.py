@@ -4,20 +4,17 @@ import time
 import pytz
 import ntplib
 import psutil
+import signal
 import threading
 import darkdetect
 import datetime as dt
 from loguru import logger
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union, Callable, Type
+from typing import Dict, Any, Optional, Union, Callable, Type, Tuple
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
 from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
-
 from file import base_directory, config_center
-import signal
-
-from typing import Tuple
 
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
