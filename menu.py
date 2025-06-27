@@ -1572,7 +1572,7 @@ class SettingsMenu(FluentWindow):
         check_update_btn.clicked.connect(self.check_update)
 
         self.auto_check_update = self.ifInterface.findChild(SwitchButton, 'auto_check_update')
-        self.auto_check_update.setChecked(int(config_center.read_conf("Version", "auto_check_update")))
+        self.auto_check_update.setChecked(int(config_center.read_conf("Version", "auto_check_update", "1")))
         self.auto_check_update.checkedChanged.connect(
             lambda checked: switch_checked("Version", "auto_check_update", checked)
         )  # 自动检查更新
