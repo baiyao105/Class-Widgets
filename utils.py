@@ -13,7 +13,6 @@ from typing import Dict, Any, Optional, Union, Callable, Type
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
 from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
-
 from file import base_directory, config_center
 import signal
 
