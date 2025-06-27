@@ -83,7 +83,7 @@ class ConfigCenter:
 
     def _initialize_config(self) -> None:
         """初始化配置文件（当配置文件不存在时）"""
-        logger.info("配置文件不存在，已创建并写入默认配置。")
+        logger.debug("配置文件不存在，已创建并写入默认配置。")
         self.config.read_dict(self.default_data)
         self._write_config_to_file()
         if sys.platform != 'win32':
@@ -199,7 +199,7 @@ class ConfigCenter:
                 self.config.add_section(new_section)
                 logger.debug(f"创建新配置节: {new_section}")
             self.config[new_section][new_key] = str(new_value)
-            logger.info(f"配置项迁移: {old_section}.{old_key} -> {new_section}.{new_key} (值: {old_value} -> {new_value})")
+            logger.debug(f"配置项迁移: {old_section}.{old_key} -> {new_section}.{new_key} (值: {old_value} -> {new_value})")
             if remove_old:
                 del self.config[old_section][old_key]
                 logger.debug(f"已删除原配置项: {old_section}.{old_key}")
@@ -271,7 +271,7 @@ class ConfigCenter:
                 results[rule_name] = False
         if any(results.values()):
             self._write_config_to_file()
-            logger.info(f"批量配置迁移完成，成功: {sum(results.values())}/{len(results)}")
+            logger.debug(f"批量配置迁移完成,成功: {sum(results.values())}/{len(results)}")
         return results
 
     def _check_and_migrate_config(self) -> None:
@@ -300,7 +300,7 @@ class ConfigCenter:
                 logger.error(f"默认配置文件中的版本号 '{default_config_version_str}' 无效")
                 return
             if user_config_version < default_config_version:
-                logger.info(f"检测到配置文件版本不一致或缺失 (配置版本: {user_config_version}, 默认版本: {default_config_version})，正在执行配置迁移...")
+                logger.debug(f"检测到配置文件版本不一致或缺失 (配置版本: {user_config_version}, 默认版本: {default_config_version})，正在执行配置迁移...")
                 self._migrate_config()
                 self._write_config_to_file()
         self._check_schedule_config()
