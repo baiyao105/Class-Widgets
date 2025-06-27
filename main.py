@@ -87,7 +87,6 @@ weather_data_temp = None
 city = 101010100  # 默认城市
 theme = None
 
-# time_offset = 0  # 时差偏移 - 已迁移到时间管理器
 first_start = True
 error_cooldown = dt.timedelta(seconds=2)  # 冷却时间(s)
 ignore_errors = []

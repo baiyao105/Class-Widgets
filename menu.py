@@ -33,7 +33,7 @@ import conf
 import list_ as list_
 import tip_toast
 import utils
-from utils import time_manager
+from utils import time_manager, TimeManagerFactory
 import weather
 import weather as wd
 from conf import base_directory
@@ -1767,10 +1767,41 @@ class SettingsMenu(FluentWindow):
         ntp_refresh_picker.setSuffix(' 分钟')
         ntp_refresh_picker.setValue(auto_refresh_minutes)
         ntp_refresh_picker.valueChanged.connect(self.on_ntp_auto_refresh_changed)
+        ntp_sync_timezone = self.adInterface.findChild(ComboBox, 'ntp_sync_timezone')
+        timezone_options = [
+            ('系统时区', 'local'),
+            ('(UTC+0)  伦敦时间', 'Europe/London'),
+            ('(UTC+1)  巴黎时间', 'Europe/Paris'),
+            ('(UTC+3)  莫斯科时间', 'Europe/Moscow'),
+            ('(UTC+8)  北京时间', 'Asia/Shanghai'),
+            ('(UTC+8)  新加坡时间', 'Asia/Singapore'),
+            ('(UTC+9)  东京时间', 'Asia/Tokyo'),
+            ('(UTC+10)  悉尼时间', 'Australia/Sydney'),
+            ('(UTC-8)  洛杉矶时间', 'America/Los_Angeles'),
+            ('(UTC-5)  纽约时间', 'America/New_York')
+        ]
+        for display_name, timezone_value in timezone_options:
+            ntp_sync_timezone.addItem(display_name)
+            ntp_sync_timezone.setItemData(ntp_sync_timezone.count() - 1, timezone_value)
+        current_timezone = config_center.read_conf('Time', 'timezone', 'local')
+        timezone_found = False
+        for i, (_, timezone_value) in enumerate(timezone_options):
+            if timezone_value == current_timezone:
+                ntp_sync_timezone.setCurrentIndex(i)
+                timezone_found = True
+                break
+        if not timezone_found:
+            ntp_sync_timezone.setCurrentIndex(0)
+            config_center.write_conf('Time', 'timezone', 'local')
+        ntp_sync_timezone.currentIndexChanged.connect(self.on_ntp_timezone_changed)
+        switch_enable_ntp_auto_sync = self.adInterface.findChild(SwitchButton, 'switch_enable_ntp_auto_sync')
+        auto_sync_enabled = int(config_center.read_conf('Time', 'switch_enable_ntp_auto_sync', '1'))
+        switch_enable_ntp_auto_sync.setChecked(bool(auto_sync_enabled))
+        switch_enable_ntp_auto_sync.checkedChanged.connect(self.on_ntp_auto_sync_switch_changed)
         self.ntp_card_widget = self.adInterface.findChild(CardWidget, 'CardWidget_17')
         self.update_ntp_status_display()
         self.update_ntp_ui_visibility()
-        if config_center.read_conf('Time', 'type') == 'ntp':
+        if config_center.read_conf('Time', 'type') == 'ntp' and auto_sync_enabled:
             self._add_ntp_auto_sync_callback()
 
     def on_time_method_changed(self):
@@ -1779,7 +1810,6 @@ class SettingsMenu(FluentWindow):
         is_ntp = conf_time_get.currentIndex() == 1
         config_center.write_conf('Time', 'type', 'ntp' if is_ntp else 'local')
         try:
-            from utils import TimeManagerFactory
             new_manager = TimeManagerFactory.reset_instance()
             utils.time_manager = new_manager
             try:
@@ -1793,7 +1823,9 @@ class SettingsMenu(FluentWindow):
                 if is_ntp:
                     self.show_info_toast('时间设置', '已切换到NTP时间,正在同步时间~')
                     self._start_async_ntp_sync(current_manager)
-                    self._add_ntp_auto_sync_callback()
+                    auto_sync_enabled = int(config_center.read_conf('Time', 'switch_enable_ntp_auto_sync', '1'))
+                    if auto_sync_enabled:
+                        self._add_ntp_auto_sync_callback()
                 else:
                     self.show_success_toast('时间设置', '已切换到系统时间')
             except Exception as e:
@@ -1817,7 +1849,6 @@ class SettingsMenu(FluentWindow):
                 return
             self.show_info_toast('NTP同步', '正在同步NTP时间~')
             self._start_async_ntp_sync(current_manager)
-                
         except Exception as e:
             logger.error(f"NTP同步失败: {e}")
             self.show_warning_toast('NTP同步', 'NTP时间同步失败')
@@ -1826,11 +1857,46 @@ class SettingsMenu(FluentWindow):
         """修改ntp自动刷新时间"""
         config_center.write_conf('Time', 'ntp_auto_refresh', str(value))
         try:
-            if config_center.read_conf('Time', 'type') == 'ntp':
+            if config_center.read_conf('Time', 'type') == 'ntp' and int(config_center.read_conf('Time', 'switch_enable_ntp_auto_sync', '1')):
                 self._remove_ntp_auto_sync_callback()
                 self._add_ntp_auto_sync_callback()
         except Exception as e:
             logger.error(f"更新NTP自动同步间隔失败: {e}")
+    
+    def on_ntp_auto_sync_switch_changed(self, checked):
+        """NTP自动同步开关"""
+        try:
+            config_center.write_conf('Time', 'switch_enable_ntp_auto_sync', '1' if checked else '0')
+            if config_center.read_conf('Time', 'type') == 'ntp':
+                if checked:
+                    self._add_ntp_auto_sync_callback()
+                    self.show_success_toast('NTP设置', '已开启NTP自动同步ヾ(≧▽≦*)o')
+                else:
+                    self._remove_ntp_auto_sync_callback()
+                    self.show_info_toast('NTP设置', '已关闭NTP自动同步(≧﹏ ≦)')
+        except Exception as e:
+            logger.error(f"NTP自动同步开关设置失败: {e}")
+            self.show_warning_toast('NTP设置', '设置失败 (╥﹏╥)')
+    
+    def on_ntp_timezone_changed(self):
+        """NTP时区设置改变时的处理"""
+        try:
+            ntp_sync_timezone = self.adInterface.findChild(ComboBox, 'ntp_sync_timezone')
+            selected_timezone = ntp_sync_timezone.itemData(ntp_sync_timezone.currentIndex())
+            config_center.write_conf('Time', 'timezone', selected_timezone)
+            if config_center.read_conf('Time', 'type') == 'ntp':
+                try:
+                    self.show_info_toast('时区设置', f'时区已更新为 {ntp_sync_timezone.currentText()}，正在重新同步时间~')
+                    TimeManagerFactory.reset_instance()
+                    QTimer.singleShot(100, self.update_ntp_status_display)
+                    self._start_async_ntp_sync(utils.time_manager)
+                except Exception as e:
+                    logger.error(f"应用新时区失败: {e}")
+            else:
+                self.show_success_toast('时区设置', f'时区已设置为 {ntp_sync_timezone.currentText()}')
+        except Exception as e:
+            logger.error(f"时区设置失败: {e}")
+            self.show_error_toast('时区设置', '时区设置失败')
     
     def _add_ntp_auto_sync_callback(self):
         """添加NTP自动同步回调"""
@@ -1867,8 +1933,6 @@ class SettingsMenu(FluentWindow):
             if hasattr(self, '_ntp_auto_sync_callback'):
                 update_timer.remove_callback(self._ntp_auto_sync_callback)
                 delattr(self, '_ntp_auto_sync_callback')
-                logger.info("已移除NTP自动同步回调")
-            
         except Exception as e:
             logger.error(f"移除NTP自动同步回调失败: {e}")
     
@@ -2229,11 +2293,16 @@ class SettingsMenu(FluentWindow):
         try:
             if success:
                 self.show_success_toast('NTP同步', 'NTP时间同步成功!')
+                # 异步更新UI状态，避免阻塞
+                QTimer.singleShot(50, self.update_ntp_status_display)
+                # 延迟更新父组件数据
+                if hasattr(self, 'parent') and self.parent and hasattr(self.parent, 'update_data'):
+                    QTimer.singleShot(100, self.parent.update_data)
             else:
                 self.show_warning_toast('NTP同步', 'NTP时间同步失败,请检查网络连接和url地址!')
-            self.update_ntp_status_display()
         except Exception as e:
             logger.error(f"NTP同步完成回调失败: {e}")
+        finally:
             QTimer.singleShot(100, self._cleanup_ntp_thread)
     
     def _cleanup_ntp_thread(self):

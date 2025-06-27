@@ -1,20 +1,17 @@
 import os
 import sys
-import subprocess
 import time
-from pathlib import Path
-from typing import Dict, Any, Optional, Union, List, Callable
+import pytz
+import ntplib
 import psutil
 import threading
-from typing import Dict, Callable, Any, Optional, Union
-
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QAction
-from loguru import logger
-from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal, QThread
-from PyQt5 import QtCore
 import darkdetect
 import datetime as dt
+from loguru import logger
+from typing import Dict, Any, Optional, Union, Callable
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
+from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
 
 from file import base_directory, config_center
 import signal
@@ -305,8 +302,9 @@ class UnionUpdateTimer(QObject):
         """移除回调函数"""
         with self._lock:
             removed: Optional[Dict[str, Union[float, dt.datetime]]] = self.callback_info.pop(callback, None)
-        if removed:
-            logger.debug(f"移除回调函数,原间隔: {removed['interval']}s")
+            if removed:
+                logger.debug(f"移除回调函数(间隔:{removed['interval']}s)")
+
     def remove_all_callbacks(self) -> None:
         """移除所有回调函数"""
         # 意义不明
@@ -477,10 +475,6 @@ class TimeManagerInterface(ABC):
         """获取时差偏移(秒)"""
         pass
     
-    @abstractmethod
-    def set_time_offset(self, offset: int) -> None:
-        """设置时差偏移(秒)"""
-        pass
     
     @abstractmethod
     def sync_with_ntp(self) -> bool:
@@ -491,7 +485,6 @@ class LocalTimeManager(TimeManagerInterface):
     """本地时间管理器"""
     
     def __init__(self):
-        from file import config_center
         self._config_center = config_center
     
     def _get_time_offset(self) -> int:
@@ -526,12 +519,8 @@ class LocalTimeManager(TimeManagerInterface):
         """获取时差偏移(秒)"""
         return self._get_time_offset()
     
-    def set_time_offset(self, offset: int) -> None:
-        """设置时差偏移(秒)"""
-        self._config_center.write_conf('Time', 'time_offset', str(offset))
-    
     def sync_with_ntp(self) -> bool:
-        """本地时间管理器不支持NTP同步"""
+        """为什么"""
         logger.warning("本地时间管理器不支持NTP同步")
         return False
 
@@ -539,19 +528,21 @@ class NTPTimeManager(TimeManagerInterface):
     """NTP时间管理器"""
     
     def __init__(self):
-        from file import config_center
         self._config_center = config_center
         self._ntp_reference_time = None
         self._ntp_reference_timestamp = None
         self._lock = threading.Lock()
         self._use_fallback = True
+        self._last_sync_time = 0
+        self._sync_debounce_interval = 3.5
+        self._pending_sync_timer = None
         threading.Thread(target=self._background_sync, daemon=True).start()
         # logger.debug("NTP时间管理器初始化完成")
     
     def _background_sync(self):
         """后台NTP同步"""
         try:
-            if self._sync_ntp_internal(timeout=5.0):
+            if self.sync_with_ntp():
                 with self._lock:
                     self._use_fallback = False
             else:
@@ -561,6 +552,7 @@ class NTPTimeManager(TimeManagerInterface):
     
     def _get_time_offset(self) -> int:
         """从配置读取时差偏移"""
+        # 意义不明+1
         try:
             offset_str = self._config_center.read_conf('Time', 'time_offset')
             return int(offset_str) if offset_str else 0
@@ -568,9 +560,9 @@ class NTPTimeManager(TimeManagerInterface):
             return 0
     
     def _get_ntp_server(self) -> str:
-        """从配置读取NTP服务器"""
+        """从配置读取NTP服务器(目前不知存在意义)"""
         try:
-            return self._config_center.read_conf('Time', 'ntp_server') or 'ntp.aliyun.com'
+            return self._config_center.read_conf('Time', 'ntp_server', 'ntp.aliyun.com')
         except Exception:
             return 'ntp.aliyun.com'
     
@@ -578,23 +570,38 @@ class NTPTimeManager(TimeManagerInterface):
         """执行NTP同步"""
         ntp_server = self._get_ntp_server()
         try:
-            import ntplib
             ntp_client = ntplib.NTPClient()
             response = ntp_client.request(ntp_server, version=3, timeout=timeout)
             ntp_timestamp = response.tx_time
-            ntp_time_utc = dt.datetime.utcfromtimestamp(ntp_timestamp)
-            if time.daylight and time.localtime().tm_isdst:
-                local_offset_seconds = time.altzone
+            ntp_time_utc = dt.datetime.fromtimestamp(ntp_timestamp, dt.timezone.utc).replace(tzinfo=None)
+            timezone_setting = self._config_center.read_conf('Time', 'timezone', 'local')
+            if not timezone_setting or timezone_setting == 'local':
+                if time.daylight and time.localtime().tm_isdst:
+                    local_offset_seconds = time.altzone
+                else:
+                    local_offset_seconds = time.timezone
+                ntp_time_local = ntp_time_utc - dt.timedelta(seconds=local_offset_seconds)
             else:
-                local_offset_seconds = time.timezone
-            ntp_time_local = ntp_time_utc - dt.timedelta(seconds=local_offset_seconds)
+                try:
+                    utc_tz = pytz.UTC
+                    if not timezone_setting:
+                        raise ValueError("时区设置为空")
+                    target_tz = pytz.timezone(timezone_setting)
+                    ntp_time_utc_aware = utc_tz.localize(ntp_time_utc)
+                    ntp_time_target = ntp_time_utc_aware.astimezone(target_tz)
+                    ntp_time_local = ntp_time_target.replace(tzinfo=None)
+                except Exception as tz_error:
+                    logger.warning(f"时区转换失败,回退系统时区: {tz_error}")
+                    if time.daylight and time.localtime().tm_isdst:
+                        local_offset_seconds = time.altzone
+                    else:
+                        local_offset_seconds = time.timezone
+                    ntp_time_local = ntp_time_utc - dt.timedelta(seconds=local_offset_seconds)
             with self._lock:
                 self._ntp_reference_time = ntp_time_local
                 self._ntp_reference_timestamp = time.time()
-            
-            logger.debug(f"NTP同步成功: 服务器={ntp_server}, 时间={ntp_time_local}, 延迟={response.delay:.3f}秒")
-            return True
-                
+            logger.debug(f"NTP同步成功: 服务器={ntp_server},时间={ntp_time_local}({timezone_setting}),延迟={response.delay:.3f}秒")
+            return True 
         except Exception as e:
             logger.error(f"NTP同步失败: {e}")
             return False
@@ -604,8 +611,6 @@ class NTPTimeManager(TimeManagerInterface):
         with self._lock:
             if self._use_fallback or self._ntp_reference_time is None:
                 return dt.datetime.now()
-            
-            # 基于NTP基准时间计算当前时间
             elapsed_seconds = time.time() - self._ntp_reference_timestamp
             return self._ntp_reference_time + dt.timedelta(seconds=elapsed_seconds)
     
@@ -629,16 +634,34 @@ class NTPTimeManager(TimeManagerInterface):
         """获取时差偏移(秒)"""
         return self._get_time_offset()
     
-    def set_time_offset(self, offset: int) -> None:
-        """设置时差偏移(秒)"""
-        self._config_center.write_conf('Time', 'time_offset', str(offset))
-    
     def sync_with_ntp(self) -> bool:
         """进行NTP同步"""
+        current_time = time.time()
+        if current_time - self._last_sync_time < self._sync_debounce_interval:
+            #logger.debug(f"NTP同步防抖({current_time - self._last_sync_time:.1f}秒),延迟执行同步")
+            if self._pending_sync_timer:
+                self._pending_sync_timer.cancel()
+            remaining_time = self._sync_debounce_interval - (current_time - self._last_sync_time)
+            self._pending_sync_timer = threading.Timer(remaining_time, self._delayed_sync)
+            self._pending_sync_timer.start()
+            return True
+        if self._pending_sync_timer:
+            self._pending_sync_timer.cancel()
+            self._pending_sync_timer = None
+        return self._execute_sync()
+    
+    def _delayed_sync(self):
+        """延迟执行的同步"""
+        self._pending_sync_timer = None
+        self._execute_sync()
+    
+    def _execute_sync(self) -> bool:
+        """执行实际的NTP同步"""
         success = self._sync_ntp_internal(timeout=5.0)
         if success:
             with self._lock:
                 self._use_fallback = False
+                self._last_sync_time = time.time()
         return success
     
     def get_last_ntp_sync(self) -> Optional[dt.datetime]:
@@ -657,7 +680,6 @@ class TimeManagerFactory:
     @classmethod
     def create_manager(cls) -> TimeManagerInterface:
         """创建时间管理器"""
-        from file import config_center
         try:
             time_type = config_center.read_conf('Time', 'type')
             manager_type = 'ntp' if time_type == 'ntp' else 'local'
@@ -676,12 +698,8 @@ class TimeManagerFactory:
     def reset_instance(cls) -> TimeManagerInterface:
         """重置实例（配置变更时使用）"""
         cls._instance = cls.create_manager()
-        
-        # 更新全局变量
         globals()['time_manager'] = cls._instance
         sys.modules[__name__].time_manager = cls._instance
-        
-        # 重置相关模块的状态
         modules_to_reset = ['main', 'conf']
         for module_name in modules_to_reset:
             if module_name in sys.modules:
