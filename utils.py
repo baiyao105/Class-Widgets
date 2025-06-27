@@ -8,7 +8,8 @@ import threading
 import darkdetect
 import datetime as dt
 from loguru import logger
-from typing import Dict, Any, Optional, Union, Callable
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Union, Callable, Type
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
 from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
@@ -437,10 +438,6 @@ def slice_str_by_length(text: str, max_length: int) -> str:
         current_length += char_length
 
     return ''.join(result)
-
-# 时间管理模块 - 简化版工厂模式实现
-from abc import ABC, abstractmethod
-from typing import Dict, Type
 
 class TimeManagerInterface(ABC):
     """时间管理器接口"""

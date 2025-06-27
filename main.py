@@ -217,7 +217,7 @@ def get_start_time() -> None:
                 logger.error(f'加载课程表文件[节点类型]出错：{e}')
                 part_type = 'part'
 
-            # 使用时间管理器应用时差偏移到课程表时间
+            # 应用时差偏移到课程表时间
             base_time = dt.datetime.combine(time_manager.get_today(), dt.time(h, m))
             start_time = base_time + dt.timedelta(seconds=time_manager.get_time_offset())
             parts_start_time.append(start_time)
@@ -2018,7 +2018,6 @@ class DesktopWidget(QWidget):  # 主要小组件
     def update_data(self, path: str = '') -> None:
         global current_time, current_week, start_y, today
 
-        # 使用时间管理器统一处理时间
         today = TimeManagerFactory.get_instance().get_today()
         current_time = TimeManagerFactory.get_instance().get_current_time_str('%H:%M:%S')
         get_start_time()

@@ -4,7 +4,7 @@ import configparser as config
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List
 
-from datetime import datetime
+from utils import TimeManagerFactory
 import time
 from dateutil import parser
 from loguru import logger
@@ -219,8 +219,6 @@ def get_custom_countdown() -> str:
         except Exception as e:
             logger.error(f"解析日期时出错: {custom_countdown}, 错误: {e}")
             return '解析失败'
-        # 使用时间管理器获取当前时间
-        from utils import TimeManagerFactory
         current_time = TimeManagerFactory.get_instance().get_current_time()
         if custom_countdown < current_time:
             return '0 天'
@@ -242,8 +240,6 @@ def get_week_type() -> int:
         except (ValueError, TypeError):
             logger.error(f"解析日期时出错: {start_date_str}")
             return 0  # 解析失败默认单周
-        # 使用时间管理器获取当前时间
-        from utils import TimeManagerFactory
         today = TimeManagerFactory.get_instance().get_current_time()
         week_num = (today - start_date).days // 7 + 1
         if week_num % 2 == 0:
