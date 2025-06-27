@@ -3,7 +3,6 @@
     "schedule": "新课表 - 1.json",
     "pin_on_top": 1,
     "margin": 10,
-    "time_offset": 0,
     "opacity": 95,
     "auto_startup": 0,
     "hide": 0,
@@ -56,6 +55,12 @@
     "mirror": "gh_proxy",
     "auto_delay": 5,
     "auto_enable_plugin": 1
+  },
+  "Time": {
+    "type": "ntp",
+    "ntp_server": "ntp.aliyun.com",
+    "ntp_auto_refresh": 10,
+    "time_offset": 0
   },
   "Date": {
     "start_date": "",

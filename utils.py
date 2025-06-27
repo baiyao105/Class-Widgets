@@ -15,7 +15,6 @@ from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal, QThread
 from PyQt5 import QtCore
 import darkdetect
 import datetime as dt
-import winreg
 
 from file import base_directory, config_center
 import signal
@@ -223,7 +222,7 @@ class UnionUpdateTimer(QObject):
             self._safe_stop_timer()
             return
 
-        current_time = dt.datetime.now()
+        current_time = TimeManagerFactory.get_instance().get_current_time()
         callbacks_to_run = []
         with self._lock:
             if not self.callback_info:
@@ -231,7 +230,8 @@ class UnionUpdateTimer(QObject):
                 self._safe_stop_timer()
                 return
             for callback, info in list(self.callback_info.items()):
-                if current_time >= info['next_run']:
+                time_rollback = current_time < info['last_run']
+                if current_time >= info['next_run'] or time_rollback:
                     callbacks_to_run.append(callback)
                     info['last_run'] = current_time
                     info['next_run'] = current_time + dt.timedelta(seconds=info['interval'])
@@ -284,7 +284,7 @@ class UnionUpdateTimer(QObject):
         if not callable(callback):
             raise TypeError("回调必须是可调用对象")
         interval = max(0.1, interval)
-        current_time: dt.datetime = dt.datetime.now()
+        current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
         with self._lock:
             if callback not in self.callback_info:
                 self.callback_info[callback] = {
@@ -377,7 +377,7 @@ class UnionUpdateTimer(QObject):
         """获取所有回调函数的详细信息"""
         with self._lock:
             info: Dict[Callable[[], Any], Dict[str, Union[float, dt.datetime]]] = {}
-            current_time: dt.datetime = dt.datetime.now()
+            current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
             for callback, data in self.callback_info.items():
                 info[callback] = {
                     'interval': data['interval'],
@@ -440,5 +440,260 @@ def slice_str_by_length(text: str, max_length: int) -> str:
 
     return ''.join(result)
 
+# 时间管理模块 - 简化版工厂模式实现
+from abc import ABC, abstractmethod
+from typing import Dict, Type
+
+class TimeManagerInterface(ABC):
+    """时间管理器接口"""
+    
+    @abstractmethod
+    def get_real_time(self) -> dt.datetime:
+        """获取真实当前时间（无偏移）"""
+        pass
+    
+    @abstractmethod
+    def get_current_time(self) -> dt.datetime:
+        """获取程序时间（含偏移）"""
+        pass
+    
+    @abstractmethod
+    def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
+        """获取格式化时间字符串"""
+        pass
+    
+    @abstractmethod
+    def get_today(self) -> dt.date:
+        """获取今天日期"""
+        pass
+    
+    @abstractmethod
+    def get_current_weekday(self) -> int:
+        """获取当前星期几（0=周一, 6=周日）"""
+        pass
+    
+    @abstractmethod
+    def get_time_offset(self) -> int:
+        """获取时差偏移(秒)"""
+        pass
+    
+    @abstractmethod
+    def set_time_offset(self, offset: int) -> None:
+        """设置时差偏移(秒)"""
+        pass
+    
+    @abstractmethod
+    def sync_with_ntp(self) -> bool:
+        """同步NTP时间"""
+        pass
+
+class LocalTimeManager(TimeManagerInterface):
+    """本地时间管理器"""
+    
+    def __init__(self):
+        from file import config_center
+        self._config_center = config_center
+    
+    def _get_time_offset(self) -> int:
+        """从配置读取时差偏移"""
+        try:
+            offset_str = self._config_center.read_conf('Time', 'time_offset')
+            return int(offset_str) if offset_str else 0
+        except (ValueError, TypeError, Exception):
+            return 0
+    
+    def get_real_time(self) -> dt.datetime:
+        """获取真实当前时间"""
+        return dt.datetime.now()
+    
+    def get_current_time(self) -> dt.datetime:
+        """获取程序时间（含偏移）"""
+        return self.get_real_time() + dt.timedelta(seconds=self._get_time_offset())
+    
+    def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
+        """获取格式化时间字符串"""
+        return self.get_current_time().strftime(format_str)
+    
+    def get_today(self) -> dt.date:
+        """获取今天日期"""
+        return self.get_current_time().date()
+
+    def get_current_weekday(self) -> int:
+        """获取当前星期几（0=周一, 6=周日）"""
+        return self.get_current_time().weekday()
+    
+    def get_time_offset(self) -> int:
+        """获取时差偏移(秒)"""
+        return self._get_time_offset()
+    
+    def set_time_offset(self, offset: int) -> None:
+        """设置时差偏移(秒)"""
+        self._config_center.write_conf('Time', 'time_offset', str(offset))
+    
+    def sync_with_ntp(self) -> bool:
+        """本地时间管理器不支持NTP同步"""
+        logger.warning("本地时间管理器不支持NTP同步")
+        return False
+
+class NTPTimeManager(TimeManagerInterface):
+    """NTP时间管理器"""
+    
+    def __init__(self):
+        from file import config_center
+        self._config_center = config_center
+        self._ntp_reference_time = None
+        self._ntp_reference_timestamp = None
+        self._lock = threading.Lock()
+        self._use_fallback = True
+        threading.Thread(target=self._background_sync, daemon=True).start()
+        # logger.debug("NTP时间管理器初始化完成")
+    
+    def _background_sync(self):
+        """后台NTP同步"""
+        try:
+            if self._sync_ntp_internal(timeout=5.0):
+                with self._lock:
+                    self._use_fallback = False
+            else:
+                logger.warning("NTP同步失败,继续使用系统时间")
+        except Exception as e:
+            logger.error(f"NTP同步异常: {e}")
+    
+    def _get_time_offset(self) -> int:
+        """从配置读取时差偏移"""
+        try:
+            offset_str = self._config_center.read_conf('Time', 'time_offset')
+            return int(offset_str) if offset_str else 0
+        except (ValueError, TypeError, Exception):
+            return 0
+    
+    def _get_ntp_server(self) -> str:
+        """从配置读取NTP服务器"""
+        try:
+            return self._config_center.read_conf('Time', 'ntp_server') or 'ntp.aliyun.com'
+        except Exception:
+            return 'ntp.aliyun.com'
+    
+    def _sync_ntp_internal(self, timeout: float = 5.0) -> bool:
+        """执行NTP同步"""
+        ntp_server = self._get_ntp_server()
+        try:
+            import ntplib
+            ntp_client = ntplib.NTPClient()
+            response = ntp_client.request(ntp_server, version=3, timeout=timeout)
+            ntp_timestamp = response.tx_time
+            ntp_time_utc = dt.datetime.utcfromtimestamp(ntp_timestamp)
+            if time.daylight and time.localtime().tm_isdst:
+                local_offset_seconds = time.altzone
+            else:
+                local_offset_seconds = time.timezone
+            ntp_time_local = ntp_time_utc - dt.timedelta(seconds=local_offset_seconds)
+            with self._lock:
+                self._ntp_reference_time = ntp_time_local
+                self._ntp_reference_timestamp = time.time()
+            
+            logger.debug(f"NTP同步成功: 服务器={ntp_server}, 时间={ntp_time_local}, 延迟={response.delay:.3f}秒")
+            return True
+                
+        except Exception as e:
+            logger.error(f"NTP同步失败: {e}")
+            return False
+    
+    def get_real_time(self) -> dt.datetime:
+        """获取真实当前时间"""
+        with self._lock:
+            if self._use_fallback or self._ntp_reference_time is None:
+                return dt.datetime.now()
+            
+            # 基于NTP基准时间计算当前时间
+            elapsed_seconds = time.time() - self._ntp_reference_timestamp
+            return self._ntp_reference_time + dt.timedelta(seconds=elapsed_seconds)
+    
+    def get_current_time(self) -> dt.datetime:
+        """获取程序时间（含偏移）"""
+        return self.get_real_time() + dt.timedelta(seconds=self._get_time_offset())
+    
+    def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
+        """获取格式化时间字符串"""
+        return self.get_current_time().strftime(format_str)
+    
+    def get_today(self) -> dt.date:
+        """获取今天日期"""
+        return self.get_current_time().date()
+    
+    def get_current_weekday(self) -> int:
+        """获取当前星期几（0=周一, 6=周日）"""
+        return self.get_current_time().weekday()
+    
+    def get_time_offset(self) -> int:
+        """获取时差偏移(秒)"""
+        return self._get_time_offset()
+    
+    def set_time_offset(self, offset: int) -> None:
+        """设置时差偏移(秒)"""
+        self._config_center.write_conf('Time', 'time_offset', str(offset))
+    
+    def sync_with_ntp(self) -> bool:
+        """进行NTP同步"""
+        success = self._sync_ntp_internal(timeout=5.0)
+        if success:
+            with self._lock:
+                self._use_fallback = False
+        return success
+    
+    def get_last_ntp_sync(self) -> Optional[dt.datetime]:
+        """获取上次NTP同步时间"""
+        with self._lock:
+            return self._ntp_reference_time
+
+class TimeManagerFactory:
+    """时间管理器工厂"""
+    _managers: Dict[str, Type[TimeManagerInterface]] = {
+        'local': LocalTimeManager,
+        'ntp': NTPTimeManager
+    }
+    _instance: Optional[TimeManagerInterface] = None
+    
+    @classmethod
+    def create_manager(cls) -> TimeManagerInterface:
+        """创建时间管理器"""
+        from file import config_center
+        try:
+            time_type = config_center.read_conf('Time', 'type')
+            manager_type = 'ntp' if time_type == 'ntp' else 'local'
+        except Exception:
+            manager_type = 'local'
+        return cls._managers[manager_type]()
+    
+    @classmethod
+    def get_instance(cls) -> TimeManagerInterface:
+        """获取管理器实例"""
+        if cls._instance is None:
+            cls._instance = cls.create_manager()
+        return cls._instance
+    
+    @classmethod
+    def reset_instance(cls) -> TimeManagerInterface:
+        """重置实例（配置变更时使用）"""
+        cls._instance = cls.create_manager()
+        
+        # 更新全局变量
+        globals()['time_manager'] = cls._instance
+        sys.modules[__name__].time_manager = cls._instance
+        
+        # 重置相关模块的状态
+        modules_to_reset = ['main', 'conf']
+        for module_name in modules_to_reset:
+            if module_name in sys.modules:
+                module = sys.modules[module_name]
+                if hasattr(module, 'time_manager'):
+                    setattr(module, 'time_manager', cls._instance)
+                if hasattr(module, '__dict__') and 'time_manager' in module.__dict__:
+                    module.__dict__['time_manager'] = cls._instance
+        
+        return cls._instance
+
+
 tray_icon = None
 update_timer = UnionUpdateTimer()
+time_manager = TimeManagerFactory.get_instance()

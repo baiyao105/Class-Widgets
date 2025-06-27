@@ -18,6 +18,7 @@ from conf import base_directory
 import list_
 from file import config_center, schedule_center
 from menu import SettingsMenu
+from utils import time_manager
 import platform
 from loguru import logger
 
@@ -32,7 +33,7 @@ else:
 
 settings = None
 
-current_week = dt.datetime.today().weekday()
+current_week = time_manager.get_current_weekday()
 temp_schedule = {'schedule': {}, 'schedule_even': {}}
 
 

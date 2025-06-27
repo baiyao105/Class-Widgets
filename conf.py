@@ -82,7 +82,7 @@ def save_installed_plugin(data: List[Any]) -> bool:
         return False
 
 
-def load_theme_width(theme: str) -> int:
+def load_theme_width(theme: str) -> Dict[str, Any]:
     try:
         with open(base_directory / 'ui' / theme / 'theme.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
@@ -181,14 +181,6 @@ def remove_from_startup() -> None:
     if os.path.exists(shortcut_path):
         os.remove(shortcut_path)
 
-
-def get_time_offset() -> int:  # 获取时差偏移
-    time_offset = config_center.read_conf('General', 'time_offset')
-    if time_offset is None or time_offset == '' or time_offset == '0':
-        return 0
-    else:
-        return int(time_offset)
-    
 def update_countdown(cnt: int) -> None:
     global update_countdown_custom_last
     global countdown_cnt
@@ -227,11 +219,14 @@ def get_custom_countdown() -> str:
         except Exception as e:
             logger.error(f"解析日期时出错: {custom_countdown}, 错误: {e}")
             return '解析失败'
-        if custom_countdown < datetime.now():
+        # 使用时间管理器获取当前时间
+        from utils import TimeManagerFactory
+        current_time = TimeManagerFactory.get_instance().get_current_time()
+        if custom_countdown < current_time:
             return '0 天'
         else:
-            cd_text = custom_countdown - datetime.now()
-            return f'{cd_text.days + 1} 天'
+            cd_text = custom_countdown - current_time
+            return f'{cd_text.days + 1} 天'
             # return (
             #     f"{cd_text.days} 天 {cd_text.seconds // 3600} 小时 {cd_text.seconds // 60 % 60} 分"
             # )
@@ -247,7 +242,9 @@ def get_week_type() -> int:
         except (ValueError, TypeError):
             logger.error(f"解析日期时出错: {start_date_str}")
             return 0  # 解析失败默认单周
-        today = datetime.now()
+        # 使用时间管理器获取当前时间
+        from utils import TimeManagerFactory
+        today = TimeManagerFactory.get_instance().get_current_time()
         week_num = (today - start_date).days // 7 + 1
         if week_num % 2 == 0:
             return 1  # 双周

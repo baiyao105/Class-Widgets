@@ -42,7 +42,7 @@ from weather import WeatherReportThread as weatherReportThread
 from weather import get_unified_weather_alerts, get_alert_image
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, stop, share, update_timer, DarkModeWatcher
+from utils import restart, stop, share, update_timer, DarkModeWatcher, time_manager, TimeManagerFactory
 from file import config_center, schedule_center
 
 if os.name == 'nt':
@@ -87,7 +87,7 @@ weather_data_temp = None
 city = 101010100  # 默认城市
 theme = None
 
-time_offset = 0  # 时差偏移
+# time_offset = 0  # 时差偏移 - 已迁移到时间管理器
 first_start = True
 error_cooldown = dt.timedelta(seconds=2)  # 冷却时间(s)
 ignore_errors = []
@@ -218,8 +218,9 @@ def get_start_time() -> None:
                 logger.error(f'加载课程表文件[节点类型]出错：{e}')
                 part_type = 'part'
 
-            # 应用时差偏移到课程表时间
-            start_time = dt.datetime.combine(today, dt.time(h, m)) + dt.timedelta(seconds=time_offset)
+            # 使用时间管理器应用时差偏移到课程表时间
+            base_time = dt.datetime.combine(time_manager.get_today(), dt.time(h, m))
+            start_time = base_time + dt.timedelta(seconds=time_manager.get_time_offset())
             parts_start_time.append(start_time)
             order.append(item_name)
             parts_type.append(part_type)
@@ -268,7 +269,7 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
         c_time = parts_start_time[i]
         return c_time, int(order[i])  # 返回开始时间、Part序号
 
-    current_dt = dt.datetime.now() # 当前时间
+    current_dt = TimeManagerFactory.get_instance().get_current_time() # 当前时间
 
     for i in range(len(parts_start_time)):  # 遍历每个Part
         time_len = dt.timedelta(minutes=0)  # Part长度
@@ -285,7 +286,7 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
                 if current_dt <= parts_start_time[i] + time_len:
                     return return_data()
 
-    return parts_start_time[0] + dt.timedelta(seconds=time_offset), 0, 'part'
+    return parts_start_time[0] + dt.timedelta(seconds=time_manager.get_time_offset()), 0, 'part'
 
 def get_excluded_lessons() -> None:
     global excluded_lessons
@@ -333,7 +334,7 @@ def get_current_lessons() -> None:  # 获取当前课程
 # 获取倒计时、弹窗提示
 def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # 重构好累aaaa
     global last_notify_time
-    current_dt = dt.datetime.now()
+    current_dt = TimeManagerFactory.get_instance().get_current_time()
     if last_notify_time and (current_dt - last_notify_time).seconds < notify_cooldown:
         return
     def after_school():  # 放学
@@ -343,7 +344,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
             if config_center.read_conf('Toast', 'after_school') == '1':
                 notification.push_notification(2)  # 放学
 
-    current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
+    current_dt = TimeManagerFactory.get_instance().get_current_time()  # 当前时间
     return_text = []
     got_return_data = False
 
@@ -437,7 +438,7 @@ def get_next_lessons() -> None:
     global next_lessons
     next_lessons = []
     part = 0
-    current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
+    current_dt = TimeManagerFactory.get_instance().get_current_time()  # 当前时间
 
     if parts_start_time:
         c_time, part = get_part()
@@ -473,7 +474,7 @@ def get_next_lessons_text() -> str:
 # 获取当前活动
 def get_current_lesson_name() -> None:
     global current_lesson_name, current_state
-    current_dt = dt.datetime.combine(today, dt.datetime.strptime(current_time, '%H:%M:%S').time())  # 当前时间
+    current_dt = TimeManagerFactory.get_instance().get_current_time()  # 当前时间
     current_lesson_name = '暂无课程'
     current_state = 0
 
@@ -715,7 +716,7 @@ class PluginManager:  # 插件管理器
             "Timeline_Data": timeline_data,  # 时间线数据
             "Parts_Start_Time": parts_start_time,  # 节点开始时间
             "Parts_Type": parts_type,  # 节点类型
-            "Time_Offset": time_offset,  # 时差偏移
+            "Time_Offset": time_manager.get_time_offset(),  # 时差偏移
 
             "Schedule_Name": config_center.schedule_name,  # 课程表名称
             "Loaded_Data": loaded_data,  # 加载的课程表数据
@@ -2016,12 +2017,11 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.open_extra_menu()
 
     def update_data(self, path: str = '') -> None:
-        global current_time, current_week, start_y, time_offset, today
+        global current_time, current_week, start_y, today
 
-        today = dt.date.today()
-        current_time = dt.datetime.now().strftime('%H:%M:%S')
-        time_offset = conf.get_time_offset()
-
+        # 使用时间管理器统一处理时间
+        today = TimeManagerFactory.get_instance().get_today()
+        current_time = TimeManagerFactory.get_instance().get_current_time_str('%H:%M:%S')
         get_start_time()
         get_current_lessons()
         get_current_lesson_name()
@@ -2049,7 +2049,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         if conf.is_temp_week():  # 调休日
             current_week = config_center.read_conf('Temp', 'set_week')
         else:
-            current_week = dt.datetime.now().weekday()
+            current_week = time_manager.get_current_weekday()
         
         cd_list = get_countdown()
 
