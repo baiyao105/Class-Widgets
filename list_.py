@@ -1,11 +1,14 @@
 import json
 import os
 from copy import deepcopy
-from shutil import copy
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
+from shutil import copy
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from loguru import logger
+
+from basic_dirs import THEME_DIRS
+from data_model import ThemeConfig, ThemeInfo
 from file import base_directory, config_center, save_data_to_json
 
 week = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -106,13 +109,47 @@ widget_name = {
 }
 
 native_widget_name = [widget_name[i] for i in widget_name]
+schedule_dbs = {
+    '@hpd': 'https://cwkv.hpdnya.com'
+}
+
+
+def validate_theme(folder: Path) -> Optional[ThemeInfo]:
+    file_path = folder / 'theme.json'
+    if not file_path.exists():
+        return None
+    try:
+        with file_path.open('r', encoding='utf-8') as f:
+            return ThemeInfo(
+                path=folder,
+                config=ThemeConfig.model_validate_json(f.read())
+            )
+    except Exception as e:
+        logger.error(f'验证主题配置文件发生错误：{e}')
+        return None
+
+
+def __collect_themes(it: Iterable[Tuple[str, ThemeInfo]]) -> Dict[str, ThemeInfo]:
+    themes: Dict[str, ThemeInfo] = {}
+    for name, info in it:
+        if name in themes:
+            logger.warning(f'主题 {name} - {themes[name].path} 已存在，{info.path} 将覆盖原有配置')
+        themes[name] = info
+    return themes
+
 
 try:  # 加载课程/主题配置文件
     subject_info = json.load(open(f'{base_directory}/config/data/subject.json', 'r', encoding='utf-8'))
     subject_icon = subject_info['subject_icon']
     subject_abbreviation = subject_info['subject_abbreviation']
-    theme_folder = [f for f in os.listdir(f'{base_directory}/ui/')
-                    if os.path.isdir(os.path.join(f'{base_directory}/ui/', f))]
+    __theme = __collect_themes(
+        (dir.name, info)
+        for root_dir in reversed(THEME_DIRS)
+        for dir in root_dir.iterdir()
+        if (info := validate_theme(dir)) is not None
+    )
+    theme_folder = list(folder.path.name for folder in __theme.values())
+    theme_names = list(folder.config.name for folder in __theme.values())
 except Exception as e:
     logger.error(f'加载课程/主题配置文件发生错误，使用默认配置：{e}')
     config_center.write_conf('General', 'theme', 'default')
@@ -145,20 +182,8 @@ except Exception as e:
         '历史': '史'
     }
 
-not_exist_themes = []
 
 countdown_modes = ['轮播', '多小组件']
-
-for folder in theme_folder:
-    try:
-        json_file = json.load(open(f'{base_directory}/ui/{folder}/theme.json', 'r', encoding='utf-8'))
-        theme_names.append(json_file['name'])
-    except Exception as e:
-        logger.error(f'加载主题文件 theme.json {folder} 发生错误，跳过：{e}')
-        not_exist_themes.append(folder)
-
-for folder in not_exist_themes:
-    theme_folder.remove(folder)
 
 
 def get_widget_list() -> List[str]:
@@ -221,7 +246,6 @@ def get_schedule_config() -> List[str]:
         if file_name.endswith('.json') and file_name != 'backup.json':
             # 将文件路径添加到列表
             schedule_config.append(file_name)
-    schedule_config.append('添加新课表')
     return schedule_config
 
 
@@ -246,10 +270,14 @@ def import_schedule(filepath: str, filename: str) -> bool:  # 导入课表
         logger.error(f"加载数据时出错: {e}")
         return False
 
-    checked_data = convert_schedule(check_data)
+    try:
+        checked_data = convert_schedule(check_data)
+    except Exception as e:
+        logger.error(f"转换数据时出错: {e}")
+        return False
     # 保存文件
     try:
-        print(check_data)
+        print(checked_data)
         copy(filepath, f'{base_directory}/config/schedule/{filename}')
         save_data_to_json(checked_data, filename)
         config_center.write_conf('General', 'schedule', filename)
@@ -263,10 +291,10 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
     # 校验课程表
     if check_data is None:
         logger.warning('此文件为空')
-        return False
+        raise ValueError('此文件为空')
     elif not check_data.get('timeline') and not check_data.get('schedule'):
         logger.warning('此文件不是课程表文件')
-        return False
+        raise ValueError('此文件不是课程表文件')
     # 转换为标准格式
     if not check_data.get('schedule_even'):
         logger.warning('此课程表格式不支持单双周')
@@ -303,7 +331,7 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
                 del check_data['timeline'][item_name]
         except Exception as e:
             logger.error(f"转换数据时出错: {e}")
-            return False
+            raise e
           
     return check_data
 
@@ -317,7 +345,7 @@ def export_schedule(filepath: str, filename: str) -> bool:  # 导出课表
         return False
 
 
-def get_widget_config() -> Dict[str, Any]:
+def get_widget_config() -> List[str]:
     try:
         if os.path.exists(f'{base_directory}/config/widget.json'):
             with open(f'{base_directory}/config/widget.json', 'r', encoding='utf-8') as file:
