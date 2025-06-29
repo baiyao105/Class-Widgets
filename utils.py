@@ -473,7 +473,7 @@ class TimeManagerInterface(ABC):
 class LocalTimeManager(TimeManagerInterface):
     """本地时间管理器"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self._config_center = config_center
     
     def get_real_time(self) -> dt.datetime:
@@ -504,8 +504,18 @@ class LocalTimeManager(TimeManagerInterface):
 
 class NTPTimeManager(TimeManagerInterface):
     """NTP时间管理器"""
+    _config_center: Any
+    _ntp_reference_time: Optional[float]
+    _ntp_reference_timestamp: Optional[float]
+    _lock: threading.Lock
+    _use_fallback: bool
+    _last_sync_time: float
+    _sync_debounce_interval: float
+    _pending_sync_timer: Optional[Any]
+    _sync_thread: Optional[threading.Thread]
+    _running: bool
     
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Any] = None) -> None:
         self._config_center = config or config_center
         self._ntp_reference_time = None
         self._ntp_reference_timestamp = None
@@ -519,12 +529,12 @@ class NTPTimeManager(TimeManagerInterface):
         self._start_sync_thread()
         # logger.debug("NTP时间管理器初始化完成")
     
-    def _start_sync_thread(self):
+    def _start_sync_thread(self) -> None:
         """启动后台同步线程"""
         self._sync_thread = threading.Thread(target=self._background_sync, daemon=True)
         self._sync_thread.start()
     
-    def _background_sync(self):
+    def _background_sync(self) -> None:
         """后台NTP同步"""
         try:
             # 初始同步
@@ -633,7 +643,7 @@ class NTPTimeManager(TimeManagerInterface):
             self._pending_sync_timer = None
         return self._execute_sync()
     
-    def _delayed_sync(self):
+    def _delayed_sync(self) -> None:
         """延迟执行的同步"""
         self._pending_sync_timer = None
         self._execute_sync()
@@ -652,7 +662,7 @@ class NTPTimeManager(TimeManagerInterface):
         with self._lock:
             return self._ntp_reference_time
             
-    def shutdown(self):
+    def shutdown(self) -> None:
         """关闭NTP管理器"""
         self._running = False
         if self._pending_sync_timer:

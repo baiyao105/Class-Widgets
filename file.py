@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from shutil import copy
-from typing import Dict, Any, Optional, Union, Callable, TypedDict, List
+from typing import Dict, Any, Optional, Union, Callable, List
 
 from loguru import logger
 import configparser
@@ -19,13 +19,6 @@ if str(base_directory).endswith('MacOS'):
 config_path = base_directory / 'config.ini'
 
 
-class MigrationRule(TypedDict):
-    old_section: str  # 原配置节名
-    old_key: str  # 原配置键名
-    new_section: str  # 新配置节名
-    new_key: str  # 新配置键名
-    transform_func: Optional[Callable[[Any], Any]]  # 转换函数(旧->新)
-    remove_old: bool  # 是否移除旧配置项
 
 
 class ConfigCenter:
@@ -210,10 +203,9 @@ class ConfigCenter:
             logger.error(f"配置项迁移失败 {old_section}.{old_key} -> {new_section}.{new_key}: {e}")
             return False
     
-    def migrate_config(self, old_section: str = None, old_key: str = None, 
-                      new_section: str = None, new_key: str = None,
-                      transform_func: Optional[Callable[[Any], Any]] = None,
-                      remove_old: bool = True, migration_rules: Optional[List[MigrationRule]] = None) -> Union[bool, Dict[str, bool]]:
+    def migrate_config(self, old_section: str = None, old_key: str = None, new_section: str = None, 
+                       new_key: str = None, transform_func: Optional[Callable[[Any], Any]] = None, 
+                       remove_old: bool = True, migration_rules: Optional[List[Dict[str, Any]]] = None) -> Union[bool, Dict[str, bool]]:
         """配置迁移
 
         Args:
@@ -230,8 +222,8 @@ class ConfigCenter:
                 - old_key: 原配置键
                 - new_section: 新配置节
                 - new_key: 新配置键
-                - transform_func: 转换函数（可选）
-                - remove_old: 是否删除原配置（可选，默认True）
+                - transform_func: 转换函数 (可选)
+                - remove_old: 是否删除原配置 (可选,默认True)
                 
         Returns:
             Union[bool, Dict[str, bool]]: 单个迁移返回bool，批量迁移返回Dict[str, bool]
@@ -251,7 +243,7 @@ class ConfigCenter:
             self._write_config_to_file()
         return result
     
-    def _batch_migrate_internal(self, migration_rules: List[MigrationRule]) -> Dict[str, bool]:
+    def _batch_migrate_internal(self, migration_rules: List[Dict[str, Any]]) -> Dict[str, bool]:
         results = {}
         for i, rule in enumerate(migration_rules):
             rule_name = f"{rule['old_section']}.{rule['old_key']}->{rule['new_section']}.{rule['new_key']}"
