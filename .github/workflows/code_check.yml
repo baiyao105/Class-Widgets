@@ -60,7 +60,7 @@ jobs:
         with:
           languages: python
           config: |
-            name: "CodeQL Config"
+            name: "CodeQL Security Analysis"
             disable-default-queries: false
             queries:
               - uses: security-and-quality
@@ -183,6 +183,8 @@ jobs:
             "reportAssertAlwaysTrue": "warning",
             "reportSelfClsParameterName": "warning",
             "reportImplicitStringConcatenation": "warning",
+            "venvPath": ".",
+            "venv": ".venv",
             "pythonVersion": "${{ env.PYTHON_VERSION }}",
             "pythonPlatform": "All",
             "executionEnvironments": [
@@ -206,7 +208,7 @@ jobs:
             "strictSetInference": false
           }
           EOF
-          cat > ruff.toml << 'EOF'
+          cat > pyproject.toml << 'EOF'
           [tool.ruff]
           line-length = 120
           target-version = "py38"
@@ -322,17 +324,6 @@ jobs:
             echo "MyPy 发现问题"
             echo "has_critical_issues=true" >> $GITHUB_OUTPUT
             echo "has_issues=true" >> $GITHUB_OUTPUT
-          fi
-          
-          # 生成 SARIF 格式输出
-          echo "生成 MyPy SARIF 报告..."
-          uv pip install mypy-sarif || echo "安装 mypy-sarif 失败，跳过 SARIF 生成"
-          
-          # 使用 mypy-sarif 直接生成 SARIF 格式
-          if command -v mypy-sarif &> /dev/null; then
-            echo "$files" | xargs mypy-sarif --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import --disable-error-code=misc --disable-error-code=no-redef --disable-error-code=var-annotated --disable-error-code=assignment --disable-error-code=return-value --disable-error-code=arg-type --disable-error-code=call-arg --disable-error-code=operator --disable-error-code=index --disable-error-code=union-attr --disable-error-code=has-type --disable-error-code=return --disable-error-code=dict-item --disable-error-code=override --disable-error-code=method-assign --disable-error-code=unreachable --disable-error-code=redundant-expr --disable-error-code=comparison-overlap --sarif-file mypy-results.sarif || echo "MyPy SARIF 生成失败"
-          else
-            echo "mypy-sarif 工具不可用，跳过 MyPy SARIF 生成"
           fi
 
       - name: Upload SARIF results to GitHub
