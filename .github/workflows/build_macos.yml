@@ -124,7 +124,7 @@ jobs:
             exit 1
           else
             echo "✅ 所有 Python 文件语法检查通过"
-            echo "### ✅ 语法检查通过"" >> syntax_report.md
+            echo "### ✅ 语法检查通过" >> syntax_report.md
             cat syntax_report.md >> $GITHUB_STEP_SUMMARY
             echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
           fi
@@ -220,19 +220,7 @@ jobs:
           else
             file_size_mb="未知"
           fi
-          {
-            echo ""
-            echo "---"
-            echo ""
-            echo "## 📦 文件信息"
-            echo ""
-            echo "| 属性 | 值 |"
-            echo "|------|----|" 
-            echo "| 📁 文件名 | ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip |"
-            echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-            echo "| 🔐 MD5 | $file_md5 |"
-            echo ""
-          } >> $GITHUB_STEP_SUMMARY
+          printf "\n---\n\n## 📦 文件信息\n\n| 属性 | 值 |\n|------|----| \n| 📁 文件名 | ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip |\n| 📏 文件大小 | %s MB (%s bytes) |\n| 🔐 MD5 | %s |\n\n" "${file_size_mb}" "${file_size}" "${file_md5}" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload build artifact
         if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'

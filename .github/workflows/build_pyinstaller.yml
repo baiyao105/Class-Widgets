@@ -213,18 +213,7 @@ jobs:
               $file_size_mb = "未知"
               $file_md5 = "未知"
           }
-          {
-            echo ""
-            echo "---"
-            echo "## 📦 文件信息"
-            echo ""
-            echo "| 属性 | 值 |"
-            echo "|------|----|" 
-            echo "| 📁 文件名 | ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip |"
-            echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-            echo "| 🔐 MD5 | $file_md5 |"
-            echo ""
-          } >> $env:GITHUB_STEP_SUMMARY
+          "`n---`n`n## 📦 文件信息`n`n| 属性 | 值 |`n|------|----| `n| 📁 文件名 | ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip |`n| 📏 文件大小 | $file_size_mb MB ($file_size bytes) |`n| 🔐 MD5 | $file_md5 |`n`n" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
       - name: Upload build artifact
         if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
