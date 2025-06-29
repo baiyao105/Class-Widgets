@@ -34,9 +34,8 @@ async def _get_edge_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]
         zh_voices = [
             {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}", "locale": voice["Locale"]}
             for voice in edge_voices
-            if _is_zh_voice(voice["Locale"])
-        ]
-        def sort_key(voice):
+            if _is_zh_voice(voice["Locale"])        ]
+        def sort_key(voice: Dict[str, str]) -> int:
             name_lower = voice["name"].lower()
             locale_lower = voice["locale"].lower()
             if "mainland" in locale_lower or "cn" in locale_lower:
@@ -129,11 +128,12 @@ def get_supported_languages() -> Dict[str, str]:
     }
 
 @contextmanager
-def _pyttsx3_context():
+def _pyttsx3_context() -> Any:
     """安全的pyttsx3引擎上下文管理器"""
     engine = None
     try:
-        pythoncom.CoInitialize()
+        if platform.system() == "Windows":
+            pythoncom.CoInitialize()
         engine = pyttsx3.init()
         yield engine
     except Exception as e:
@@ -145,10 +145,11 @@ def _pyttsx3_context():
                 engine.stop()
             except Exception:
                 pass
-        try:
-            pythoncom.CoUninitialize()
-        except Exception:
-            pass
+        if platform.system() == "Windows":
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
 
 
 def filter_zh_voices(voices: List[Dict[str, str]]) -> List[Dict[str, str]]:
@@ -169,8 +170,8 @@ def log_voices_summary(voices: List[Dict[str, str]]) -> None:
         logger.warning("未能获取到任何 TTS 语音")
 
 _tts_voices_cache = {
-    "edge": {"voices": [], "timestamp": 0},
-    "pyttsx3": {"voices": [], "timestamp": 0},
+    "edge": {"voices": [], "timestamp": 0.0},
+    "pyttsx3": {"voices": [], "timestamp": 0.0},
 }
 
 async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
@@ -230,7 +231,7 @@ async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict
     return voices, overall_error
 
 
-def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None) -> Optional[str]:
+async def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None) -> Optional[str]:
     """
     根据语音名称查找语音ID
     参数：
@@ -239,14 +240,14 @@ def get_voice_id_by_name(name: str, engine_filter: Optional[str] = None) -> Opti
     返回：
         str 或 None: 语音ID，如果未找到则返回None
     """
-    voices = get_tts_voices(engine_filter)
+    voices, _ = await get_tts_voices(engine_filter)
     for v in voices:
         if v["name"] == name:
             return v["id"]
     return None
 
 
-def get_voice_name_by_id(
+async def get_voice_name_by_id(
     voice_id: str, available_voices: Optional[List[Dict[str, str]]] = None
 ) -> Optional[str]:
     """
@@ -257,7 +258,10 @@ def get_voice_name_by_id(
     返回：
         str 或 None: 语音名称,如果未找到则返回None
     """
-    voices = available_voices if available_voices is not None else get_tts_voices()
+    if available_voices is not None:
+        voices = available_voices
+    else:
+        voices, _ = await get_tts_voices()
     return next((v["name"] for v in voices if v["id"] == voice_id), None)
 
 
@@ -828,7 +832,7 @@ class TTSEngine:
                 continue
         raise RuntimeError(f"所有引擎尝试失败\n" + "\n".join(errors))
 
-    def cleanup(self, max_age: int = 86400):
+    def cleanup(self, max_age: int = 86400) -> None:
         """清理过期缓存文件"""
         now = time.time()
         for f in Path(self.cache_dir).glob("*.*"):
@@ -841,7 +845,7 @@ class TTSEngine:
         file_path: str,
         retries: int = DEFAULT_DELETE_RETRIES,
         delay: float = DEFAULT_DELETE_DELAY,
-    ):
+    ) -> bool:
         """
         安全删除音频文件，包含多次重试和强制删除机制
 
@@ -953,7 +957,7 @@ def generate_speech_sync(
     )
 
 
-def list_pyttsx3_voices() -> List[str]:
+def list_pyttsx3_voices() -> List[Dict[str, str]]:
     """列出所有可用的 Pyttsx3 语音."""
     try:
         try:
@@ -991,7 +995,7 @@ class TTSQueueProcessor:
     _lock = threading.Lock()
     
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls) -> 'TTSQueueProcessor':
         """获取单例实例"""
         with cls._lock:
             if cls._instance is None:
@@ -1007,14 +1011,14 @@ class TTSQueueProcessor:
         self.tts_engine = TTSEngine()
         self.callbacks: Dict[str, Dict[str, Any]] = {}
     
-    def start(self):
+    def start(self) -> None:
         """启动处理线程"""
         if not self.running:
             self.running = True
             self.thread = threading.Thread(target=self._process_queue, daemon=True)
             self.thread.start()
     
-    def stop(self):
+    def stop(self) -> None:
         """停止处理线程"""
         if self.running:
             self.running = False
@@ -1022,7 +1026,7 @@ class TTSQueueProcessor:
             if self.thread:
                 self.thread.join(timeout=2.0)
     
-    def _process_queue(self):
+    def _process_queue(self) -> None:
         """处理队列中的 TTS 请求"""
         while self.running:
             try:
@@ -1099,7 +1103,7 @@ class TTSQueueProcessor:
         logger.debug(f"已添加 TTS 任务到队列 [ID: {task_id}]")
         return task_id
     
-    def on_audio_played(self, file_path: str):
+    def on_audio_played(self, file_path: str) -> None:
         """音频播放完成后的回调，用于安全删除文件
         
         参数:
@@ -1202,7 +1206,7 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
     return result_container["file_path"]
 
 
-def on_audio_played(file_path: str):
+def on_audio_played(file_path: str) -> None:
     """音频播放完成后调用此函数，用于安全删除文件
     
     参数:

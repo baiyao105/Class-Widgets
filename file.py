@@ -23,14 +23,14 @@ class ConfigCenter:
     """
     Config中心
     """
-    def __init__(self, base_directory: Path, schedule_update_callback: Optional[Callable] = None) -> None:
+    def __init__(self, base_directory: Path, schedule_update_callback: Optional[Callable[[], None]] = None) -> None:
         self.base_directory = base_directory
         self.config_version = 1
         self.config_file_name = 'config.ini'
         self.user_config_path = self.base_directory / self.config_file_name
         self.default_config_path = self.base_directory / 'config' / 'default_config.json'
         self.config = configparser.ConfigParser()
-        self.default_data = {}
+        self.default_data: Dict[str, Any] = {}
         self.schedule_update_callback = schedule_update_callback
 
         self._load_default_config()
@@ -252,21 +252,21 @@ class ScheduleCenter:
     """
     def __init__(self, config_center_instance: ConfigCenter) -> None:
         self.config_center = config_center_instance
-        self.schedule_data = None
+        self.schedule_data: Dict[str, Any] = {}
         self.update_schedule()
 
     def update_schedule(self) -> None:
         """
         更新课程表
         """
-        self.schedule_data:dict = load_from_json(self.config_center.read_conf('General', 'schedule'))
+        self.schedule_data: Dict[str, Any] = load_from_json(self.config_center.read_conf('General', 'schedule'))
         if 'timeline' not in self.schedule_data:
             self.schedule_data['timeline'] = {}
         if self.schedule_data.get('url', None) is None:
             self.schedule_data['url'] = 'local'
             self.save_data(self.schedule_data, config_center.schedule_name)
 
-    def update_url(self, url):
+    def update_url(self, url: str) -> None:
         """
         更新课程表url
         """
@@ -292,6 +292,7 @@ class ScheduleCenter:
             return f"数据已成功保存到 config/schedule/{filename}"
         except Exception as e:
             logger.error(f"保存数据时出错: {e}")
+            return None
 
 
 def load_from_json(filename: str) -> Dict[str, Any]:

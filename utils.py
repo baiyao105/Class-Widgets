@@ -23,8 +23,9 @@ from typing import Tuple
 
 share = QSharedMemory('ClassWidgets')
 _stop_in_progress = False
+update_timer: Optional['UnionUpdateTimer'] = None
 
-def _reset_signal_handlers():
+def _reset_signal_handlers() -> None:
     """重置信号处理器为默认状态"""
     try:
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
@@ -32,7 +33,7 @@ def _reset_signal_handlers():
     except (AttributeError, ValueError):
         pass
 
-def _cleanup_shared_memory():
+def _cleanup_shared_memory() -> None:
     """清理共享内存"""
     global share
     if share and share.isAttached():
@@ -42,7 +43,7 @@ def _cleanup_shared_memory():
         except Exception as e:
             logger.error(f"分离共享内存时出错: {e}")
 
-def _terminate_child_processes():
+def _terminate_child_processes() -> None:
     """终止所有子进程"""
     try:
         parent = psutil.Process(os.getpid())
@@ -88,7 +89,7 @@ def restart() -> None:
     _cleanup_shared_memory()
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-def stop(status: int = 0):
+def stop(status: int = 0) -> None:
     """
     退出程序
     :param status: 退出状态码,0=正常退出,!=0表示异常退出
