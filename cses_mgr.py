@@ -4,14 +4,13 @@ what is CSES: https://github.com/CSES-org/CSES
 """
 import json
 import typing
-from typing import Union, Optional, Dict, Any, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Union
 
 import cses
-from datetime import datetime, timedelta
 from loguru import logger
 
 import list_ as list_
-import conf
 from file import base_directory, config_center
 
 CSES_WEEKS_TEXTS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

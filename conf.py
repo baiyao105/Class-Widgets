@@ -1,4 +1,5 @@
 import configparser as config
+import configparser
 import json
 import os
 import time
@@ -6,8 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from utils import TimeManagerFactory
-import time
 from dateutil import parser
 from loguru import logger
 
@@ -15,12 +14,13 @@ import list_
 from basic_dirs import CW_HOME, THEME_DIRS
 from data_model import ThemeConfig, ThemeInfo
 from file import base_directory, config_center
+from utils import TimeManagerFactory
 
 if os.name == 'nt':
     from win32com.client import Dispatch
 
 base_directory = Path(base_directory)
-conf = config.ConfigParser()
+conf = configparser.ConfigParser()
 name = 'Class Widgets'
 
 PLUGINS_DIR = Path(base_directory) / 'plugins'
@@ -82,6 +82,8 @@ def load_plugin_config() -> Optional[Dict[str, Any]]:
 
 def save_plugin_config(data: Dict[str, Any]) -> bool:
     data_dict = load_plugin_config()
+    if data_dict is None:
+        data_dict = {}
     data_dict.update(data)
     try:
         with open(base_directory / 'config' / 'plugin.json', 'w', encoding='utf-8') as file:
@@ -129,7 +131,11 @@ def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
         shortcut_path = menu_folder / f'{name}.lnk'
 
         # 创建快捷方式
-        shell = Dispatch('WScript.Shell')
+        try:
+            shell = Dispatch('WScript.Shell')
+        except NameError:
+            logger.error("Dispatch not available on this platform")
+            return
         shortcut = shell.CreateShortCut(str(shortcut_path))
         shortcut.Targetpath = str(file_path)
         shortcut.WorkingDirectory = str(file_path.parent)

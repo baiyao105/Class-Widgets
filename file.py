@@ -1,15 +1,13 @@
+import configparser
 import json
 import os
 import sys
 from pathlib import Path
 from shutil import copy
-from typing import Dict, Any, Optional, Union, Callable, List
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
-import configparser
 from packaging.version import Version
-import json
-
 
 base_directory = Path(os.path.dirname(os.path.abspath(__file__)))
 '''
@@ -50,9 +48,10 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f"加载默认配置文件失败: {e}")
             self.default_data = {}
-            from qfluentwidgets import Dialog
-            from PyQt5.QtWidgets import QApplication
             import sys
+
+            from PyQt5.QtWidgets import QApplication
+            from qfluentwidgets import Dialog
             app = QApplication.instance() or QApplication(sys.argv)
             dlg = Dialog(
                 'Class Widgets 启动失败w(ﾟДﾟ)w',
@@ -203,8 +202,8 @@ class ConfigCenter:
             logger.error(f"配置项迁移失败 {old_section}.{old_key} -> {new_section}.{new_key}: {e}")
             return False
 
-    def migrate_config(self, old_section: str = None, old_key: str = None, new_section: str = None,
-                       new_key: str = None, transform_func: Optional[Callable[[Any], Any]] = None,
+    def migrate_config(self, old_section: Optional[str] = None, old_key: Optional[str] = None, new_section: Optional[str] = None,
+                       new_key: Optional[str] = None, transform_func: Optional[Callable[[Any], Any]] = None,
                        remove_old: bool = True, migration_rules: Optional[List[Dict[str, Any]]] = None) -> Union[bool, Dict[str, bool]]:
         """配置迁移
 
@@ -237,6 +236,8 @@ class ConfigCenter:
             return self._batch_migrate_internal(migration_rules)
         if not all([old_section, old_key, new_section, new_key]):
             raise ValueError("需提供完整参数")
+        # 类型断言，确保参数不为None
+        assert old_section is not None and old_key is not None and new_section is not None and new_key is not None
         result = self.migrate_config_item(old_section, old_key, new_section, new_key,
                                          transform_func, remove_old)
         if result:

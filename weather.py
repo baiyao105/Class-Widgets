@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 """天气统一封装模块"""
 
-import json
-import sqlite3
 import datetime
-import time
-import requests
+import json
 import os
 import re
+import sqlite3
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Union
-from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
-from loguru import logger
 from functools import wraps
+from typing import Any, Dict, List, Optional
+
+import requests
+from loguru import logger
+from PyQt5.QtCore import QEventLoop, QThread, pyqtSignal
 
 from conf import base_directory
 from file import config_center
+
 
 def cache_result(expire_seconds: int = 300):
     """缓存装饰器 """
@@ -95,6 +97,8 @@ class WeatherapiProvider(ABC):
 
     def supports_alerts(self) -> bool:
         """检查是否支持天气预警"""
+        if self.config is None:
+            return False
         return 'alerts' in self.config and bool(self.config['alerts'])
 
     def get_database_name(self) -> str:
@@ -563,6 +567,7 @@ class QWeatherProvider(GenericWeatherProvider):
 
         try:
             from network_thread import proxies
+
             # 和风天气预警API
             alert_url = f"https://devapi.qweather.com/v7/warning/now?location={location_key}&key={api_key}"
             # logger.debug(f'和风天气预警请求URL: {alert_url.replace(api_key, "***" if api_key else "(空)")}')

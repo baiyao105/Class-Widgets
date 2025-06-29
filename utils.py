@@ -1,20 +1,25 @@
-import os
-import sys
-import time
-import pytz
-import ntplib
-import psutil
-import signal
-import inspect
-import threading
-import darkdetect
 import datetime as dt
-from loguru import logger
+import os
+import signal
+import sys
+import threading
+import time
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
+
+import darkdetect
+import psutil
+import inspect
+import ntplib
+try:
+    import pytz  # type: ignore
+except ImportError:
+    pytz = None
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union, Callable, Type, Tuple
+from loguru import logger
+from PyQt5.QtCore import QObject, QSharedMemory, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
-from PyQt5.QtCore import QSharedMemory, QTimer, QObject, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon
+
 from file import base_directory, config_center
 
 share = QSharedMemory('ClassWidgets')
@@ -219,7 +224,7 @@ class UnionUpdateTimer(QObject):
             self._safe_stop_timer()
             return
 
-        current_time = TimeManagerFactory.get_instance().get_current_time()
+        current_time = dt.datetime.now()
         callbacks_to_run = []
         with self._lock:
             if not self.callback_info:
@@ -227,11 +232,13 @@ class UnionUpdateTimer(QObject):
                 self._safe_stop_timer()
                 return
             for callback, info in list(self.callback_info.items()):
-                time_rollback = current_time < info['last_run']
-                if current_time >= info['next_run'] or time_rollback:
+                next_run = info['next_run']
+                interval = info['interval']
+                if isinstance(next_run, dt.datetime) and current_time >= next_run:
                     callbacks_to_run.append(callback)
                     info['last_run'] = current_time
-                    info['next_run'] = current_time + dt.timedelta(seconds=info['interval'])
+                    if isinstance(interval, (int, float)):
+                        info['next_run'] = current_time + dt.timedelta(seconds=float(interval))
         invalid_callbacks = []
         for callback in callbacks_to_run:
             try:
@@ -281,7 +288,7 @@ class UnionUpdateTimer(QObject):
         if not callable(callback):
             raise TypeError("回调必须是可调用对象")
         interval = max(0.1, interval)
-        current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
+        current_time: dt.datetime = dt.datetime.now()
         with self._lock:
             if callback not in self.callback_info:
                 self.callback_info[callback] = {
@@ -302,9 +309,8 @@ class UnionUpdateTimer(QObject):
         """移除回调函数"""
         with self._lock:
             removed: Optional[Dict[str, Union[float, dt.datetime]]] = self.callback_info.pop(callback, None)
-            if removed:
-                logger.debug(f"移除回调函数(间隔:{removed['interval']}s)")
-
+        if removed:
+            logger.debug(f"移除回调函数,原间隔: {removed['interval']}s")
     def remove_all_callbacks(self) -> None:
         """移除所有回调函数"""
         # 意义不明
@@ -333,7 +339,8 @@ class UnionUpdateTimer(QObject):
     def set_callback_interval(self, callback: Callable[[], Any], interval: float) -> bool:
         """设置特定回调函数的间隔(s)"""
         interval = max(0.1, interval)
-        current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()  # 使用真实时间
+        current_time: dt.datetime = dt.datetime.now()
+
         with self._lock:
             if callback in self.callback_info:
                 self.callback_info[callback]['interval'] = interval
@@ -375,7 +382,7 @@ class UnionUpdateTimer(QObject):
         """获取所有回调函数的详细信息"""
         with self._lock:
             info: Dict[Callable[[], Any], Dict[str, Union[float, dt.datetime]]] = {}
-            current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
+            current_time: dt.datetime = dt.datetime.now()
             for callback, data in self.callback_info.items():
                 info[callback] = {
                     'interval': data['interval'],
@@ -474,8 +481,8 @@ class TimeManagerInterface(ABC):
 class LocalTimeManager(TimeManagerInterface):
     """本地时间管理器"""
 
-    def __init__(self) -> None:
-        self._config_center = config_center
+    def __init__(self, config: Optional[Any] = None) -> None:
+        self._config_center = config or config_center
 
     def get_real_time(self) -> dt.datetime:
         """获取真实当前时间"""
@@ -506,7 +513,7 @@ class LocalTimeManager(TimeManagerInterface):
 class NTPTimeManager(TimeManagerInterface):
     """NTP时间管理器"""
     _config_center: Any
-    _ntp_reference_time: Optional[float]
+    _ntp_reference_time: Optional[dt.datetime]
     _ntp_reference_timestamp: Optional[float]
     _lock: threading.Lock
     _use_fallback: bool
@@ -586,6 +593,8 @@ class NTPTimeManager(TimeManagerInterface):
                 local_offset = -time.altzone
             return utc_time.replace(tzinfo=None) + dt.timedelta(seconds=local_offset)
         try:
+            if pytz is None:
+                raise ImportError("pytz not available")
             utc_tz = pytz.UTC
             target_tz = pytz.timezone(timezone_setting)
             if utc_time.tzinfo is None:
@@ -602,7 +611,7 @@ class NTPTimeManager(TimeManagerInterface):
     def get_real_time(self) -> dt.datetime:
         """获取真实当前时间"""
         with self._lock:
-            if self._use_fallback or self._ntp_reference_time is None:
+            if self._use_fallback or self._ntp_reference_time is None or self._ntp_reference_timestamp is None:
                 return dt.datetime.now()
             elapsed_seconds = time.time() - self._ntp_reference_timestamp
             return self._ntp_reference_time + dt.timedelta(seconds=elapsed_seconds)
@@ -624,7 +633,7 @@ class NTPTimeManager(TimeManagerInterface):
         """获取当前星期几（0=周一, 6=周日）"""
         return self.get_current_time().weekday()
 
-    def get_time_offset(self) -> int:
+    def get_time_offset(self) -> float:
         """获取时差偏移(秒)"""
         return float(self._config_center.read_conf('Time', 'time_offset', 0))
 
@@ -695,7 +704,7 @@ class TimeManagerFactory:
 
         manager_class = cls._managers[manager_type]
         if 'config' in inspect.signature(manager_class.__init__).parameters:
-            return manager_class(config=conf)
+            return manager_class(config=conf)  # type: ignore
         return manager_class()
 
     @classmethod

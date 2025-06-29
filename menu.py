@@ -1,57 +1,63 @@
-import datetime as dt
+import asyncio
 import json
 import os
-import re
 import platform
+import re
+import shutil
 import subprocess
 import sys
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-import re
-import zipfile
-import shutil
-import asyncio
 
-from PyQt5 import uic, QtCore
-from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QObject, QTimer
-from PyQt5.QtGui import QIcon, QDesktopServices, QColor
-# from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtCore import Qt, pyqtSignal, QRectF
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
-    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget, QStyle
-from packaging.version import Version
 from loguru import logger
-from qfluentwidgets import (
-    Theme, setTheme, FluentWindow, FluentIcon as fIcon, ToolButton, ListWidget, ComboBox, CaptionLabel,
-    SpinBox, LineEdit, PrimaryPushButton, TableWidget, Flyout, InfoBarIcon, InfoBar, InfoBarPosition,
-    FlyoutAnimationType, NavigationItemPosition, MessageBox, SubtitleLabel, PushButton, SwitchButton,
-    CalendarPicker, BodyLabel, ColorDialog, isDarkTheme, TimeEdit, EditableComboBox, MessageBoxBase,
-    SearchLineEdit, Slider, PlainTextEdit, ToolTipFilter, ToolTipPosition, RadioButton, HyperlinkLabel,
-    PrimaryDropDownPushButton, Action, RoundMenu, CardWidget, ImageLabel, StrongBodyLabel, TimePicker, FlyoutViewBase,
-    TransparentDropDownToolButton, Dialog, SmoothScrollArea, TransparentToolButton, TableWidget, HyperlinkButton, DropDownToolButton, HyperlinkLabel, themeColor
-)
+from packaging.version import Version
+from PyQt5 import QtCore, uic
+from PyQt5.QtCore import (QDate, QObject, QSize, Qt, QThread, QTime,
+                          QTimer, QUrl, pyqtSignal)
+from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter
+from PyQt5.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout,
+                             QHeaderView, QLabel, QListWidgetItem, QScroller,
+                             QSizePolicy, QSpacerItem,
+                             QTableWidgetItem, QVBoxLayout, QWidget)
+from qfluentwidgets import (Action, BodyLabel, CalendarPicker, CaptionLabel,
+                            CardWidget, ColorDialog, ComboBox, Dialog,
+                            DropDownToolButton, EditableComboBox)
+from qfluentwidgets import FluentIcon as fIcon
+from qfluentwidgets import (FluentWindow, Flyout, FlyoutAnimationType,
+                            FlyoutViewBase, HyperlinkLabel,
+                            ImageLabel, InfoBar, InfoBarIcon, InfoBarPosition,
+                            LineEdit, ListWidget, MessageBox, MessageBoxBase,
+                            NavigationItemPosition, PlainTextEdit,
+                            PrimaryDropDownPushButton, PrimaryPushButton,
+                            PushButton, RadioButton, RoundMenu, SearchLineEdit,
+                            Slider, SmoothScrollArea, SpinBox, StrongBodyLabel,
+                            SubtitleLabel, SwitchButton, TableWidget, Theme,
+                            TimeEdit, ToolButton, ToolTipFilter,
+                            ToolTipPosition, TransparentDropDownToolButton,
+                            TransparentToolButton, isDarkTheme, setTheme,
+                            themeColor)
 from qfluentwidgets.common import themeColor
 from qfluentwidgets.components.widgets import ListItemDelegate
 
-from basic_dirs import THEME_HOME
 import conf
+import file
+import generate_speech
 import list_ as list_
 import tip_toast
 import utils
-from utils import time_manager, TimeManagerFactory
 import weather
 import weather as wd
+from basic_dirs import THEME_HOME
 from conf import base_directory, load_theme_config
 from cses_mgr import CSES_Converter
-from generate_speech import get_tts_voices, get_voice_id_by_name, get_voice_name_by_id, get_available_engines
-import generate_speech
 from file import config_center, schedule_center
-import file
+from generate_speech import get_tts_voices, get_voice_name_by_id
 from network_thread import VersionThread, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
+from utils import TimeManagerFactory, time_manager
 
 # 适配高DPI缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -314,11 +320,16 @@ class PluginCard(CardWidget):  # 插件卡片
         self.url = url
         self.enable_settings = enable_settings
 
-        self.iconWidget = ImageLabel(icon)  # 插件图标
-        self.titleLabel = StrongBodyLabel(title, self)  # 插件名
-        self.versionLabel = BodyLabel(version, self)  # 插件版本
-        self.authorLabel = BodyLabel(author, self)  # 插件作者
-        self.contentLabel = CaptionLabel(content, self)  # 插件描述
+        self.iconWidget = ImageLabel()  # 插件图标
+        self.iconWidget.setPixmap(icon)
+        self.titleLabel = StrongBodyLabel(title)  # 插件名
+        self.titleLabel.setParent(self)
+        self.versionLabel = BodyLabel(version)  # 插件版本
+        self.versionLabel.setParent(self)
+        self.authorLabel = BodyLabel(author)  # 插件作者
+        self.authorLabel.setParent(self)
+        self.contentLabel = CaptionLabel(content)  # 插件描述
+        self.contentLabel.setParent(self)
         self.enableButton = SwitchButton()
         self.moreButton = TransparentDropDownToolButton()
         self.moreMenu = RoundMenu(parent=self.moreButton)
@@ -597,9 +608,10 @@ class TTSPreviewThread(QThread):
                 logger.info("TTS预览线程收到中断请求，正在退出...")
                 return
 
-            from generate_speech import generate_speech_sync, TTSEngine
-            from play_audio import play_audio
             import os
+
+            from generate_speech import TTSEngine, generate_speech_sync
+            from play_audio import play_audio
 
             logger.info(f"使用引擎 {self.engine} 生成预览语音")
             audio_file = generate_speech_sync(

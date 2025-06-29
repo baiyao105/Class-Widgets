@@ -1,26 +1,27 @@
-import datetime as dt
+import platform
+import platform
 import sys
 from shutil import copy
-from typing import Optional, List
+from typing import List
 
+from loguru import logger
 from PyQt5 import uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QScroller
-from loguru import logger
-from qfluentwidgets import FluentWindow, FluentIcon as fIcon, ComboBox, \
-    PrimaryPushButton, Flyout, FlyoutAnimationType, InfoBarIcon, ListWidget, LineEdit, ToolButton, HyperlinkButton, \
-    SmoothScrollArea, Dialog
+from qfluentwidgets import ComboBox
+from qfluentwidgets import FluentIcon as fIcon
+from qfluentwidgets import (FluentWindow, Flyout, FlyoutAnimationType,
+                            HyperlinkButton, InfoBarIcon, LineEdit, ListWidget,
+                            PrimaryPushButton, SmoothScrollArea, ToolButton)
 
 import conf
 import file
-from conf import base_directory
 import list_
+from conf import base_directory
 from file import config_center, schedule_center
 from menu import SettingsMenu
 from utils import TimeManagerFactory
-import platform
-from loguru import logger
 
 # 适配高DPI缩放
 if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:

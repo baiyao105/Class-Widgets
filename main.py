@@ -4,46 +4,54 @@ import json
 import os
 import platform
 import re
+import signal
 import subprocess
 import sys
-import psutil
-import signal
 import traceback
 from shutil import copy
-from typing import Optional, Dict, List, Any, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from PyQt5 import uic
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve, QSize, QPoint, QUrl, QObject, QParallelAnimationGroup
-from PyQt5.QtGui import QColor, QIcon, QPixmap, QPainter, QDesktopServices
-from PyQt5.QtGui import QFontDatabase
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QProgressBar, QGraphicsBlurEffect, QPushButton, \
-    QGraphicsDropShadowEffect, QSystemTrayIcon, QFrame, QGraphicsOpacityEffect, QHBoxLayout
+import psutil
 from loguru import logger
 from packaging.version import Version
-from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Action, FluentIcon as fIcon, isDarkTheme, \
-    Dialog, ProgressRing, PlainTextEdit, ImageLabel, PushButton, InfoBarIcon, Flyout, FlyoutAnimationType, CheckBox, \
-    PrimaryPushButton, IconWidget
-
-from PyQt5.QtGui import QCloseEvent, QShowEvent, QHideEvent, QMouseEvent, QFocusEvent
+from PyQt5 import uic
+from PyQt5.QtCore import (QEasingCurve, QParallelAnimationGroup,
+                          QPoint, QPropertyAnimation, QRect, QSize, Qt, QTimer,
+                          QUrl)
+from PyQt5.QtGui import (QCloseEvent, QColor, QDesktopServices, QFocusEvent,
+                         QFontDatabase, QHideEvent, QIcon, QMouseEvent,
+                         QPainter, QPixmap, QShowEvent)
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtWidgets import (QApplication, QFrame, QGraphicsBlurEffect,
+                             QGraphicsDropShadowEffect, QGraphicsOpacityEffect,
+                             QHBoxLayout, QLabel, QProgressBar, QPushButton,
+                             QSystemTrayIcon, QWidget)
+from qfluentwidgets import Action, CheckBox, Dialog
+from qfluentwidgets import FluentIcon as fIcon
+from qfluentwidgets import (Flyout, FlyoutAnimationType, IconWidget,
+                            ImageLabel, InfoBarIcon, PlainTextEdit,
+                            PrimaryPushButton, ProgressRing, PushButton,
+                            SystemTrayMenu, Theme, isDarkTheme, setTheme,
+                            setThemeColor)
 
 import conf
 import list_
 import tip_toast
-from tip_toast import active_windows
 import utils
 import weather as db
 from conf import base_directory, load_theme_config
 from extra_menu import ExtraMenu, open_settings
-from generate_speech import generate_speech_sync, list_pyttsx3_voices
+from file import config_center, schedule_center
+from generate_speech import generate_speech_sync
 from menu import open_plaza
 from network_thread import check_update
-from weather import WeatherReportThread as weatherReportThread
-from weather import get_unified_weather_alerts, get_alert_image
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, stop, share, update_timer, DarkModeWatcher, TimeManagerFactory
-from file import config_center, schedule_center
+from tip_toast import active_windows
+from utils import (DarkModeWatcher, TimeManagerFactory, restart, share, stop,
+                   update_timer)
+from weather import WeatherReportThread as weatherReportThread
+from weather import get_alert_image, get_unified_weather_alerts
 
 if os.name == 'nt':
     import pygetwindow
@@ -90,6 +98,8 @@ theme = None
 first_start = True
 error_cooldown = dt.timedelta(seconds=2)  # 冷却时间(s)
 ignore_errors = []
+fw = None  # 浮窗对象
+screen_width = 0  # 屏幕宽度
 last_error_time = dt.datetime.now() - error_cooldown  # 上一次错误
 
 ex_menu = None
@@ -636,12 +646,16 @@ class ErrorDialog(Dialog):  # 重大错误提示框
         self.iconLabel = ImageLabel()
         self.iconLabel.setImage(f"{base_directory}/img/logo/favicon-error.ico")
         self.error_log = PlainTextEdit()
-        self.report_problem = PushButton(fIcon.FEEDBACK, '报告此问题')
-        self.copy_log_btn = PushButton(fIcon.COPY, '复制日志')
-        self.ignore_error_btn = PushButton(fIcon.INFO, '忽略错误')
+        self.report_problem = PushButton('报告此问题')
+        self.report_problem.setIcon(fIcon.FEEDBACK)
+        self.copy_log_btn = PushButton('复制日志')
+        self.copy_log_btn.setIcon(fIcon.COPY)
+        self.ignore_error_btn = PushButton('忽略错误')
+        self.ignore_error_btn.setIcon(fIcon.INFO)
         self.ignore_same_error = CheckBox()
         self.ignore_same_error.setText('在下次启动之前，忽略此错误')
-        self.restart_btn = PrimaryPushButton(fIcon.SYNC, '重新启动')
+        self.restart_btn = PrimaryPushButton('重新启动')
+        self.restart_btn.setIcon(fIcon.SYNC)
 
         self.iconLabel.setScaledContents(True)
         self.iconLabel.setFixedSize(50, 50)
@@ -801,6 +815,7 @@ class PluginMethod:  # 插件方法
 
     @staticmethod
     def subprocess_exec(title: str, action: str) -> None:  # 执行系统命令
+        global p_mgr
         w = openProgressDialog(title, action)
         p_mgr.temp_window = [w]
         w.show()
@@ -952,6 +967,7 @@ class WidgetsManager:
         return [int(pos_x), int(self.start_pos_y)]
 
     def get_start_pos(self) -> None:
+        global app
         self.calculate_widgets_width()
         screen_geometry = app.primaryScreen().availableGeometry()
         screen_width = screen_geometry.width()
@@ -2131,7 +2147,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self) -> None:
         logger.info('获取天气数据')
-        if not hasattr(self, 'weather_thread') or not self.weather_thread.isRunning():
+        if not hasattr(self, 'weather_thread') or (hasattr(self, 'weather_thread') and not self.weather_thread.isRunning()):
             self.weather_thread = weatherReportThread()
             self.weather_thread.weather_signal.connect(self.update_weather_data)
             self.weather_thread.start()
@@ -2434,7 +2450,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                         self.weather_alert_timer = QTimer(self)
                         self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
                     self.weather_alert_timer.start(6000)  # 6秒切换一次
-                    if not hasattr(self, 'weather_info_timer') or not self.weather_info_timer:
+                    if not hasattr(self, 'weather_info_timer') or (hasattr(self, 'weather_info_timer') and not self.weather_info_timer):
                         self.weather_info_timer = QTimer(self)
                         self.weather_info_timer.timeout.connect(self.toggle_weather_alert)
                         self.weather_info_timer.setSingleShot(True)
@@ -2674,6 +2690,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 
 def check_windows_maximize() -> bool:  # 检查窗口是否最大化
+    try:
+        import pygetwindow
+    except ImportError:
+        pygetwindow = None
     if os.name != 'nt' or not pygetwindow:
         # logger.debug("非Windows NT系统或pygetwindow未加载, 无法检查最大化.")
         return False
@@ -2794,7 +2814,8 @@ def init_config() -> None:  # 重设配置文件
 
 def init() -> None:
     global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode
-    update_timer.remove_all_callbacks()
+    if update_timer is not None:
+        update_timer.remove_all_callbacks()
 
     theme = load_theme_config(config_center.read_conf('General', 'theme')).path.name # 主题
     logger.info(f'应用主题：{theme}')
@@ -2803,7 +2824,7 @@ def init() -> None:
     fw = FloatingWidget()
 
     # 获取屏幕横向分辨率
-    screen_geometry = app.primaryScreen().availableGeometry()
+    screen_geometry = QApplication.primaryScreen().availableGeometry()
     screen_width = screen_geometry.width()
 
     widgets = list_.get_widget_config()
@@ -2818,8 +2839,9 @@ def init() -> None:
             fw.show()
             mgr.full_hide_windows()
 
-    update_timer.add_callback(mgr.update_widgets)
-    update_timer.start()
+    if update_timer is not None:
+        update_timer.add_callback(mgr.update_widgets)
+        update_timer.start()
 
     version = config_center.read_conf("Version", "version")
     build_uuid = config_center.read_conf("Version", "build_runid") or "(Debug)"
@@ -2843,8 +2865,10 @@ def setup_signal_handlers_optimized(app: QApplication) -> None:
     signal.signal(signal.SIGTERM, signal_handler)  # taskkill
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
     if os.name == 'posix':
-        signal.signal(signal.SIGQUIT, signal_handler) # 终端退出
-        signal.signal(signal.SIGHUP, signal_handler)  # 终端挂起
+        if hasattr(signal, 'SIGQUIT'):
+            signal.signal(signal.SIGQUIT, signal_handler) # 终端退出
+        if hasattr(signal, 'SIGHUP'):
+            signal.signal(signal.SIGHUP, signal_handler)  # 终端挂起
 
 if __name__ == '__main__':
     if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':

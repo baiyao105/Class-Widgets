@@ -1,21 +1,31 @@
 import json
+import platform
 import sys
 from datetime import datetime
 from random import shuffle
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from PyQt5 import uic
-from PyQt5.QtCore import QSize, Qt, QTimer, QUrl, QStringListModel, pyqtSignal, QThread
-from PyQt5.QtGui import QIcon, QPixmap, QDesktopServices
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QGridLayout, QSpacerItem, QSizePolicy, QWidget, \
-    QScroller, QCompleter
 from loguru import logger
-from qfluentwidgets import MSFluentWindow, FluentIcon as fIcon, NavigationItemPosition, TitleLabel, \
-    ImageLabel, StrongBodyLabel, HyperlinkLabel, CaptionLabel, PrimaryPushButton, HorizontalFlipView, \
-    InfoBar, InfoBarPosition, SplashScreen, MessageBoxBase, TransparentToolButton, BodyLabel, \
-    PrimarySplitPushButton, RoundMenu, Action, PipsPager, TextBrowser, CardWidget, \
-    IndeterminateProgressRing, ComboBox, ProgressBar, SmoothScrollArea, SearchLineEdit, HyperlinkButton, \
-    MessageBox, SwitchButton, SubtitleLabel
+from PyQt5 import uic
+from PyQt5.QtCore import (QSize, QStringListModel, Qt, QThread, QTimer, QUrl,
+                          pyqtSignal)
+from PyQt5.QtGui import QDesktopServices, QIcon, QPixmap
+from PyQt5.QtWidgets import (QApplication, QCompleter, QGridLayout,
+                             QHBoxLayout, QScroller, QSizePolicy, QSpacerItem,
+                             QVBoxLayout, QWidget)
+from qfluentwidgets import (Action, BodyLabel, CaptionLabel, CardWidget,
+                            ComboBox)
+from qfluentwidgets import FluentIcon as fIcon
+from qfluentwidgets import (HorizontalFlipView, HyperlinkButton,
+                            HyperlinkLabel, ImageLabel,
+                            IndeterminateProgressRing, InfoBar,
+                            InfoBarPosition, MessageBox, MessageBoxBase,
+                            MSFluentWindow, NavigationItemPosition, PipsPager,
+                            PrimaryPushButton, PrimarySplitPushButton,
+                            ProgressBar, RoundMenu, SearchLineEdit,
+                            SmoothScrollArea, SplashScreen, StrongBodyLabel,
+                            SubtitleLabel, SwitchButton, TextBrowser,
+                            TitleLabel, TransparentToolButton)
 
 import conf
 import list_ as l
@@ -23,9 +33,7 @@ import network_thread as nt
 from conf import base_directory
 from file import config_center
 from plugin import p_loader
-from utils import restart, calculate_size
-import platform
-from loguru import logger
+from utils import calculate_size, restart
 
 
 class ThreadManager:
@@ -382,11 +390,15 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
         self.data = data
         author_url = '/'.join(self.url.rsplit('/', 2)[:-1])
 
-        self.iconWidget = ImageLabel(icon)  # 插件图标
-        self.titleLabel = StrongBodyLabel(title, self)  # 插件名
-        self.versionLabel = CaptionLabel(version, self)  # 插件版本
+        self.iconWidget = ImageLabel()  # 插件图标
+        self.iconWidget.setPixmap(icon)
+        self.titleLabel = StrongBodyLabel(title)  # 插件名
+        self.titleLabel.setParent(self)
+        self.versionLabel = CaptionLabel(version)  # 插件版本
+        self.versionLabel.setParent(self)
         self.authorLabel = HyperlinkLabel()  # 插件作者
-        self.contentLabel = CaptionLabel(content, self)  # 插件描述
+        self.contentLabel = CaptionLabel(content)  # 插件描述
+        self.contentLabel.setParent(self)
         self.installButton = PrimaryPushButton()
 
         # layout

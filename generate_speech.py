@@ -4,9 +4,9 @@ import os
 import platform
 import re
 import time
-from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any, Generator, Callable
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 import edge_tts
 import pyttsx3
@@ -14,6 +14,7 @@ from pyttsx3.voice import Voice
 if platform.system() == "Windows":
     import pythoncom
 from loguru import logger
+
 from file import config_center
 
 # 默认用常量
@@ -988,7 +989,9 @@ def list_pyttsx3_voices() -> List[Dict[str, str]]:
 import queue
 import threading
 import uuid
-from typing import Callable, Dict, Optional, Any
+from typing import Any, Callable, Dict, Optional
+
+
 class TTSQueueProcessor:
     """单线程 TTS 队列处理器"""
     _instance = None

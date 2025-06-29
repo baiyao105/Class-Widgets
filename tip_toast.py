@@ -1,22 +1,25 @@
-import sys
-
 import os
+import os
+import platform
+import sys
 from collections import defaultdict
-from typing import Optional, Union, List, Tuple, Dict, Any
-from PyQt5 import uic
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QPoint, pyqtProperty, QThread
-from PyQt5.QtGui import QColor, QPainter, QBrush, QPixmap
-from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QFrame, QGraphicsBlurEffect
+from typing import Any, Dict, List, Optional, Tuple
+
 from loguru import logger
+from PyQt5 import uic
+from PyQt5.QtCore import (QEasingCurve, QPoint, QPropertyAnimation, QRect, Qt,
+                          QThread, QTimer, pyqtProperty)
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap
+from PyQt5.QtWidgets import (QApplication, QFrame, QGraphicsBlurEffect, QLabel,
+                             QWidget)
 from qfluentwidgets import setThemeColor
 
 import conf
-from conf import base_directory
 import list_
+from conf import base_directory
 from file import config_center
+from generate_speech import generate_speech_sync
 from play_audio import PlayAudio, play_audio
-from generate_speech import generate_speech_sync, get_voice_id_by_name
-import platform
 
 # 适配高DPI缩放
 if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:

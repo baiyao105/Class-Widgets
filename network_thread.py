@@ -1,22 +1,22 @@
-import os
 import json
+import os
 import shutil
 import zipfile  # 解压插件zip
 from datetime import datetime
-from typing import Optional, Union, List, Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 
 import requests
-from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
 from loguru import logger
 from packaging.version import Version
+from PyQt5.QtCore import QThread, pyqtSignal
 
 import conf
+import list_
 import utils
 import weather as db
-from weather import WeatherReportThread as weatherReportThread
 from conf import base_directory
 from file import config_center
-import list_
+from weather import WeatherReportThread as weatherReportThread
 
 headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache"}  # 设置请求头
 # proxies = {"http": "http://127.0.0.1:10809", "https": "http://127.0.0.1:10809"}  # 加速访问
@@ -34,9 +34,11 @@ try:
         mirror_dict = json.load(file).get('gh_mirror')
 except Exception as e:
     logger.error(f"读取镜像配置失败: {e}")
+    mirror_dict = {}
 
-for name in mirror_dict:
-    mirror_list.append(name)
+if mirror_dict:
+    for name in mirror_dict:
+        mirror_list.append(name)
 
 if config_center.read_conf('Plugin', 'mirror') not in mirror_list:  # 如果当前配置不在镜像列表中，则设置为默认镜像
     logger.warning(f"当前配置不在镜像列表中，设置为默认镜像: {mirror_list[0]}")

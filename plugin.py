@@ -1,9 +1,8 @@
 import importlib
 import json
-from pathlib import Path
 import shutil
-import importlib
-from typing import Dict, List, Optional, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
@@ -22,6 +21,8 @@ class PluginLoader:  # 插件加载器
 
     def load_plugins(self) -> List[str]:
         plugin_config = conf.load_plugin_config()
+        if plugin_config is None:
+            plugin_config = {'enabled_plugins': [], 'safe_plugin': False}
         safe_plugin_enabled = plugin_config.get('safe_plugin', False)
         if 'temp_disabled_plugins' in plugin_config:
             temp_disabled = plugin_config['temp_disabled_plugins']
@@ -59,6 +60,8 @@ class PluginLoader:  # 插件加载器
                 except (ImportError, FileNotFoundError) as e:
                     logger.warning(f"加载插件 {folder.name} 失败: {e}. 将禁用此插件")
                     plugin_config = conf.load_plugin_config()
+                    if plugin_config is None:
+                        plugin_config = {'enabled_plugins': []}
                     if folder.name in plugin_config['enabled_plugins']:
                         plugin_config['enabled_plugins'].remove(folder.name)
                         conf.save_plugin_config(plugin_config)

@@ -1,18 +1,17 @@
-import sys
 import os
-import time
 import pathlib
-from typing import Optional, Dict, Any
+import sys
+import time
+from typing import Any, Dict, Optional
 
 import pygame
 import pygame.mixer
-from PyQt5.QtCore import QThread, pyqtSignal
 from loguru import logger
+from PyQt5.QtCore import QThread, pyqtSignal
 
 import conf
 from file import config_center
 from generate_speech import TTSEngine, on_audio_played
-
 
 sound_cache: Dict[str, Any] = {}
 

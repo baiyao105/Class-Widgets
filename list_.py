@@ -206,6 +206,7 @@ def get_current_theme_num() -> Union[str, int]:
             return "default"
         if theme_folder[i] == config_center.read_conf('General', 'theme'):
             return i
+    return "default"  # 默认返回值
 
 
 def get_theme_ui_path(name: str) -> str:
@@ -301,7 +302,7 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
         check_data['schedule_even'] = {str(i): [] for i in range(0, 6)}
 
     part_data = check_data.get('part')
-    if part_data and len(part_data.get('0', [])) == 2:
+    if part_data and part_data.get('0') is not None and len(part_data.get('0', [])) == 2:
         logger.warning('此课程表格式不支持休息段')
         for i in range(len(check_data.get('part'))):
             check_data['part'][str(i)].append('节点')
