@@ -169,19 +169,19 @@ jobs:
           echo "🌿 BRANCH:      $build_branch"
           echo "🆔 RUN_ID:      $build_runid"
           echo "🧪 BUILD_TYPE:  $build_type"
-          {
-            echo ""
-            echo "---"
-            echo "## 📋 构建信息"
-            echo ""
-            echo "| 项目 | 值 |"
-            echo "|------|----|" 
-            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
-            echo "| 🔗 提交哈希 | $build_commit |"
-            echo "| 🌿 分支 | $build_branch |"
-            echo "| 🆔 运行 ID | $build_runid |"
-            echo "| 🧪 构建类型 | $build_type |"
-          } >> $env:GITHUB_STEP_SUMMARY
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
+
+          ---
+          
+          ## 📋 构建信息
+          | 项目 | 值 |
+          |------|----|
+          | ⏰ 构建时间 (UTC+8) | $build_time |
+          | 🔗 提交哈希 | $build_commit |
+          | 🌿 分支 | $build_branch |
+          | 🆔 运行 ID | $build_runid |
+          | 🧪 构建类型 | $build_type |
+          EOF
 
       - name: Run Windows build & package
         if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
