@@ -63,9 +63,9 @@ class ConfigCenter:
             dlg.exec()
             import utils
             utils.stop(0)
-11我w
+
     def _load_user_config(self) -> None:
-        """加载用户配置文件"""1
+        """加载用户配置文件"""
         try:
             self.config.read(self.user_config_path, encoding='utf-8')
         except Exception as e:
