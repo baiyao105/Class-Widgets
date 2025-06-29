@@ -5,7 +5,7 @@ import platform
 import re
 import time
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Optional, List, Dict, Tuple, Any, Generator
 from contextlib import contextmanager
 
 import edge_tts
@@ -69,7 +69,7 @@ async def _get_pyttsx3_voices_async() -> Tuple[List[Dict[str, str]], Optional[st
             ], None
     except OSError as oe:
         error_message = ""
-        if oe.winerror == -2147221005:
+        if hasattr(oe, 'winerror') and oe.winerror == -2147221005:
             error_message = "系统语音引擎(pyttsx3/SAPI5)初始化失败,可能是组件未正确注册或损坏,跳过加载系统语音"
         elif platform.system() != "Windows":
             error_message = f"在 {platform.system()} 上获取 Pyttsx3 语音列表时发生OS错误: {oe}。这可能是因为系统未安装或配置兼容的TTS引擎。将跳过加载系统语音。"
@@ -169,7 +169,7 @@ def log_voices_summary(voices: List[Dict[str, str]]) -> None:
     if not voices:
         logger.warning("未能获取到任何 TTS 语音")
 
-_tts_voices_cache = {
+_tts_voices_cache: Dict[str, Dict[str, Any]] = {
     "edge": {"voices": [], "timestamp": 0.0},
     "pyttsx3": {"voices": [], "timestamp": 0.0},
 }
@@ -190,14 +190,14 @@ async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict
             return cache_entry["voices"], None
     elif not engine_filter:
         all_cached = True
-        combined_voices = []
+        combined_voices: List[Dict[str, str]] = []
         for eng, cache_entry in _tts_voices_cache.items():
             if not cache_entry["voices"] or (
                 current_time - cache_entry["timestamp"] >= CACHE_MAX_AGE
             ):
                 all_cached = False
                 break
-            combined_voices.extend(cache_entry["voices"])
+            combined_voices.extend(cache_entry["voices"])  # type: ignore
         if all_cached:
             return combined_voices, None
     voices = []
@@ -387,7 +387,7 @@ class TTSEngine:
         return await loop.run_in_executor(None, self._sync_pyttsx3, text, voice, file_path)
 
     @contextmanager
-    def _pyttsx3_context(self):
+    def _pyttsx3_context(self) -> Generator[Any, None, None]:
         """pyttsx3引擎的上下文管理器"""
         if platform.system() != "Windows":
             raise RuntimeError("pyttsx3 仅支持 Windows 系统")
@@ -1195,7 +1195,11 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
     
     processor = TTSQueueProcessor.get_instance()
     processor.add_task(
-        **params,
+        text=text,
+        engine=engine,
+        voice=voice,
+        auto_fallback=auto_fallback,
+        timeout=timeout,
         on_complete=on_complete,
         on_error=on_error
     )
@@ -1203,7 +1207,11 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
     result_event.wait()
     if result_container["error"]:
         raise RuntimeError(f"TTS生成失败: {result_container['error']}")
-    return result_container["file_path"]
+    
+    file_path = result_container["file_path"]
+    if file_path is None:
+        raise RuntimeError("TTS生成失败: 未获取到文件路径")
+    return file_path
 
 
 def on_audio_played(file_path: str) -> None:

@@ -259,7 +259,7 @@ class ScheduleCenter:
         """
         更新课程表
         """
-        self.schedule_data: Dict[str, Any] = load_from_json(self.config_center.read_conf('General', 'schedule'))
+        self.schedule_data = load_from_json(self.config_center.read_conf('General', 'schedule'))
         if 'timeline' not in self.schedule_data:
             self.schedule_data['timeline'] = {}
         if self.schedule_data.get('url', None) is None:
@@ -303,7 +303,7 @@ def load_from_json(filename: str) -> Dict[str, Any]:
     """
     try:
         with open(base_directory / 'config' / 'schedule' / filename, 'r', encoding='utf-8') as file:
-            data = json.load(file)
+            data: Dict[str, Any] = json.load(file)
         return data
     except FileNotFoundError:
         logger.error(f"文件未找到: {filename}")

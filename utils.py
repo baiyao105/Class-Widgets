@@ -136,13 +136,13 @@ class DarkModeWatcher(QObject):
     darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号
     def __init__(self, interval: int = 500, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._isDarkMode = darkdetect.isDark()  # 初始状态
+        self._isDarkMode: bool = bool(darkdetect.isDark())  # 初始状态
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._checkTheme)
         self._timer.start(interval)  # 轮询间隔（毫秒）
 
     def _checkTheme(self) -> None:
-        currentMode = darkdetect.isDark()
+        currentMode: bool = bool(darkdetect.isDark())
         if currentMode != self._isDarkMode:
             self._isDarkMode = currentMode
             self.darkModeChanged.emit(currentMode)  # 发出变化信号
@@ -350,7 +350,8 @@ class UnionUpdateTimer(QObject):
         # 意义不明x2
         with self._lock:
             if callback in self.callback_info:
-                return self.callback_info[callback]['interval']
+                interval = self.callback_info[callback]['interval']
+                return float(interval) if isinstance(interval, (int, float)) else None
             return None
     
     def set_base_interval(self, interval: float) -> None:
@@ -383,7 +384,7 @@ class UnionUpdateTimer(QObject):
                     'interval': data['interval'],
                     'last_run': data['last_run'],
                     'next_run': data['next_run'],
-                    'time_until_next': (data['next_run'] - current_time).total_seconds()
+                    'time_until_next': (data['next_run'] - current_time).total_seconds() if isinstance(data['next_run'], dt.datetime) else 0.0
                 }
             return info
     
