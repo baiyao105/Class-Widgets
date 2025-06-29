@@ -234,7 +234,6 @@ jobs:
           ignore = [
               "E501",    # line too long
               "E203",    # whitespace before ':'
-              "W503",    # line break before binary operator
               "F841",    # local variable assigned but never used
               "PLR0913", # too many arguments
               "PLR0912", # too many branches
@@ -292,13 +291,6 @@ jobs:
             echo "has_critical_issues=true" >> $GITHUB_OUTPUT
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
-          echo "生成 PyLint SARIF 报告..."
-          uv pip install pylint-sarif-unofficial || echo "安装 pylint-sarif-unofficial 失败，跳过 SARIF 生成"
-          if command -v pylint-sarif &> /dev/null; then
-            echo "$files" | xargs pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606,E1121,E0203,import-error,undefined-variable,used-before-assignment,unresolved-import,relative-beyond-top-level,cyclic-import,duplicate-code,too-many-locals,too-many-arguments,too-many-branches,too-many-statements,too-few-public-methods,too-many-instance-attributes,line-too-long,missing-docstring,invalid-name,broad-except,dict-item-0-or-1,return-in-init,arguments-differ,signature-differs,method-hidden,access-member-before-definition,attribute-defined-outside-init --output-format=json --reports=no 2>/dev/null | pylint-sarif > pylint-results.sarif || echo "PyLint SARIF 生成失败"
-          else
-            echo "pylint-sarif 工具不可用，跳过 SARIF 生成"
-          fi
 
       - name: Run MyPy check
         id: mypy
@@ -326,15 +318,6 @@ jobs:
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload SARIF results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && needs.detect-changes.outputs.python == 'true'
-        with:
-          sarif_file: |
-            pylint-results.sarif
-            mypy-results.sarif
-          category: static-analysis
-        continue-on-error: true
 
       - name: Generate report
         id: code-quality
