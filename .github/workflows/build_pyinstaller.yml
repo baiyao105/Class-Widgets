@@ -52,7 +52,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.architecture != 'all' && github.event.inputs.architecture != matrix.arch
         run: |
           echo "Skip build ${{ matrix.arch }}"
-          echo "::set-output name=should_skip::true"
+          echo "should_skip=false" >> $env:GITHUB_OUTPUT
 
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -108,11 +108,11 @@ jobs:
               Write-Host "### ❌ 语法错误在文件 $file" -ForegroundColor Red
               Write-Host $result -ForegroundColor Red
               $hasErrors = $true
-              $errorReport += "## ❌ 语法错误: \`$file\`"
+              $errorReport += "## ❌ 语法错误: $file"
               $errorReport += ""
-              $errorReport += "\`\`\`"
+              $errorReport += '```'
               $errorReport += $result
-              $errorReport += "\`\`\`"
+              $errorReport += '```'
               $errorReport += ""
             }
           }
@@ -122,6 +122,7 @@ jobs:
             echo "has_syntax_errors=true" >> $env:GITHUB_OUTPUT
             exit 1
           } else {
+            $errorReport += "### ✅ 语法检查通过"
             $errorReport -join "`n" | Out-File -FilePath "syntax_success.md" -Encoding UTF8
             Get-Content "syntax_success.md" >> $env:GITHUB_STEP_SUMMARY
             echo "has_syntax_errors=false" >> $env:GITHUB_OUTPUT
@@ -168,6 +169,19 @@ jobs:
           echo "🌿 BRANCH:      $build_branch"
           echo "🆔 RUN_ID:      $build_runid"
           echo "🧪 BUILD_TYPE:  $build_type"
+          {
+            echo ""
+            echo "---"
+            echo "## 📋 构建信息"
+            echo ""
+            echo "| 项目 | 值 |"
+            echo "|------|----|" 
+            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
+            echo "| 🔗 提交哈希 | $build_commit |"
+            echo "| 🌿 分支 | $build_branch |"
+            echo "| 🆔 运行 ID | $build_runid |"
+            echo "| 🧪 构建类型 | $build_type |"
+          } >> $env:GITHUB_STEP_SUMMARY
 
       - name: Run Windows build & package
         if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
@@ -189,6 +203,28 @@ jobs:
             --add-data LICENSE:. `
             --hidden-import darkdetect
           ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
+          $zip_file = "zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip"
+          if (Test-Path $zip_file) {
+              $file_size = (Get-Item $zip_file).Length
+              $file_size_mb = [math]::Round($file_size / 1MB, 2)
+              $file_md5 = (Get-FileHash $zip_file -Algorithm MD5).Hash.ToLower()
+          } else {
+              $file_size = "未知"
+              $file_size_mb = "未知"
+              $file_md5 = "未知"
+          }
+          {
+            echo ""
+            echo "---"
+            echo "## 📦 文件信息"
+            echo ""
+            echo "| 属性 | 值 |"
+            echo "|------|----|" 
+            echo "| 📁 文件名 | ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip |"
+            echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+            echo "| 🔐 MD5 | $file_md5 |"
+            echo ""
+          } >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload build artifact
         if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
