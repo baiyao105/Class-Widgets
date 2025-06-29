@@ -130,11 +130,14 @@ jobs:
         run: |
           uv venv .venv
           source .venv/bin/activate
+          echo "$PWD/.venv/bin" >> $GITHUB_PATH
+          echo "Python 版本: $(python --version)"
           uv pip install -r requirements.txt
           uv pip install ruff pylint pyright mypy
-          echo "工具版本信息:"
-          pylint --version
-          mypy --version
+          echo "🔧 工具版本信息:"
+          echo "PyLint: $(pylint --version | head -1)"
+          echo "MyPy: $(mypy --version)"
+          echo "📦 包安装位置: $(python -c 'import site; print(site.getsitepackages()[0])')"
 
       - name: Generate tool configurations
         run: |
@@ -267,7 +270,10 @@ jobs:
           pylance-version: latest-release
           extra-args: ${{ needs.detect-changes.outputs.python_files }}
           venv-path: .venv
+          python-path: .venv/bin/python
         continue-on-error: true
+        env:
+          PYTHONPATH: ".venv/lib/python${{ env.PYTHON_VERSION }}/site-packages"
 
       - name: Run PyLint check
         id: pylint
