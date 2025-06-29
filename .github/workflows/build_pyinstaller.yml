@@ -63,6 +63,7 @@ jobs:
         with:
           python-version: '3.8.10'
           architecture: ${{ matrix.arch }}
+          cache: 'pip'
 
       - name: Setup uv
         if: steps.skip_check.outputs.should_skip != 'true'
@@ -73,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/uv
+            ~\AppData\Local\uv
             .venv
           key: ${{ runner.os }}-${{ matrix.arch }}-uv-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
@@ -99,16 +100,16 @@ jobs:
           $pythonFiles = Get-ChildItem -Path . -Name "*.py" -Recurse | Where-Object { $_ -notmatch "__pycache__" -and $_ -notmatch ".venv" -and $_ -notmatch "build" -and $_ -notmatch "dist" }
           $hasErrors = $false
           $errorReport = @()
-          $errorReport += "# 🔍 Python 语法检查"
+          $errorReport += "## 🔍 Python 语法检查"
           $errorReport += ""
           foreach ($file in $pythonFiles) {
             Write-Host "检查文件: $file"
             $result = python -m py_compile $file 2>&1
             if ($LASTEXITCODE -ne 0) {
-              Write-Host "### ❌ 语法错误在文件 $file" -ForegroundColor Red
+              Write-Host "❌ 语法错误在文件 $file" -ForegroundColor Red
               Write-Host $result -ForegroundColor Red
               $hasErrors = $true
-              $errorReport += "## ❌ 语法错误: $file"
+              $errorReport += "### ❌ 语法错误: $file"
               $errorReport += ""
               $errorReport += '```'
               $errorReport += $result

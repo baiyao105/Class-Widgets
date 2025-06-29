@@ -66,6 +66,7 @@ jobs:
         with:
           python-version: '3.12.0'
           architecture: ${{ matrix.arch }}
+          cache: 'pip'
 
       - name: Setup uv
         if: steps.skip_check.outputs.should_skip != 'true'
@@ -99,7 +100,7 @@ jobs:
           python_files=$(find . -name "*.py" -not -path "*/__pycache__/*" -not -path "*/.venv/*" -not -path "*/build/*" -not -path "*/dist/*")
           has_errors=false
           file_count=$(echo "$python_files" | wc -l)
-          echo "# 🔍 Python 语法检查" > syntax_report.md
+          echo "## 🔍 Python 语法检查" > syntax_report.md
           echo "" >> syntax_report.md
           for file in $python_files; do
             echo "检查文件: $file"
@@ -108,7 +109,7 @@ jobs:
               echo "❌ 语法错误在文件 $file"
               echo "$error_output"
               has_errors=true
-              echo "## ❌ 语法错误: \`$file\`" >> syntax_report.md
+              echo "### ❌ 语法错误: \`$file\`" >> syntax_report.md
               echo "" >> syntax_report.md
               echo "\`\`\`" >> syntax_report.md
               echo "$error_output" >> syntax_report.md
@@ -124,7 +125,7 @@ jobs:
             exit 1
           else
             echo "✅ 所有 Python 文件语法检查通过"
-            echo "### ✅ 语法检查通过" >> syntax_report.md
+            echo "## ✅ 语法检查通过" >> syntax_report.md
             cat syntax_report.md >> $GITHUB_STEP_SUMMARY
             echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
           fi
