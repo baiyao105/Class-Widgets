@@ -63,7 +63,7 @@ class ConfigCenter:
             dlg.exec()
             import utils
             utils.stop(0)
-
+11我w
     def _load_user_config(self) -> None:
         """加载用户配置文件"""1
         try:
