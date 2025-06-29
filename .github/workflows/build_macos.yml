@@ -99,14 +99,8 @@ jobs:
           python_files=$(find . -name "*.py" -not -path "*/__pycache__/*" -not -path "*/.venv/*" -not -path "*/build/*" -not -path "*/dist/*")
           has_errors=false
           file_count=$(echo "$python_files" | wc -l)
-          
-          # 创建错误报告
-          echo "# 🔍 Python 语法检查报告" > syntax_report.md
+          echo "# 🔍 Python 语法检查" > syntax_report.md
           echo "" >> syntax_report.md
-          echo "**检查时间**: $(date '+%Y-%m-%d %H:%M:%S')" >> syntax_report.md
-          echo "**检查文件数**: $file_count" >> syntax_report.md
-          echo "" >> syntax_report.md
-          
           for file in $python_files; do
             echo "检查文件: $file"
             error_output=$(python -m py_compile "$file" 2>&1)
@@ -124,22 +118,12 @@ jobs:
           done
           
           if [ "$has_errors" = true ]; then
-            echo "💥 发现 Python 语法错误，跳过构建流程"
-            echo "## 📋 总结" >> syntax_report.md
-            echo "" >> syntax_report.md
-            echo "❌ **构建状态**: 失败 - 发现语法错误" >> syntax_report.md
-            echo "🚫 **后续步骤**: 已跳过构建流程" >> syntax_report.md
-            echo "" >> syntax_report.md
-            echo "请修复上述语法错误后重新提交。" >> syntax_report.md
+            echo "❌ **构建失败**" >> syntax_report.md
             cat syntax_report.md >> $GITHUB_STEP_SUMMARY
             echo "has_syntax_errors=true" >> $GITHUB_OUTPUT
             exit 1
           else
             echo "✅ 所有 Python 文件语法检查通过"
-            echo "## ✅ 检查结果" >> syntax_report.md
-            echo "" >> syntax_report.md
-            echo "🎉 **所有 Python 文件语法检查通过！**" >> syntax_report.md
-            echo "✅ **构建状态**: 继续执行" >> syntax_report.md
             cat syntax_report.md >> $GITHUB_STEP_SUMMARY
             echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
           fi
