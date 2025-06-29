@@ -1008,7 +1008,7 @@ class TTSQueueProcessor:
 
     def __init__(self) -> None:
         """初始化队列处理器"""
-        self.queue: queue.Queue[Optional[Tuple[str, Dict[str, Any], Optional[Callable[[str], None]], Optional[Callable[[str], None]]]]] = queue.Queue()
+        self.queue: "queue.Queue[Optional[Tuple[str, Dict[str, Any], Optional[Callable[[str], None]], Optional[Callable[[str], None]]]]]" = queue.Queue()
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.tts_engine = TTSEngine()

@@ -288,7 +288,7 @@ def import_schedule(filepath: str, filename: str) -> bool:  # 导入课表
         return False
 
 
-def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课表
+def convert_schedule(check_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:  # 转换课表
     # 校验课程表
     if check_data is None:
         logger.warning('此文件为空')
@@ -302,9 +302,9 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
         check_data['schedule_even'] = {str(i): [] for i in range(0, 6)}
 
     part_data = check_data.get('part')
-    if part_data and part_data.get('0') is not None and len(part_data.get('0', [])) == 2:
+    if part_data and part_data.get('0') is not None and len(part_data.get('0') or []) == 2:
         logger.warning('此课程表格式不支持休息段')
-        for i in range(len(check_data.get('part'))):
+        for i in range(len(check_data.get('part', {}))):
             check_data['part'][str(i)].append('节点')
 
     if not check_data.get('part') or not check_data.get('part_name'):  # 兼容旧版本

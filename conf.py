@@ -69,7 +69,7 @@ def load_plugin_config() -> Optional[Dict[str, Any]]:
         plugin_config_path = base_directory / 'config' / 'plugin.json'
         if plugin_config_path.exists():
             with open(plugin_config_path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
+                data: Dict[str, Any] = json.load(file)
         else:
             with open(plugin_config_path, 'w', encoding='utf-8') as file:
                 data = {"enabled_plugins": []}
@@ -95,10 +95,10 @@ def save_plugin_config(data: Dict[str, Any]) -> bool:
 
 
 def save_installed_plugin(data: List[Any]) -> bool:
-    data = {"plugins": data}
+    data_dict = {"plugins": data}
     try:
         with open(base_directory / 'plugins' / 'plugins_from_pp.json', 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
+            json.dump(data_dict, file, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
         logger.error(f"保存已安装插件数据时出错: {e}")
@@ -124,7 +124,11 @@ def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
         icon_path = Path(icon) if icon else file_path
 
         # 获取开始菜单文件夹路径
-        menu_folder = Path(os.getenv('APPDATA')) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
+        appdata = os.getenv('APPDATA')
+        if appdata is None:
+            logger.error("无法获取APPDATA环境变量")
+            return
+        menu_folder = Path(appdata) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
 
         # 快捷方式文件名（使用文件名或自定义名称）
         name = file_path.stem  # 使用文件名作为快捷方式名称
@@ -132,8 +136,12 @@ def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
 
         # 创建快捷方式
         try:
-            shell = Dispatch('WScript.Shell')
-        except NameError:
+            if os.name == 'nt':
+                shell = Dispatch('WScript.Shell')
+            else:
+                logger.error("Dispatch not available on this platform")
+                return
+        except (NameError, ImportError):
             logger.error("Dispatch not available on this platform")
             return
         shortcut = shell.CreateShortCut(str(shortcut_path))
@@ -170,22 +178,26 @@ def add_shortcut(file: str = '', icon: str = '') -> None:
 def add_to_startup(file_path: str = f'{base_directory}/ClassWidgets.exe', icon_path: str = '') -> None:  # 注册到开机启动
     if os.name != 'nt':
         return
-    file_path = Path(file_path) if file_path else Path(__file__).resolve()
-    icon_path = Path(icon_path) if icon_path else file_path
+    file_path_obj = Path(file_path) if file_path else Path(__file__).resolve()
+    icon_path_obj = Path(icon_path) if icon_path else file_path_obj
 
     # 获取启动文件夹路径
-    startup_folder = Path(os.getenv('APPDATA')) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
+    appdata = os.getenv('APPDATA')
+    if appdata is None:
+        logger.error("无法获取APPDATA环境变量")
+        return
+    startup_folder = Path(appdata) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
 
     # 快捷方式文件名（使用文件名或自定义名称）
-    name = file_path.stem  # 使用文件名作为快捷方式名称
+    name = file_path_obj.stem  # 使用文件名作为快捷方式名称
     shortcut_path = startup_folder / f'{name}.lnk'
 
     # 创建快捷方式
     shell = Dispatch('WScript.Shell')
     shortcut = shell.CreateShortCut(str(shortcut_path))
-    shortcut.Targetpath = str(file_path)
-    shortcut.WorkingDirectory = str(file_path.parent)
-    shortcut.IconLocation = str(icon_path)  # 设置图标路径
+    shortcut.Targetpath = str(file_path_obj)
+    shortcut.WorkingDirectory = str(file_path_obj.parent)
+    shortcut.IconLocation = str(icon_path_obj)  # 设置图标路径
     shortcut.save()
 
 

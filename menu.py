@@ -57,7 +57,7 @@ from generate_speech import get_tts_voices, get_voice_name_by_id
 from network_thread import VersionThread, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
-from utils import TimeManagerFactory, time_manager
+from utils import TimeManagerFactory
 
 # 适配高DPI缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -1070,7 +1070,7 @@ class SettingsMenu(FluentWindow):
 
     def available_voices_cnt(self, voices):
         self.available_voices = voices
-        if hasattr(self, 'voice_selector') and self.voice_selector and hasattr(self, 'update_tts_voices') and self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
+        if hasattr(self, 'voice_selector') and self.voice_selector and hasattr(self, 'update_tts_voices') and hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog and not self.TTSSettingsDialog.isHidden():
             self.update_tts_voices(self.available_voices)
         self.switch_enable_TTS.setEnabled(True if voices else False)
         self.voice_selector.setEnabled(True if voices else False)
@@ -1231,7 +1231,9 @@ class SettingsMenu(FluentWindow):
 
 
     def open_tts_settings(self):
-        if not hasattr(self, 'TTSSettingsDialog') or not self.TTSSettingsDialog:
+        if not hasattr(self, 'TTSSettingsDialog'):
+            self.TTSSettingsDialog = None
+        if not self.TTSSettingsDialog:
             self.TTSSettingsDialog = self.TTSSettings(self)
         current_selected_engine_in_selector = self.engine_selector.currentData()
         tts_enabled = config_center.read_conf('TTS', 'enable') == '1'
@@ -2080,7 +2082,7 @@ class SettingsMenu(FluentWindow):
         """修改 NTP 服务器 URL"""
         url = url.strip()
         ntp_server_url_widget = self.adInterface.findChild(LineEdit, 'ntp_server_url')
-        if hasattr(self, '_ntp_flyout_timer'):
+        if hasattr(self, '_ntp_flyout_timer') and self._ntp_flyout_timer:
             self._ntp_flyout_timer.stop()
         self._ntp_flyout_timer = QTimer()
         self._ntp_flyout_timer.setSingleShot(True)
@@ -3987,9 +3989,9 @@ class SettingsMenu(FluentWindow):
 class NTPSyncWorker(QObject):
     """NTP异步同步工作线程"""
     sync_finished = pyqtSignal(bool)
-    def __init__(self, time_manager):
+    def __init__(self, time_mgr):
         super().__init__()
-        self.time_manager = time_manager
+        self.time_manager = time_mgr
 
     def sync_ntp(self):
         """执行NTP同步"""
@@ -4005,11 +4007,10 @@ def sp_get_class_num():  # 获取当前周课程数（未完成）
     for timeline_ in get_timeline().keys():
         timeline = get_timeline()[timeline_]
         count = 0
-        for item_name, item_time in timeline.items():
+        for item_name, _ in timeline.items():
             if item_name.startswith('a'):
                 count += 1
-        if count > highest_count:
-            highest_count = count
+        highest_count = max(highest_count, count)
     return highest_count
 
 

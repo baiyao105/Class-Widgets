@@ -689,7 +689,7 @@ class TimeManagerFactory:
     _instance_lock = threading.Lock()
 
     @classmethod
-    def create_manager(cls, config_provider=None) -> TimeManagerInterface:
+    def create_manager(cls, config_provider: Optional[Any] = None) -> TimeManagerInterface:
         """创建时间管理器
 
         Args:
@@ -708,7 +708,7 @@ class TimeManagerFactory:
         return manager_class()
 
     @classmethod
-    def get_instance(cls, config_provider=None) -> TimeManagerInterface:
+    def get_instance(cls, config_provider: Optional[Any] = None) -> TimeManagerInterface:
         """获取管理器实例
 
         Args:
@@ -720,7 +720,7 @@ class TimeManagerFactory:
             return cls._instance
 
     @classmethod
-    def reset_instance(cls, config_provider=None) -> TimeManagerInterface:
+    def reset_instance(cls, config_provider: Optional[Any] = None) -> TimeManagerInterface:
         """重置实例(配置变更时使用)
         """
         with cls._instance_lock:

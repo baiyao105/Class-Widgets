@@ -53,8 +53,14 @@ from utils import (DarkModeWatcher, TimeManagerFactory, restart, share, stop,
 from weather import WeatherReportThread as weatherReportThread
 from weather import get_alert_image, get_unified_weather_alerts
 
-if os.name == 'nt':
-    import pygetwindow
+# 条件导入 pygetwindow
+try:
+    if os.name == 'nt':
+        import pygetwindow
+    else:
+        pygetwindow = None
+except ImportError:
+    pygetwindow = None
 
 # 适配高DPI缩放
 if platform.system() == 'Windows' and platform.release() not in ['7', 'XP', 'Vista']:
@@ -101,6 +107,8 @@ ignore_errors = []
 fw = None  # 浮窗对象
 screen_width = 0  # 屏幕宽度
 last_error_time = dt.datetime.now() - error_cooldown  # 上一次错误
+p_mgr = None  # 插件管理器
+app = None  # 应用程序实例
 
 ex_menu = None
 dark_mode_watcher = None
@@ -2147,7 +2155,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self) -> None:
         logger.info('获取天气数据')
-        if not hasattr(self, 'weather_thread') or (hasattr(self, 'weather_thread') and not self.weather_thread.isRunning()):
+        if not hasattr(self, 'weather_thread') or not self.weather_thread.isRunning():
             self.weather_thread = weatherReportThread()
             self.weather_thread.weather_signal.connect(self.update_weather_data)
             self.weather_thread.start()
@@ -2450,7 +2458,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                         self.weather_alert_timer = QTimer(self)
                         self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
                     self.weather_alert_timer.start(6000)  # 6秒切换一次
-                    if not hasattr(self, 'weather_info_timer') or (hasattr(self, 'weather_info_timer') and not self.weather_info_timer):
+                    if not hasattr(self, 'weather_info_timer') or not self.weather_info_timer:
                         self.weather_info_timer = QTimer(self)
                         self.weather_info_timer.timeout.connect(self.toggle_weather_alert)
                         self.weather_info_timer.setSingleShot(True)
@@ -2690,10 +2698,6 @@ class DesktopWidget(QWidget):  # 主要小组件
 
 
 def check_windows_maximize() -> bool:  # 检查窗口是否最大化
-    try:
-        import pygetwindow
-    except ImportError:
-        pygetwindow = None
     if os.name != 'nt' or not pygetwindow:
         # logger.debug("非Windows NT系统或pygetwindow未加载, 无法检查最大化.")
         return False
@@ -2813,7 +2817,7 @@ def init_config() -> None:  # 重设配置文件
 
 
 def init() -> None:
-    global theme, radius, mgr, screen_width, first_start, fw, was_floating_mode
+    global theme, mgr, screen_width, fw, first_start
     if update_timer is not None:
         update_timer.remove_all_callbacks()
 
@@ -2822,6 +2826,7 @@ def init() -> None:
 
     mgr = WidgetsManager()
     fw = FloatingWidget()
+    first_start = True
 
     # 获取屏幕横向分辨率
     screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -2855,9 +2860,9 @@ def init() -> None:
     first_start = False
 
 
-def setup_signal_handlers_optimized(app: QApplication) -> None:
+def setup_signal_handlers_optimized(_app: QApplication) -> None:
     """退出信号处理器"""
-    def signal_handler(signum, frame):
+    def signal_handler(signum, _frame):
         logger.debug(f'收到信号 {signal.Signals(signum).name},退出...')
         # utils.stop 处理退出
         utils.stop(0)
@@ -2873,7 +2878,6 @@ def setup_signal_handlers_optimized(app: QApplication) -> None:
 if __name__ == '__main__':
     if share.attach() and config_center.read_conf('Other', 'multiple_programs') != '1':
         logger.debug('不允许多开实例')
-        from qfluentwidgets import Dialog
         app = QApplication.instance() or QApplication(sys.argv)
         dlg = Dialog(
             'Class Widgets 正在运行',

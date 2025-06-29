@@ -47,7 +47,7 @@ class CSES_Converter:
     def load_generator(self) -> None:
         self.generator = cses.CSESGenerator(version=int(config_center.read_conf('Version', 'cses_version')))
 
-    def convert_to_cw(self) -> Union[Dict, bool]:
+    def convert_to_cw(self) -> Union[Dict[str, Any], bool]:
         """
         将CSES文件转换为Class Widgets格式
         """
@@ -131,9 +131,9 @@ class CSES_Converter:
             cw_path: Class Widgets文件路径(Optional)
         """
         def convert(schedules: Dict[str, List[str]], type_: str = 'odd') -> None:
-            class_counter_dict = {}  # 记录一个节点当天的课程数
+            class_counter_dict: Dict[str, Dict[str, int]] = {}  # 记录一个节点当天的课程数
             for part in parts:  # 节点循环
-                name = part_names[part]
+                name: str = part_names[part]
                 part_start_time = datetime.strptime(f'{parts[part][0]}:{parts[part][1]}', '%H:%M')
                 print(f'Part {part}: {name} - {part_start_time.strftime("%H:%M")}')
                 class_counter_dict[part] = {}
@@ -142,11 +142,11 @@ class CSES_Converter:
                     time_counter = 0
                     class_counter = 0
                     if timelines[day]:  # 自定时间线存在
-                        timeline = timelines[day]
+                        timeline: Dict[str, Any] = timelines[day]
                     else:  # 自定时间线不存在
                         timeline = timelines['default']
 
-                    timelines_part = {str(day): []}  # 一个节点的时间线列表
+                    timelines_part: Dict[str, List[Any]] = {str(day): []}  # 一个节点的时间线列表
                     for key, time in timeline.items():  # 时间线循环
                         if key.startswith(f'a{part}'):  # 科目
                             class_dict = {}
