@@ -89,14 +89,58 @@ jobs:
           uv pip install -r requirements.txt
           uv pip install pyinstaller
 
-      - name: Prepare output directory
+      - name: Python Syntax Check
+        id: syntax_check
         if: steps.skip_check.outputs.should_skip != 'true'
+        shell: pwsh
+        run: |
+          .venv\Scripts\activate
+          echo "🔍 开始 Python 语法检查..."
+          $pythonFiles = Get-ChildItem -Path . -Name "*.py" -Recurse | Where-Object { $_ -notmatch "__pycache__" -and $_ -notmatch ".venv" -and $_ -notmatch "build" -and $_ -notmatch "dist" }
+          $hasErrors = $false
+          $errorReport = @()
+          $errorReport += "# 🔍 Python 语法检查报告"
+          $errorReport += ""
+          $errorReport += "**检查时间**: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+          $errorReport += "**检查文件数**: $($pythonFiles.Count)"
+          $errorReport += ""
+          foreach ($file in $pythonFiles) {
+            Write-Host "检查文件: $file"
+            $result = python -m py_compile $file 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "### ❌ 语法错误在文件 $file" -ForegroundColor Red
+              Write-Host $result -ForegroundColor Red
+              $hasErrors = $true
+              $errorReport += "## ❌ 语法错误: \`$file\`"
+              $errorReport += ""
+              $errorReport += "```"
+              $errorReport += $result
+              $errorReport += "```"
+              $errorReport += ""
+            }
+          }
+          if ($hasErrors) {
+            $errorReport += "# ❌ **发现语法错误, 已跳过构建流程**"
+            $errorReport += ""
+            $errorReport += "请修复上述语法错误后重新提交。"
+            $errorReport -join "`n" | Out-File -FilePath "syntax_errors.md" -Encoding UTF8
+            Get-Content "syntax_errors.md" >> $env:GITHUB_STEP_SUMMARY
+            echo "has_syntax_errors=true" >> $env:GITHUB_OUTPUT
+            exit 1
+          } else {
+            $errorReport -join "`n" | Out-File -FilePath "syntax_success.md" -Encoding UTF8
+            Get-Content "syntax_success.md" >> $env:GITHUB_STEP_SUMMARY
+            echo "has_syntax_errors=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Prepare output directory
+        if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
         run: |
           if (Test-Path zip) { Remove-Item zip -Recurse -Force }
           mkdir zip
 
       - name: Set Build Info
-        if: steps.skip_check.outputs.should_skip != 'true'
+        if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
@@ -132,7 +176,7 @@ jobs:
           echo "🧪 BUILD_TYPE:  $build_type"
 
       - name: Run Windows build & package
-        if: steps.skip_check.outputs.should_skip != 'true'
+        if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
         shell: pwsh
         run: |
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
@@ -153,7 +197,7 @@ jobs:
           ./zip -r -q zip/ClassWidgets_${{ github.run_id }}-${{ matrix.arch }}.zip dist/ClassWidgets/*
 
       - name: Upload build artifact
-        if: steps.skip_check.outputs.should_skip != 'true'
+        if: steps.skip_check.outputs.should_skip != 'true' && steps.syntax_check.outputs.has_syntax_errors != 'true'
         uses: actions/upload-artifact@v4.4.2
         with:
           name: windows-${{ matrix.arch }}_debug_#${{ github.run_number }}

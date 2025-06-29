@@ -55,6 +55,17 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Cache CodeQL database
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/codeql
+            ${{ github.workspace }}/.codeql
+          key: ${{ runner.os }}-codeql-db-${{ env.CACHE_VERSION }}-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-codeql-db-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-codeql-db-
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -82,17 +93,39 @@ jobs:
       - name: Setup uv for CodeQL
         uses: astral-sh/setup-uv@v4
 
+      - name: Cache CodeQL dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-codeql-uv-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-codeql-uv-${{ env.CACHE_VERSION }}-${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-codeql-uv-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-codeql-uv-
+
       - name: Install dependencies for CodeQL analysis
         run: |
           uv venv .venv
           source .venv/bin/activate
           uv pip install -r requirements.txt
 
+      - name: Cache CodeQL queries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/codeql-queries
+          key: ${{ runner.os }}-codeql-queries-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-codeql-queries-
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:python"
           upload: true
+          output: sarif-results
+          upload-database: false
 
   code-quality:
     name: Code Check
@@ -283,7 +316,7 @@ jobs:
           source .venv/bin/activate
           echo "运行 PyLint 检查..."
           files="${{ needs.detect-changes.outputs.python_files }}"
-          if echo "$files" | xargs pylint --errors-only --disable=no-member,no-name-in-module,E0601,E0606,E1121,E0203,import-error,undefined-variable,used-before-assignment,unresolved-import,relative-beyond-top-level,cyclic-import,duplicate-code,too-many-locals,too-many-arguments,too-many-branches,too-many-statements,too-few-public-methods,too-many-instance-attributes,line-too-long,missing-docstring,invalid-name,broad-except,dict-item-0-or-1,return-in-init,arguments-differ,signature-differs,method-hidden,access-member-before-definition,attribute-defined-outside-init --output-format=text --reports=no > pylint_output.txt 2>&1; then
+          if echo "$files" | xargs pylint --disable=no-member,no-name-in-module,import-error,unresolved-import,relative-beyond-top-level,cyclic-import,duplicate-code,too-many-locals,too-many-arguments,too-many-branches,too-many-statements,too-few-public-methods,too-many-instance-attributes,line-too-long,missing-docstring,invalid-name --output-format=text --reports=no --score=no --enable=unused-variable,unused-import,redefined-outer-name,redefined-builtin,dangerous-default-value,broad-except,bare-except,pointless-statement,unreachable,expression-not-assigned,unnecessary-pass,unused-argument > pylint_output.txt 2>&1; then
             if grep -E "(syntax-error|indentation-error|E0001|E0011|E0012|E0100|E0101|E0102|E0103|E0104|E0105|E0107|E0108|E0110|E0111|E0112|E0113|E0114|E0115|E0116|E0117|E0118|E1003|E1004|E1101|E1102|E1111|E1120|E1123|E1124|E1125|E1126|E1127|E1128|E1129|E1130|E1131|E1132|E1133|E1134|E1135|E1136|E1137|E1138|E1139|E1140|E1141)" pylint_output.txt > /dev/null 2>&1; then
               echo "PyLint 发现严重错误"
               echo "has_critical_issues=true" >> $GITHUB_OUTPUT
@@ -306,9 +339,7 @@ jobs:
           source .venv/bin/activate
           echo "运行 MyPy 检查..."
           files="${{ needs.detect-changes.outputs.python_files }}"
-          
-          # 生成文本格式输出
-          if echo "$files" | xargs mypy --ignore-missing-imports --no-strict-optional --show-error-codes --disable-error-code=name-defined --disable-error-code=attr-defined --disable-error-code=import --disable-error-code=misc --disable-error-code=no-redef --disable-error-code=var-annotated --disable-error-code=assignment --disable-error-code=return-value --disable-error-code=arg-type --disable-error-code=call-arg --disable-error-code=operator --disable-error-code=index --disable-error-code=union-attr --disable-error-code=has-type --disable-error-code=return --disable-error-code=dict-item --disable-error-code=override --disable-error-code=method-assign --disable-error-code=unreachable --disable-error-code=redundant-expr --disable-error-code=comparison-overlap > mypy_output.txt 2>&1; then
+          if echo "$files" | xargs mypy --strict --ignore-missing-imports --show-error-codes --disable-error-code=import --disable-error-code=misc --disable-error-code=no-redef --disable-error-code=method-assign --disable-error-code=comparison-overlap --warn-unused-ignores --warn-redundant-casts --warn-return-any --warn-unreachable --disallow-untyped-calls --disallow-untyped-defs --disallow-incomplete-defs --check-untyped-defs --disallow-untyped-decorators > mypy_output.txt 2>&1; then
             if grep -E "(syntax error|invalid syntax|unexpected indent|unindent does not match|SyntaxError|IndentationError|TabError)" mypy_output.txt > /dev/null 2>&1; then
               echo "MyPy 发现严重错误"
               echo "has_critical_issues=true" >> $GITHUB_OUTPUT
@@ -323,7 +354,6 @@ jobs:
             echo "has_critical_issues=true" >> $GITHUB_OUTPUT
             echo "has_issues=true" >> $GITHUB_OUTPUT
           fi
-
 
       - name: Generate report
         id: code-quality
@@ -354,7 +384,6 @@ jobs:
             commit_full_hash=$(git log -1 --pretty=format:'%H' HEAD)
           fi
           short_link="[**${commit_hash}**](${repo_url}/commit/${commit_full_hash})"
-
           all_passed=true
           has_any_issues=false
           has_critical_issues=false
@@ -379,11 +408,8 @@ jobs:
             critical_report+="\`\`\`\n\n"
             critical_report+="</details>\n\n"
           fi
-          # 检查是否有任何提示需要显示
           has_pylint_warnings=false
           has_mypy_warnings=false
-          
-          # 处理 PyLint 提示（排除严重错误）
           if [[ "${{ steps.pylint.outputs.has_issues }}" == "true" ]]; then
             pylint_warnings=$(cat pylint_output.txt | grep -v -E '^[^:]+:[0-9]+:[0-9]+: [EF][0-9]+:' | head -50)
             if [[ -n "$pylint_warnings" ]]; then
@@ -397,8 +423,6 @@ jobs:
               other_report+="</details>\n\n"
             fi
           fi
-          
-          # 处理 MyPy 提示（排除严重错误）
           if [[ "${{ steps.mypy.outputs.has_issues }}" == "true" ]]; then
             mypy_warnings=$(cat mypy_output.txt | grep -v -E ': error:' | head -50)
             if [[ -n "$mypy_warnings" ]]; then
@@ -418,7 +442,6 @@ jobs:
           report+="🕒 **检查时间**：$(date -u '+%Y-%m-%d %H:%M:%S UTC') / $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S UTC+8')\n"
           report+="📝 **触发提交信息**：${short_link}: ${commit_msg}\n"
           report+="📁 **检查的文件数**：${file_count} 个 - ${file_list}\n\n"
-          report+=">📊 **SARIF**：报告已生成并上传到 GitHub 安全\n\n"
           if [[ "$has_critical_issues" == "true" ]]; then
             report+="---\n\n"
             report+="## 🚨 严重错误\n\n"
@@ -426,21 +449,15 @@ jobs:
             all_passed=false
             has_any_issues=true
           fi
-          
-          # 只有当有其他检查内容时才显示
           if [[ -n "$other_report" ]]; then
             report+="---\n\n"
             report+="## 📋 其他检查\n\n"
             report+="${other_report}"
-            
-            # 如果有其他问题，标记为未通过
             if [[ "$has_other_issues" == "true" ]]; then
               all_passed=false
               has_any_issues=true
             fi
           fi
-          
-          # 如果完全没有任何问题，添加通过标记
           if [[ "$has_any_issues" == "false" ]]; then
             report+="---\n\n"
             report+="## ✅ 全部检查通过\n\n"
