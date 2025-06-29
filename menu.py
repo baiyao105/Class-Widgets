@@ -281,7 +281,7 @@ class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
     def __init__(self, plugin_dir=None, parent=None):
         if plugin_dir not in p_loader.plugins_settings:
             return
-            
+
         super().__init__(parent)
         self.plugin_widget = None
         self.plugin_dir = plugin_dir
@@ -352,7 +352,7 @@ class PluginCard(CardWidget):  # 插件卡片
 
         plugin_config = conf.load_plugin_config()
         is_temp_disabled = plugin_dir in plugin_config.get('temp_disabled_plugins', [])
-        
+
         if plugin_dir in enabled_plugins['enabled_plugins']:  # 插件是否启用
             self.enableButton.setChecked(True)
             if enable_settings and plugin_dir in p_loader.plugins_settings:
@@ -533,7 +533,7 @@ class TextFieldMessageBox(MessageBoxBase):
             is_valid, message = self.check_func(self.textField.text())
             if not is_valid:
                 self.tipsLabel.setText(message)
-                return 
+                return
 
         self.yesButton.setEnabled(True)
         self.tipsLabel.setTextColor(self.success_color[0], self.success_color[1])
@@ -596,11 +596,11 @@ class TTSPreviewThread(QThread):
             if self.isInterruptionRequested():
                 logger.info("TTS预览线程收到中断请求，正在退出...")
                 return
-                
+
             from generate_speech import generate_speech_sync, TTSEngine
             from play_audio import play_audio
             import os
-            
+
             logger.info(f"使用引擎 {self.engine} 生成预览语音")
             audio_file = generate_speech_sync(
                 text=self.text,
@@ -609,18 +609,18 @@ class TTSPreviewThread(QThread):
                 auto_fallback=True,
                 timeout=10.0
             )
-            
+
             # 再次检查是否有中断请求
             if self.isInterruptionRequested():
                 logger.info("TTS预览线程收到中断请求，正在退出...")
                 # 删除已生成的音频文件
                 TTSEngine.delete_audio_file(audio_file)
                 return
-            
+
             # 检查文件是否存在且有效
             if not os.path.exists(audio_file):
                 raise FileNotFoundError(f"生成的音频文件不存在: {audio_file}")
-                
+
             # 检查文件大小是否正常（小于10字节的文件可能是损坏的）
             file_size = os.path.getsize(audio_file)
             if file_size < 10:
@@ -628,7 +628,7 @@ class TTSPreviewThread(QThread):
                 # 删除可能损坏的文件
                 TTSEngine.delete_audio_file(audio_file)
                 raise ValueError(f"生成的音频文件可能无效，大小仅为 {file_size} 字节")
-                
+
             play_audio(audio_file, tts_delete_after=True)
             self.previewFinished.emit(True)
         except Exception as e:
@@ -754,7 +754,7 @@ class SettingsMenu(FluentWindow):
         container_widget = self.plugin_card_layout.parentWidget()
         if container_widget:
             container_widget.setUpdatesEnabled(False)
-        
+
         for plugin in plugin_dict:
             if (Path(conf.PLUGINS_DIR) / plugin / 'icon.png').exists():  # 若插件目录存在icon.png
                 icon_path = f'{base_directory}/plugins/{plugin}/icon.png'
@@ -780,7 +780,7 @@ class SettingsMenu(FluentWindow):
             self.tips_plugin_empty.show()
         if container_widget:
             container_widget.setUpdatesEnabled(True)
-    
+
     def clear_plugin_cards(self):
         """清空插件卡片"""
         container_widget = self.plugin_card_layout.parentWidget()
@@ -793,18 +793,18 @@ class SettingsMenu(FluentWindow):
         self.all_plugin_cards.clear()
         if container_widget:
             container_widget.setUpdatesEnabled(True)
-    
+
     def update_plugin_count(self):
         """更新计数显示"""
         total_count = len(plugin_dict)
         enabled_count = len([p for p in plugin_dict if plugin_dict[p]['name'] in enabled_plugins])
         self.plugin_count_label.setText(f'已安装 {total_count} 个插件，已启用 {enabled_count} 个')
-    
+
     def filter_plugins(self):
         """根据搜索条件和过滤器过滤插件"""
         search_text = self.plugin_search.text().lower()
         filter_type = self.filter_combo.currentText()
-        
+
         visible_count = 0
         valid_cards = []
         for card in self.all_plugin_cards:
@@ -814,7 +814,7 @@ class SettingsMenu(FluentWindow):
             except RuntimeError:
                 continue
         self.all_plugin_cards = valid_cards
-        
+
         for card in self.all_plugin_cards:
             should_show = True
             if search_text:
@@ -842,7 +842,7 @@ class SettingsMenu(FluentWindow):
             self.tips_plugin_empty.show()
         else:
             self.tips_plugin_empty.hide()
-    
+
     def refresh_plugin_list(self):
         """刷新插件列表"""
         global plugin_dict, enabled_plugins
@@ -860,13 +860,13 @@ class SettingsMenu(FluentWindow):
             duration=3000,
             parent=self.window()
         )
-    
+
     def import_plugin_from_file(self):
         """从文件导入插件"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            '选择插件文件', 
-            '', 
+            self,
+            '选择插件文件',
+            '',
             'ZIP文件 (*.zip);;JSON配置文件 (*.json);;所有文件 (*)'
         )
         if not file_path:
@@ -876,11 +876,11 @@ class SettingsMenu(FluentWindow):
                 self._import_from_plugin_json(file_path)
             else:
                 self._import_from_zip(file_path)
-                
+
         except Exception as e:
             logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
             self._show_error_dialog(f'导入插件时发生错误：{str(e)}')
-    
+
     def _import_from_plugin_json(self, json_file_path):
         try:
             with open(json_file_path, 'r', encoding='utf-8') as f:
@@ -891,8 +891,8 @@ class SettingsMenu(FluentWindow):
             target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
             if os.path.exists(target_dir):
                 reply = MessageBox(
-                    '插件已存在', 
-                    f'插件 "{plugin_name}" 已存在，是否覆盖？', 
+                    '插件已存在',
+                    f'插件 "{plugin_name}" 已存在，是否覆盖？',
                     self
                 ).exec_()
                 if reply != MessageBox.Yes:
@@ -901,21 +901,21 @@ class SettingsMenu(FluentWindow):
             shutil.copytree(source_dir, target_dir)
             self.refresh_plugin_list()
             w = MessageBox(
-                '导入成功', 
-                f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。', 
+                '导入成功',
+                f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。',
                 self
             )
             w.yesButton.setText('好')
             w.cancelButton.hide()
             w.exec_()
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"插件导入失败 - JSON配置文件格式错误: {json_file_path}, 错误详情: {str(e)}")
             self._show_error_dialog('插件配置文件格式错误')
         except Exception as e:
             logger.error(f"插件导入失败 - 文件夹复制错误: {json_file_path}, 错误详情: {str(e)}")
             self._show_error_dialog(f'复制插件文件夹时发生错误：{str(e)}')
-    
+
     def _import_from_zip(self, zip_file_path):
         try:
             with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
@@ -929,8 +929,8 @@ class SettingsMenu(FluentWindow):
                 target_dir = os.path.join(base_directory, conf.PLUGINS_DIR, plugin_dir_name)
                 if os.path.exists(target_dir):
                     reply = MessageBox(
-                        '插件已存在', 
-                        f'插件 "{plugin_name}" 已存在，是否覆盖？', 
+                        '插件已存在',
+                        f'插件 "{plugin_name}" 已存在，是否覆盖？',
                         self
                     ).exec_()
                     if reply != MessageBox.Yes:
@@ -939,14 +939,14 @@ class SettingsMenu(FluentWindow):
                 zip_ref.extractall(target_dir)
                 self.refresh_plugin_list()
                 w = MessageBox(
-                    '导入成功', 
-                    f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。', 
+                    '导入成功',
+                    f'插件 "{plugin_name}" 导入成功！\n重启应用后生效。',
                     self
                 )
                 w.yesButton.setText('好')
                 w.cancelButton.hide()
                 w.exec_()
-                
+
         except zipfile.BadZipFile as e:
             logger.error(f"插件导入失败 - 无效的ZIP文件: {zip_file_path}, 错误详情: {str(e)}")
             self._show_error_dialog('无效的ZIP文件')
@@ -1177,13 +1177,13 @@ class SettingsMenu(FluentWindow):
                 text_to_speak = text_template.format_map(format_values)
 
             logger.debug(f"生成TTS文本: {text_to_speak}")
-            
+
             try:
                 current_engine = self.parent_menu.engine_selector.currentData()
                 current_voice = None
                 if self.parent_menu.voice_selector and self.parent_menu.voice_selector.currentData():
                     current_voice = self.parent_menu.voice_selector.currentData()
-                
+
                 if hasattr(self, 'tts_preview_thread') and self.tts_preview_thread and self.tts_preview_thread.isRunning():
                     self.tts_preview_thread.requestInterruption()
                     self.tts_preview_thread.quit()
@@ -1195,10 +1195,10 @@ class SettingsMenu(FluentWindow):
                     voice=current_voice,
                     parent=self
                 )
-                
+
                 self.tts_preview_thread.previewError.connect(self.handle_tts_preview_error)
                 self.tts_preview_thread.start()
-                
+
             except Exception as e:
                 logger.error(f"启动TTS预览线程失败: {str(e)}")
                 from qfluentwidgets import MessageBox
@@ -1207,7 +1207,7 @@ class SettingsMenu(FluentWindow):
                     f"启动TTS预览时出错: {str(e)}",
                     self
                 ).exec()
-                
+
         def handle_tts_preview_error(self, error_message):
             logger.error(f"TTS生成预览失败: {error_message}")
             from qfluentwidgets import MessageBox
@@ -1293,7 +1293,7 @@ class SettingsMenu(FluentWindow):
             if engine_key == 'pyttsx3' and platform.system() != "Windows":
                 continue
             self.engine_selector.addItem(engine_name, userData=engine_key)
-        
+
         current_engine = config_center.read_conf('TTS', 'engine')
         if current_engine in available_engines:
             if current_engine == 'pyttsx3' and platform.system() != "Windows":
@@ -1334,7 +1334,7 @@ class SettingsMenu(FluentWindow):
                     self.titleLabel = StrongBodyLabel(title, self)
                     self.contentLabel = BodyLabel(
                         "系统 TTS（pyttsx3）用的是系统自带的语音服务噢~\n"
-                        "您可以在系统设置里添加更多语音(*≧▽≦)", 
+                        "您可以在系统设置里添加更多语音(*≧▽≦)",
                         self)
                     self.hyperlinkLabel = HyperlinkLabel("打开Windows语音设置", self)
                     self.hyperlinkLabel.clicked.connect(self._open_settings)
@@ -1453,7 +1453,7 @@ class SettingsMenu(FluentWindow):
         if not self.voice_selector or not self.switch_enable_TTS:
             logger.warning("voice_selector 或 switch_enable_TTS 未初始化")
             return
-            
+
         voice_selector = self.voice_selector
         switch_enable_TTS = self.switch_enable_TTS
         voice_selector.clear()
@@ -1479,7 +1479,7 @@ class SettingsMenu(FluentWindow):
             self.file_path.setWordWrap(False)
 
             self.set_file_path(file_path)
-            
+
             self.settings = self.findChild(DropDownToolButton, 'file_item_settings')
 
             self.context_menu = RoundMenu(parent=self)
@@ -1516,13 +1516,13 @@ class SettingsMenu(FluentWindow):
         self.table.setItemWidget(it, item_widget)
         item_widget.setFixedWidth(self.table.gridSize().width())
         return item_widget
-    
+
     def setup_configs_interface(self):  # 配置界面
         self.config_url = self.cfInterface.findChild(LineEdit, 'config_url')
 
         self.config_download = self.cfInterface.findChild(PushButton, 'config_download')
         self.config_download.clicked.connect(self.cf_load_schedule_from_db)  # 下载配置
-        
+
         self.update_now = self.cfInterface.findChild(PushButton, 'config_update')
         self.update_now.clicked.connect(self.cf_get_schedule)  # 更新当前
 
@@ -1569,7 +1569,7 @@ class SettingsMenu(FluentWindow):
 
                     painter.restore()
                     super().paint(painter, option, index)
-                
+
                 def _drawBackground(self, painter, option, index):
                     pass
 
@@ -1606,7 +1606,7 @@ class SettingsMenu(FluentWindow):
                     item.setSizeHint(QSize(item_width - spacing, self.item_height))
                 if event:
                     super().resizeEvent(event)
-            
+
         self.table = UniformListWidget(parent=self.cfInterface)
         parent_layout.insertWidget(idx, self.table)
 
@@ -1860,13 +1860,13 @@ class SettingsMenu(FluentWindow):
         )  # 保存缩放系数
 
         what_is_hide_mode_3 = self.adInterface.findChild(HyperlinkLabel, 'what_is_hide_mode_3')
-  
+
         def what_is_hide_mode_3_clicked():
             w = MessageBox('灵活模式', '灵活模式为上课时自动隐藏，可手动改变隐藏状态，当前课程状态（上课/课间）改变后会清除手动隐藏状态，重新转为自动隐藏。', self)
             w.cancelButton.hide()
             w.exec()
         what_is_hide_mode_3.clicked.connect(what_is_hide_mode_3_clicked)
-        
+
         # 时间获得方法配置
         conf_time_get = self.adInterface.findChild(ComboBox, 'conf_time_get')
         conf_time_get.addItems(['系统时间', 'NTP时间'])
@@ -1876,7 +1876,7 @@ class SettingsMenu(FluentWindow):
         else:
             conf_time_get.setCurrentIndex(0)
         conf_time_get.currentIndexChanged.connect(self.on_time_method_changed)
-        
+
         # NTP服务器配置
         ntp_server_url = self.adInterface.findChild(LineEdit, 'ntp_server_url')
         ntp_server_url.setText(config_center.read_conf('Time', 'ntp_server'))
@@ -1958,13 +1958,13 @@ class SettingsMenu(FluentWindow):
                     self.show_success_toast('时间设置', '已切换到系统时间')
             except Exception as e:
                 logger.error(f"管理NTP自动同步回调失败: {e}")
-            
+
             self.update_ntp_status_display()
             self.update_ntp_ui_visibility()
         except Exception as e:
             logger.error(f"时间管理器切换失败: {e}")
             self.show_warning_toast('时间设置', '切换失败')
-    
+
     def on_ntp_refresh_clicked(self):
         """NTP刷新按钮"""
         try:
@@ -1980,7 +1980,7 @@ class SettingsMenu(FluentWindow):
         except Exception as e:
             logger.error(f"NTP同步失败: {e}")
             self.show_warning_toast('NTP同步', 'NTP时间同步失败')
-    
+
     def on_ntp_auto_refresh_changed(self, value):
         """修改ntp自动刷新时间"""
         config_center.write_conf('Time', 'ntp_auto_refresh', str(value))
@@ -1990,7 +1990,7 @@ class SettingsMenu(FluentWindow):
                 self._add_ntp_auto_sync_callback()
         except Exception as e:
             logger.error(f"更新NTP自动同步间隔失败: {e}")
-    
+
     def on_ntp_auto_sync_switch_changed(self, checked):
         """NTP自动同步开关"""
         try:
@@ -2005,7 +2005,7 @@ class SettingsMenu(FluentWindow):
         except Exception as e:
             logger.error(f"NTP自动同步开关设置失败: {e}")
             self.show_warning_toast('NTP设置', '设置失败 (╥﹏╥)')
-    
+
     def on_ntp_timezone_changed(self):
         """NTP时区设置改变时的处理"""
         try:
@@ -2025,7 +2025,7 @@ class SettingsMenu(FluentWindow):
         except Exception as e:
             logger.error(f"时区设置失败: {e}")
             self.show_error_toast('时区设置', '时区设置失败')
-    
+
     def _add_ntp_auto_sync_callback(self):
         """添加NTP自动同步回调"""
         try:
@@ -2050,10 +2050,10 @@ class SettingsMenu(FluentWindow):
             ntp_auto_refresh_minutes = int(config_center.read_conf('Time', 'ntp_auto_refresh'))
             ntp_auto_refresh_seconds = ntp_auto_refresh_minutes * 60
             update_timer.add_callback(ntp_auto_sync_callback, ntp_auto_refresh_seconds)
-            
+
         except Exception as e:
             logger.error(f"添加NTP自动同步回调失败: {e}")
-    
+
     def _remove_ntp_auto_sync_callback(self):
         """移除NTP自动同步回调"""
         try:
@@ -2063,7 +2063,7 @@ class SettingsMenu(FluentWindow):
                 delattr(self, '_ntp_auto_sync_callback')
         except Exception as e:
             logger.error(f"移除NTP自动同步回调失败: {e}")
-    
+
     def on_ntp_server_url_changed(self, url: str):
         """修改 NTP 服务器 URL"""
         url = url.strip()
@@ -2074,13 +2074,13 @@ class SettingsMenu(FluentWindow):
         self._ntp_flyout_timer.setSingleShot(True)
         self._ntp_flyout_timer.timeout.connect(lambda: self._process_ntp_url_change(url, ntp_server_url_widget))
         self._ntp_flyout_timer.start(1500)  # 1.5秒延迟
-    
+
     def _process_ntp_url_change(self, url: str, ntp_server_url_widget):
         """处理NTP URL变更的实际逻辑"""
         if not url:
             self._show_ntp_flyout(
-                ntp_server_url_widget, 
-                'warning', 
+                ntp_server_url_widget,
+                'warning',
                 "NTP服务器URL不能为空 o(〃＾▽＾〃)o\n请输入有效的NTP服务器地址",
                 ""
             )
@@ -2110,21 +2110,21 @@ class SettingsMenu(FluentWindow):
         if pattern.match(url):
             config_center.write_conf('Time', 'ntp_server', url)
             self._show_ntp_flyout(
-                ntp_server_url_widget, 
-                'success', 
+                ntp_server_url_widget,
+                'success',
                 f"NTP服务器已更新: {url}"
             )
             # logger.debug(f"NTP服务器URL已更新: {url}")
         else:
             config_center.write_conf('Time', 'ntp_server', url)
             self._show_ntp_flyout(
-                ntp_server_url_widget, 
-                'warning', 
+                ntp_server_url_widget,
+                'warning',
                 f"URL格式可能不正确: {url}\n请检查是否为有效的域名或IP地址（︶^︶）",
                 url
             )
             logger.warning(f"NTP服务器URL格式可能不正确: {url}")
-    
+
     def _show_ntp_flyout(self, target_widget, flyout_type: str, message: str, invalid_url: str = None):
         if hasattr(self, '_current_ntp_flyout') and self._current_ntp_flyout:
             try:
@@ -2132,7 +2132,7 @@ class SettingsMenu(FluentWindow):
             except:
                 pass
             self._current_ntp_flyout = None
-        
+
         class NTPServerFlyoutView(FlyoutViewBase):
             def __init__(self, flyout_type: str, message: str, invalid_url: str = None, parent=None):
                 super().__init__(parent)
@@ -2166,7 +2166,7 @@ class SettingsMenu(FluentWindow):
                     if invalid_url is not None:
                         self._add_suggestion_buttons(invalid_url)
                     self._add_save_confirmation()
-            
+
             def _add_suggestion_buttons(self, invalid_url: str):
                 """为无效URL添加建议修正按钮"""
                 suggestions = self._get_url_suggestions(invalid_url)
@@ -2186,7 +2186,7 @@ class SettingsMenu(FluentWindow):
                         button_layout.addWidget(btn)
                     button_layout.addStretch()
                     self.vBoxLayout.addLayout(button_layout)
-            
+
             def _add_save_confirmation(self):
                 """添加保存确认按钮"""
                 separator = QFrame()
@@ -2218,7 +2218,7 @@ class SettingsMenu(FluentWindow):
                 button_layout.addStretch()
                 button_layout.addWidget(save_btn)
                 self.vBoxLayout.addLayout(button_layout)
-            
+
             def _get_url_suggestions(self, invalid_url: str) -> list:
                 suggestions = []
                 common_servers = ['ntp.tencent.com', 'ntp.aliyun.com', 'pool.ntp.org', \
@@ -2271,9 +2271,9 @@ class SettingsMenu(FluentWindow):
                         suggestions.append(server)
                         if len(suggestions) >= 3:
                             break
-                
+
                 return suggestions
-            
+
             def _apply_suggestion_and_close(self, suggestion: str):
                 try:
                     if self.parent_menu and hasattr(self.parent_menu, 'adInterface'):
@@ -2290,15 +2290,15 @@ class SettingsMenu(FluentWindow):
                             ntp_url_widget.textChanged.connect(self.parent_menu.on_ntp_server_url_changed)
                             config_center.write_conf('Time', 'ntp_server', suggestion)
                             self.parent_menu._show_ntp_flyout(
-                                ntp_url_widget, 
-                                'success', 
+                                ntp_url_widget,
+                                'success',
                                 f"NTP服务器已更新: {suggestion}"
                             )
                             if hasattr(self.parent_menu, 'update_ntp_status_display'):
                                 self.parent_menu.update_ntp_status_display()
                 except Exception as e:
                     logger.error(f"应用NTP服务器建议失败: {e}")
-            
+
             def _save_and_close(self):
                 try:
                     if self.parent_menu:
@@ -2324,7 +2324,7 @@ class SettingsMenu(FluentWindow):
                     flyout_widget = self
                     while flyout_widget and not hasattr(flyout_widget, 'close'):
                         flyout_widget = flyout_widget.parent()
-                    
+
                     if flyout_widget and hasattr(flyout_widget, 'close'):
                         flyout_widget.close()
                 except Exception as e:
@@ -2332,9 +2332,9 @@ class SettingsMenu(FluentWindow):
         try:
             flyout_view = NTPServerFlyoutView(flyout_type, message, invalid_url, self)
             flyout = Flyout.make(
-                flyout_view, 
-                target_widget, 
-                self, 
+                flyout_view,
+                target_widget,
+                self,
                 aniType=FlyoutAnimationType.PULL_UP
             )
             flyout.setWindowFlags(flyout.windowFlags() | Qt.Tool)
@@ -2364,7 +2364,7 @@ class SettingsMenu(FluentWindow):
                 self.show_warning_toast('NTP设置', message)
             return None
 
-    
+
     def update_ntp_status_display(self):
         """更新NTP状态显示"""
         try:
@@ -2381,10 +2381,10 @@ class SettingsMenu(FluentWindow):
                     caption_label.setText('NTP时间: 尚未进行校准')
             else:
                 caption_label.setText('时间状态: 未知')
-                
+
         except Exception as e:
             logger.error(f"更新NTP状态显示失败: {e}")
-    
+
     def update_ntp_ui_visibility(self):
         """更新NTP组件的可见性"""
         try:
@@ -2395,7 +2395,7 @@ class SettingsMenu(FluentWindow):
                 # logger.debug(f"NTP UI组件可见性: {'显示' if is_ntp_mode else '隐藏'}")
         except Exception as e:
             logger.error(f"更新UI可见性失败: {e}")
-    
+
     def _start_async_ntp_sync(self, time_manager):
         """启动NTP同步"""
         try:
@@ -2422,7 +2422,7 @@ class SettingsMenu(FluentWindow):
             logger.error(f"启动NTP同步时失败: {e}")
             self.show_warning_toast('NTP同步', '启动同步失败')
             self._cleanup_ntp_thread()
-    
+
     def _on_ntp_sync_finished(self, success):
         """NTP同步完成"""
         try:
@@ -2439,7 +2439,7 @@ class SettingsMenu(FluentWindow):
             logger.error(f"NTP同步完成回调失败: {e}")
         finally:
             QTimer.singleShot(100, self._cleanup_ntp_thread)
-    
+
     def _cleanup_ntp_thread(self):
         """清理NTP线程资源"""
         try:
@@ -2458,7 +2458,7 @@ class SettingsMenu(FluentWindow):
                         self.ntp_worker.sync_finished.disconnect()
                 except (TypeError, RuntimeError):
                     pass
-                
+
                 self.ntp_thread = None
             if hasattr(self, 'ntp_worker') and self.ntp_worker:
                 self.ntp_worker = None
@@ -2492,7 +2492,7 @@ class SettingsMenu(FluentWindow):
             )
         except Exception as e:
             logger.error(f"显示成功提示失败: {e}")
-    
+
     def show_warning_toast(self, title: str, message: str):
         try:
             InfoBar.warning(
@@ -2520,7 +2520,7 @@ class SettingsMenu(FluentWindow):
             )
         except Exception as e:
             logger.error(f"显示错误提示失败: {e}")
-        
+
     def setup_schedule_edit(self):
         se_load_item()
         se_set_button = self.findChild(ToolButton, 'set_button')
@@ -2903,7 +2903,7 @@ class SettingsMenu(FluentWindow):
                 overwrite.yesButton.setText('覆盖')
                 if not overwrite.exec():
                     return
-        
+
             importer = CSES_Converter(file_path)
             importer.load_parser()
             cw_data = importer.convert_to_cw()
@@ -2953,7 +2953,7 @@ class SettingsMenu(FluentWindow):
                 overwrite.yesButton.setText('覆盖')
                 if not overwrite.exec():
                     return
-        
+
             if list_.import_schedule(file_path, file_name):
                 self.cf_reload_table()
                 self.show_tip_flyout('您已成功导入课程表配置文件',
@@ -3032,7 +3032,7 @@ class SettingsMenu(FluentWindow):
             pass
 
         self.table.clear()
-        
+
         config_list = list_.get_schedule_config()
         self.cf_file_list = []
         for i, cfg in enumerate(config_list):
@@ -3041,7 +3041,7 @@ class SettingsMenu(FluentWindow):
 
         cur = config_list.index(config_center.read_conf('General','schedule'))
         self.table.setCurrentRow(cur)
-        
+
         self.table.currentRowChanged.connect(self.cf_change_file)
         self.table.resizeEvent(None)
 
@@ -3051,28 +3051,28 @@ class SettingsMenu(FluentWindow):
                 # 检查是否为空
                 if not file_name.strip():
                     return False, "文件名不能为空"
-                
+
                 # 检查非法字符
                 invalid_chars = r'[\\/:*?"<>|]'
                 if re.search(invalid_chars, file_name):
                     return False, "文件名包含非法字符"
-                
+
                 # 检查长度
                 if len(file_name) > 255:
                     return False, "文件名过长"
-                
+
                 # 检查保留名称
                 reserved_names = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
                                 "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
                 if file_name.upper() in reserved_names:
                     return False, "文件名是保留名称"
-                
+
                 # 检查路径分隔符
                 if os.path.sep in file_name:
                     return False, "文件名不能包含路径分隔符"
-                
+
                 return True, "文件名合法"
-            
+
             n2_dialog = TextFieldMessageBox(
                         self, '请输入新课表名称',
                         '请命名您的课程表计划：', '新课表 - 1', list_.get_schedule_config(), is_valid_filename
@@ -3160,7 +3160,7 @@ class SettingsMenu(FluentWindow):
         except ValueError as e:
             logger.error(f'更新配置文件 {config_center.schedule_name} 时发生错误：{e}')
             self.show_tip_flyout('更新配置文件失败',
-                                   f"{e}", self.config_download, InfoBarIcon.ERROR, FlyoutAnimationType.PULL_UP)  
+                                   f"{e}", self.config_download, InfoBarIcon.ERROR, FlyoutAnimationType.PULL_UP)
             return
         schedule_center.update_schedule()
 
@@ -3171,15 +3171,15 @@ class SettingsMenu(FluentWindow):
             if url == '':
                 self.show_tip_flyout('请输入配置文件链接',
                                    '请输入配置文件链接', self.config_url, InfoBarIcon.WARNING, FlyoutAnimationType.DROP_DOWN)
-                return        
+                return
             self.schedule_load_thread = scheduleThread(url)
             self.schedule_load_thread.update_signal.connect(self.cf_receive_schedule_from_db)
             self.schedule_load_thread.start()
             self.config_url.setEnabled(False)
-            
+
         except Exception as e:
             logger.error(f'获取配置文件 {url} 时发生错误：{e}')
-    
+
     def cf_receive_schedule_from_db(self, data):
         if not (data.get('error', None) is None):
             self.show_tip_flyout('获取配置文件失败',
@@ -3216,14 +3216,14 @@ class SettingsMenu(FluentWindow):
                     if url.startswith(db):
                         url = url.replace(db, list_.schedule_dbs[db])
                         break
-                
+
                 self.cf_file_list[self.table.currentIndex().row()].set_file_path(url)
                 schedule_center.update_url(url)
 
             self.schedule_post_thread = scheduleThread(url, 'POST', data=schedule_center.schedule_data)
             self.schedule_post_thread.update_signal.connect(self.cf_receive_schedule_from_post)
             self.schedule_post_thread.start()
-            
+
         except Exception as e:
             logger.error(f'上传配置文件 {url} 时发生错误：{e}')
             self.show_tip_flyout('上传配置文件失败',
@@ -3384,7 +3384,7 @@ class SettingsMenu(FluentWindow):
             parent=self,
             isClosable=True,
             aniType=aniType,
-            
+
         )
 
     # 上传课表到列表组件
@@ -3956,7 +3956,7 @@ class SettingsMenu(FluentWindow):
                 self._current_ntp_flyout = None
         except Exception as e:
             logger.error(f"页面切换时清理NTP flyout失败: {e}")
-    
+
     def closeEvent(self, event):
         try:
             if hasattr(self, '_current_ntp_flyout') and self._current_ntp_flyout:
@@ -3968,7 +3968,7 @@ class SettingsMenu(FluentWindow):
             self._remove_ntp_auto_sync_callback()
         except Exception as e:
             logger.error(f"清理NTP自动同步回调失败: {e}")
-        
+
         self.closed.emit()
         event.accept()
 
@@ -3978,7 +3978,7 @@ class NTPSyncWorker(QObject):
     def __init__(self, time_manager):
         super().__init__()
         self.time_manager = time_manager
-    
+
     def sync_ntp(self):
         """执行NTP同步"""
         try:

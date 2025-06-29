@@ -228,9 +228,9 @@ class getCity(QThread):
                     logger.error(f"获取城市失败：{data['message']}")
                     return ('', '')
             else:
-                logger.error(f"获取城市失败：{req.status_code}")    
+                logger.error(f"获取城市失败：{req.status_code}")
                 return ('', '')
-            
+
         except Exception as e:
             logger.error(f"获取城市失败：{e}")
             return ('', '')
@@ -244,7 +244,7 @@ class VersionThread(QThread):  # 获取最新版本号
     def run(self) -> None:
         version = self.get_latest_version()
         self.version_signal.emit(version)
-    
+
     @classmethod
     def is_running(cls) -> bool:
         return cls._instance_running
@@ -393,10 +393,10 @@ def check_update() -> None:
     if VersionThread.is_running():
         logger.debug("已存在版本检查线程在运行，跳过本检查")
         return
-    
+
     # 清理已终止的线程
     threads = [t for t in threads if t.isRunning()]
-    
+
     # 创建新的版本检查线程
     version_thread = VersionThread()
     threads.append(version_thread)
@@ -415,7 +415,7 @@ def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
             f"检查更新失败！\n{version['error']}"
         )
         return False
-    
+
     channel = int(config_center.read_conf("Version", "version_channel"))
     server_version = version['version_release' if channel == 0 else 'version_beta']
     local_version = config_center.read_conf("Version", "version")
@@ -446,7 +446,7 @@ class scheduleThread(QThread):  # 获取课表
             data = self.post_schedule()
         else:
             data = {'error': "method not supported"}
-        
+
         if not isinstance(data, dict):
             logger.error(f"获取课表失败，返回数据不是字典类型: {data}")
             data = {'error': "获取课表失败，返回数据不是字典类型"}
@@ -467,7 +467,7 @@ class scheduleThread(QThread):  # 获取课表
         except Exception as e:
             logger.error(f"请求失败，错误详情：{str(e)}")
             return {"error": f"请求失败\n{str(e)}"}
-        
+
     def post_schedule(self):
         try:
             logger.info(f"正在上传课表 {self.url}")

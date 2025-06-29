@@ -332,7 +332,7 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
         except Exception as e:
             logger.error(f"转换数据时出错: {e}")
             raise e
-          
+
     return check_data
 
 

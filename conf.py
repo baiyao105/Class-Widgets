@@ -145,14 +145,11 @@ def add_shortcut(file: str = '', icon: str = '') -> None:
     try:
         file_path = Path(file) if file else Path(__file__).resolve()
         icon_path = Path(icon) if icon else file_path
-
         # 获取桌面文件夹路径
         desktop_folder = Path(os.environ['USERPROFILE']) / 'Desktop'
-
         # 快捷方式文件名（使用文件名或自定义名称）
         name = file_path.stem  # 使用文件名作为快捷方式名称
         shortcut_path = desktop_folder / f'{name}.lnk'
-
         # 创建快捷方式
         shell = Dispatch('WScript.Shell')
         shortcut = shell.CreateShortCut(str(shortcut_path))

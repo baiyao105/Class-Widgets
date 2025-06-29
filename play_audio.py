@@ -13,6 +13,7 @@ import conf
 from file import config_center
 from generate_speech import TTSEngine, on_audio_played
 
+
 sound_cache: Dict[str, Any] = {}
 
 

@@ -5,6 +5,7 @@ what is CSES: https://github.com/CSES-org/CSES
 import json
 import typing
 from typing import Union, Optional, Dict, Any, List
+
 import cses
 from datetime import datetime, timedelta
 from loguru import logger

@@ -1193,7 +1193,6 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
 
     if filename:
         params["filename"] = filename
-
     processor = TTSQueueProcessor.get_instance()
     processor.add_task(
         text=text,
@@ -1204,7 +1203,6 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
         on_complete=on_complete,
         on_error=on_error
     )
-
     result_event.wait()
     if result_container["error"]:
         raise RuntimeError(f"TTS生成失败: {result_container['error']}")
