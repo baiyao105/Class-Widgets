@@ -70,7 +70,7 @@ def _terminate_child_processes() -> None:
                     logger.debug(f"子进程 {p.pid} 在强制终止前已消失.")
                 except Exception as e:
                     logger.error(f"强制终止子进程 {p.pid} 失败: {e}")
-                    
+
     except psutil.NoSuchProcess:
         logger.warning("无法获取当前进程信息,跳过子进程终止。")
     except Exception as e:
@@ -79,13 +79,13 @@ def _terminate_child_processes() -> None:
 def restart() -> None:
     """重启程序"""
     logger.debug('重启程序')
-    
+
     app = QApplication.instance()
     if app:
         _reset_signal_handlers()
         app.quit()
         app.processEvents()
-    
+
     _cleanup_shared_memory()
     os.execl(sys.executable, sys.executable, *sys.argv)
 
@@ -98,7 +98,7 @@ def stop(status: int = 0) -> None:
     if _stop_in_progress:
         return
     _stop_in_progress = True
-    
+
     logger.debug('退出程序...')
     if 'update_timer' in globals() and update_timer:
         try:
@@ -183,7 +183,7 @@ class TrayIcon(QSystemTrayIcon):
         else:
             self.setToolTip("Class Widgets - 未加载课表")
             logger.debug(f'托盘文字更新: "Class Widgets - 未加载课表"')
-            
+
     def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(f"{base_directory}/img/logo/favicon-update.png"))  # tray
         self.showMessage(
@@ -263,7 +263,7 @@ class UnionUpdateTimer(QObject):
         """调度下一次执行"""
         delay: int = int(self._base_interval * 1000)
         self.timer.start(delay)
-        
+
     def _safe_stop_timer(self) -> None:
         """安全停止定时器"""
         if self.timer and self.timer.isActive():
@@ -276,7 +276,7 @@ class UnionUpdateTimer(QObject):
 
     def add_callback(self, callback: Callable[[], Any], interval: float = 1.0) -> None:
         """添加回调函数
-        
+
         Args:
             callback: 回调函数
             interval: 刷新间隔(s),默认1秒
@@ -296,7 +296,7 @@ class UnionUpdateTimer(QObject):
             else:
                 self.callback_info[callback]['interval'] = interval
                 should_start = False
-        
+
         if should_start:
             self.start()
         #logger.debug(f"添加回调函数 {callback},间隔: {interval}s")
@@ -331,12 +331,12 @@ class UnionUpdateTimer(QObject):
             self._is_running = False
         self._safe_stop_timer()
         logger.debug("UnionUpdateTimer 已停止")
-    
+
     def set_callback_interval(self, callback: Callable[[], Any], interval: float) -> bool:
         """设置特定回调函数的间隔(s)"""
         interval = max(0.1, interval)
         current_time: dt.datetime = dt.datetime.now()
-        
+
         with self._lock:
             if callback in self.callback_info:
                 self.callback_info[callback]['interval'] = interval
@@ -344,7 +344,7 @@ class UnionUpdateTimer(QObject):
                 return True
             else:
                 return False
-    
+
     def get_callback_interval(self, callback: Callable[[], Any]) -> Optional[float]:
         """获取特定回调函数的间隔"""
         # 意义不明x2
@@ -353,7 +353,7 @@ class UnionUpdateTimer(QObject):
                 interval = self.callback_info[callback]['interval']
                 return float(interval) if isinstance(interval, (int, float)) else None
             return None
-    
+
     def set_base_interval(self, interval: float) -> None:
         """设置基础检查时间(s)"""
         # 意义不明x3
@@ -364,16 +364,16 @@ class UnionUpdateTimer(QObject):
         if was_running:
             self.stop()
             self.start()
-        
+
     def get_base_interval(self) -> float:
         """获取当前基础检查间隔"""
         return self._base_interval
-    
+
     def get_callback_count(self) -> int:
         """获取当前回调函数数量"""
         with self._lock:
             return len(self.callback_info)
-    
+
     def get_callback_info(self) -> Dict[Callable[[], Any], Dict[str, Union[float, dt.datetime]]]:
         """获取所有回调函数的详细信息"""
         with self._lock:
@@ -387,7 +387,7 @@ class UnionUpdateTimer(QObject):
                     'time_until_next': (data['next_run'] - current_time).total_seconds() if isinstance(data['next_run'], dt.datetime) else 0.0
                 }
             return info
-    
+
     def is_running(self) -> bool:
         """检查定时器是否正在运行"""
         return self._is_running
@@ -395,10 +395,10 @@ class UnionUpdateTimer(QObject):
 def get_str_length(text: str) -> int:
     """
     计算字符串长度,汉字计为2,英文和数字计为1
-    
+
     Args:
         text: 要计算的字符串
-    
+
     Returns:
         int: 字符串长度
     """
@@ -415,17 +415,17 @@ def get_str_length(text: str) -> int:
 def slice_str_by_length(text: str, max_length: int) -> str:
     """
     根据指定长度切割字符串,汉字计为2,英文和数字计为1
-    
+
     Args:
         text: 要切割的字符串
         max_length: 最大长度
-    
+
     Returns:
         str: 切割后的字符串
     """
     if not text or max_length <= 0:
         return ""
-    
+
     if get_str_length(text) <= max_length:
         return text
 

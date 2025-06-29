@@ -5,7 +5,7 @@ import platform
 import re
 import time
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any, Generator
+from typing import Optional, List, Dict, Tuple, Any, Generator, Callable
 from contextlib import contextmanager
 
 import edge_tts
@@ -43,7 +43,7 @@ async def _get_edge_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]
                     return 0
                 return 1
             elif "hongkong" in locale_lower or "hk" in locale_lower:
-                return 2 
+                return 2
             elif "taiwan" in locale_lower or "tw" in locale_lower:
                 return 3
             return 4
@@ -110,7 +110,7 @@ def get_available_engines() -> Dict[str, str]:
 
 def get_supported_languages() -> Dict[str, str]:
     """获取支持的语言列表及其显示名称
-    
+
     返回:
         Dict[str, str]: 语言代码到显示名称的映射
     """
@@ -197,7 +197,7 @@ async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict
             ):
                 all_cached = False
                 break
-            combined_voices.extend(cache_entry["voices"])  # type: ignore
+            combined_voices.extend(cache_entry["voices"])
         if all_cached:
             return combined_voices, None
     voices = []
@@ -395,7 +395,7 @@ class TTSEngine:
         engine = None
         com_initialized = False
         max_retries = 3
-        
+
         for attempt in range(max_retries):
             try:
                 pythoncom.CoInitialize()
@@ -410,7 +410,7 @@ class TTSEngine:
                         if not voices or len(voices) == 0:
                             logger.warning("pyttsx3引擎未检测到任何语音")
                             raise RuntimeError("未检测到语音")
-                        
+
                         logger.debug(f"pyttsx3引擎检测到 {len(voices)} 个语音")
                         yield engine
                         return
@@ -420,11 +420,11 @@ class TTSEngine:
                 else:
                     logger.warning("pyttsx3引擎初始化返回空引擎")
                     raise RuntimeError("初始化返回空引擎")
-                    
+
             except OSError as oe:
                 if hasattr(oe, "winerror") and oe.winerror == -2147221005:
                     logger.error(
-                        f"系统语音引擎(pyttsx3/SAPI5)初始化失败 (尝试 {attempt+1}/{max_retries})，"  
+                        f"系统语音引擎(pyttsx3/SAPI5)初始化失败 (尝试 {attempt+1}/{max_retries})，"
                         f"错误码: {oe.winerror}。请检查系统语音组件。"
                     )
                 else:
@@ -435,7 +435,7 @@ class TTSEngine:
                     except Exception:
                         pass
                     engine = None
-                
+
                 if com_initialized:
                     try:
                         pythoncom.CoUninitialize()
@@ -447,7 +447,7 @@ class TTSEngine:
                 wait_time = (attempt + 1) * 1.0
                 logger.info(f"等待 {wait_time} 秒后重试pyttsx3初始化...")
                 time.sleep(wait_time)
-                
+
             except Exception as init_e:
                 logger.error(f"pyttsx3初始化失败 (尝试 {attempt+1}/{max_retries}): {init_e}")
                 if engine:
@@ -456,7 +456,7 @@ class TTSEngine:
                     except Exception:
                         pass
                     engine = None
-                
+
                 if com_initialized:
                     try:
                         pythoncom.CoUninitialize()
@@ -475,7 +475,7 @@ class TTSEngine:
                     except Exception as e:
                         logger.warning(f"关闭pyttsx3引擎时出错: {e}")
                     engine = None
-                
+
                 if com_initialized:
                     try:
                         pythoncom.CoUninitialize()
@@ -496,7 +496,7 @@ class TTSEngine:
                 logger.warning(f"无法删除已存在的临时文件: {temp_file_path}, 错误: {e}")
                 temp_filename = f"temp_{int(time.time())}_{os.getpid()}_{hash(text + str(time.time())) % 10000}.mp3"
                 temp_file_path = os.path.join(temp_dir, temp_filename)
-        
+
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -541,7 +541,7 @@ class TTSEngine:
                     engine.runAndWait()
                     if not os.path.exists(temp_file_path):
                         raise FileNotFoundError(f"语音生成后临时文件未找到: {temp_file_path}")
-                    
+
                     file_size = os.path.getsize(temp_file_path)
                     if file_size < MIN_VALID_FILE_SIZE:
                         raise RuntimeError(f"生成的临时文件可能已损坏（大小: {file_size}字节）")
@@ -569,9 +569,9 @@ class TTSEngine:
                     file_size = os.path.getsize(file_path)
                     if file_size < MIN_VALID_FILE_SIZE:
                         raise RuntimeError(f"最终目标文件可能已损坏（大小: {file_size}字节）")
-                    
+
                     return file_path
-                    
+
             except Exception as e:
                 logger.error(f"pyttsx3 语音生成失败 (尝试 {attempt+1}/{max_retries}): {e}")
                 if os.path.exists(temp_file_path):
@@ -612,7 +612,7 @@ class TTSEngine:
                 "ru-ru": LANG_RU, "ru": LANG_RU, "russian": LANG_RU,
                 "pt-br": LANG_PT, "pt": LANG_PT, "portuguese": LANG_PT
             }
-            
+
             config_lang_lower = config_language.lower().strip()
             if config_lang_lower in lang_mapping:
                 return lang_mapping[config_lang_lower]
@@ -653,7 +653,7 @@ class TTSEngine:
                     return lang_voices[0].id
 
                 default_voice = engine.getProperty("voice")
-                if default_voice:
+                if default_voice and isinstance(default_voice, str):
                     logger.info(f"使用默认语音: {default_voice}")
                     return default_voice
                 else:
@@ -944,7 +944,7 @@ def generate_speech_sync(
     filename: Optional[str] = None,
 ) -> str:
     """同步生成方法
-    
+
     Note: 此函数使用队列处理器,所有 TTS 都通过单线程队列处理
     """
     return generate_speech_queue(
@@ -993,7 +993,7 @@ class TTSQueueProcessor:
     """单线程 TTS 队列处理器"""
     _instance = None
     _lock = threading.Lock()
-    
+
     @classmethod
     def get_instance(cls) -> 'TTSQueueProcessor':
         """获取单例实例"""
@@ -1002,22 +1002,22 @@ class TTSQueueProcessor:
                 cls._instance = cls()
                 cls._instance.start()
             return cls._instance
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """初始化队列处理器"""
-        self.queue = queue.Queue()
+        self.queue: queue.Queue[Optional[Tuple[str, Dict[str, Any], Optional[Callable[[str], None]], Optional[Callable[[str], None]]]]] = queue.Queue()
         self.running = False
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.tts_engine = TTSEngine()
         self.callbacks: Dict[str, Dict[str, Any]] = {}
-    
+
     def start(self) -> None:
         """启动处理线程"""
         if not self.running:
             self.running = True
             self.thread = threading.Thread(target=self._process_queue, daemon=True)
             self.thread.start()
-    
+
     def stop(self) -> None:
         """停止处理线程"""
         if self.running:
@@ -1025,7 +1025,7 @@ class TTSQueueProcessor:
             self.queue.put(None)
             if self.thread:
                 self.thread.join(timeout=2.0)
-    
+
     def _process_queue(self) -> None:
         """处理队列中的 TTS 请求"""
         while self.running:
@@ -1041,7 +1041,8 @@ class TTSQueueProcessor:
                         unique_id = str(uuid.uuid4())[:8]
                         text_hash = hashlib.md5(params["text"].encode()).hexdigest()[:6]
                         params["filename"] = f"{params.get('engine', 'edge')}_{text_hash}_{timestamp}_{unique_id}.mp3"
-                    logger.debug(f"处理TTS[ID: {task_id}]: {params.get('text')[:20]}...")
+                    text_preview = params.get('text', '')
+                    logger.debug(f"处理TTS[ID: {task_id}]: {text_preview[:20] if text_preview else ''}...")
                     file_path = asyncio.run(self.tts_engine.generate_speech(**params))
                     if on_complete:
                         try:
@@ -1054,7 +1055,7 @@ class TTSQueueProcessor:
                             "created_at": time.time(),
                             "params": params
                         }
-                        
+
                 except Exception as e:
                     logger.error(f"TTS处理失败 [ID: {task_id}]: {e}")
                     if on_error:
@@ -1062,22 +1063,22 @@ class TTSQueueProcessor:
                             on_error(str(e))
                         except Exception as cb_e:
                             logger.error(f"TTS错误回调执行出错 [ID: {task_id}]: {cb_e}")
-                
+
                 finally:
                     self.queue.task_done()
-                    
+
             except queue.Empty:
                 pass
             except Exception as e:
                 logger.error(f"TTS 队列处理器异常: {e}")
                 time.sleep(1.0)
-    
+
     def add_task(self, text: str, engine: str = ENGINE_EDGE, voice: Optional[str] = None,
                 auto_fallback: bool = False, timeout: float = DEFAULT_TTS_TIMEOUT,
                 on_complete: Optional[Callable[[str], None]] = None,
                 on_error: Optional[Callable[[str], None]] = None) -> str:
         """添加 TTS 任务到队列
-        
+
         参数:
             text: 要转换的文本
             engine: TTS 引擎
@@ -1086,7 +1087,7 @@ class TTSQueueProcessor:
             timeout: 超时时间
             on_complete: 成功回调函数，参数为生成的文件路径
             on_error: 错误回调函数，参数为错误信息
-            
+
         返回:
             任务 ID
         """
@@ -1098,21 +1099,21 @@ class TTSQueueProcessor:
             "auto_fallback": auto_fallback,
             "timeout": timeout
         }
-        
+
         self.queue.put((task_id, params, on_complete, on_error))
         logger.debug(f"已添加 TTS 任务到队列 [ID: {task_id}]")
         return task_id
-    
+
     def on_audio_played(self, file_path: str) -> None:
         """音频播放完成后的回调，用于安全删除文件
-        
+
         参数:
             file_path: 播放完成的音频文件路径
         """
         if file_path in self.callbacks:
             task_info = self.callbacks.pop(file_path)
             logger.debug(f"音频播放完成，准备删除文件 [ID: {task_info['task_id']}]: {file_path}")
-            def delayed_delete():
+            def delayed_delete() -> None:
                 time.sleep(0.5)
                 try:
                     if os.path.exists(file_path):
@@ -1127,7 +1128,7 @@ def queue_tts_request(text: str, engine: str = ENGINE_EDGE, voice: Optional[str]
                      on_complete: Optional[Callable[[str], None]] = None,
                      on_error: Optional[Callable[[str], None]] = None) -> str:
     """将 TTS 请求加入队列处理
-    
+
     参数:
         text: 要转换的文本
         engine: TTS 引擎
@@ -1136,7 +1137,7 @@ def queue_tts_request(text: str, engine: str = ENGINE_EDGE, voice: Optional[str]
         timeout: 超时时间
         on_complete: 成功回调函数，参数为生成的文件路径
         on_error: 错误回调函数，参数为错误信息
-        
+
     返回:
         任务 ID
     """
@@ -1156,10 +1157,10 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
                         auto_fallback: bool = True, timeout: float = DEFAULT_TTS_TIMEOUT,
                         filename: Optional[str] = None) -> str:
     """队列版本的语音生成函数，与原 generate_speech 函数参数兼容
-    
+
     这个函数是 generate_speech 的队列版本，将请求放入队列中串行处理，
     避免并发问题。它会阻塞直到语音生成完成，与原函数行为一致。
-    
+
     参数:
         text: 要转换的文本
         engine: TTS 引擎
@@ -1167,21 +1168,21 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
         auto_fallback: 是否自动回退到其他引擎
         timeout: 超时时间
         filename: 自定义文件名
-        
+
     返回:
         生成的音频文件路径
     """
     result_event = threading.Event()
     result_container = {"file_path": None, "error": None}
-    
-    def on_complete(file_path):
+
+    def on_complete(file_path) -> None:
         result_container["file_path"] = file_path
         result_event.set()
-    
-    def on_error(error_msg):
+
+    def on_error(error_msg) -> None:
         result_container["error"] = error_msg
         result_event.set()
-    
+
     params = {
         "text": text,
         "engine": engine,
@@ -1189,10 +1190,10 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
         "auto_fallback": auto_fallback,
         "timeout": timeout
     }
-    
+
     if filename:
         params["filename"] = filename
-    
+
     processor = TTSQueueProcessor.get_instance()
     processor.add_task(
         text=text,
@@ -1203,11 +1204,11 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
         on_complete=on_complete,
         on_error=on_error
     )
-    
+
     result_event.wait()
     if result_container["error"]:
         raise RuntimeError(f"TTS生成失败: {result_container['error']}")
-    
+
     file_path = result_container["file_path"]
     if file_path is None:
         raise RuntimeError("TTS生成失败: 未获取到文件路径")
@@ -1216,7 +1217,7 @@ def generate_speech_queue(text: str, engine: str = ENGINE_EDGE, voice: Optional[
 
 def on_audio_played(file_path: str) -> None:
     """音频播放完成后调用此函数，用于安全删除文件
-    
+
     参数:
         file_path: 播放完成的音频文件路径
     """
