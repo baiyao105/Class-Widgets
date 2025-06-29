@@ -217,11 +217,10 @@ def get_start_time() -> None:
                 logger.error(f'加载课程表文件[节点类型]出错：{e}')
                 part_type = 'part'
 
-            # 应用时差偏移到课程表时间
+            # 使用基础时间，不应用偏移（偏移在比较时统一处理）
             current_time_manager = TimeManagerFactory.get_instance()
             base_time = dt.datetime.combine(current_time_manager.get_today(), dt.time(h, m))
-            start_time = base_time + dt.timedelta(seconds=current_time_manager.get_time_offset())
-            parts_start_time.append(start_time)
+            parts_start_time.append(base_time)
             order.append(item_name)
             parts_type.append(part_type)
         except Exception as e:
@@ -266,7 +265,14 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
         return None
 
     def return_data():
-        c_time = parts_start_time[i]
+        base_time = parts_start_time[i]
+        current_manager = TimeManagerFactory.get_instance()
+        c_time = current_manager.get_current_time().replace(
+            hour=base_time.hour,
+            minute=base_time.minute,
+            second=base_time.second,
+            microsecond=base_time.microsecond
+        )
         return c_time, int(order[i])  # 返回开始时间、Part序号
 
     current_dt = TimeManagerFactory.get_instance().get_current_time() # 当前时间
@@ -283,10 +289,19 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
             if i == len(parts_start_time) - 1:  # 最后一个Part
                 return return_data()
             else:
-                if current_dt <= parts_start_time[i] + time_len:
+                # 将基础时间转换为当前时间基准进行比较
+                base_time = parts_start_time[i]
+                current_manager = TimeManagerFactory.get_instance()
+                adjusted_start_time = current_manager.get_current_time().replace(
+                    hour=base_time.hour,
+                    minute=base_time.minute,
+                    second=base_time.second,
+                    microsecond=base_time.microsecond
+                )
+                if current_dt <= adjusted_start_time + time_len:
                     return return_data()
 
-    return parts_start_time[0] + dt.timedelta(seconds=TimeManagerFactory.get_instance().get_time_offset()), 0, 'part'
+    return parts_start_time[0], 0
 
 def get_excluded_lessons() -> None:
     global excluded_lessons
@@ -419,7 +434,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                         if lesson_name != '暂无课程':
                             next_lesson_name = lesson_name
                     if current_state == 0:
-                        now = dt.datetime.now()
+                        now = TimeManagerFactory.get_instance().get_current_time()
                         if not last_notify_time or (now - last_notify_time).seconds >= notify_cooldown:
                             if next_lesson_name != None:
                                     notification.push_notification(3, next_lesson_name)
@@ -447,7 +462,12 @@ def get_next_lessons() -> None:
             if part == 0 or part == 3:
                 return True
             else:
-                if current_dt >= parts_start_time[part] - dt.timedelta(minutes=60):
+                if current_dt >= TimeManagerFactory.get_instance().get_current_time().replace(
+                    hour=parts_start_time[part].hour, 
+                    minute=parts_start_time[part].minute, 
+                    second=parts_start_time[part].second, 
+                    microsecond=parts_start_time[part].microsecond
+                ) - dt.timedelta(minutes=60):
                     return True
                 else:
                     return False
