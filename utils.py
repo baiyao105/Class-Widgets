@@ -690,11 +690,11 @@ class TimeManagerFactory:
     
     @classmethod
     def reset_instance(cls) -> TimeManagerInterface:
-        """重置实例（配置变更时使用）"""
+        """重置实例(配置变更时使用)"""
         cls._instance = cls.create_manager()
         globals()['time_manager'] = cls._instance
         sys.modules[__name__].time_manager = cls._instance
-        modules_to_reset = ['main', 'conf']
+        modules_to_reset = ['main', 'conf', 'menu', 'extra_menu']
         for module_name in modules_to_reset:
             if module_name in sys.modules:
                 module = sys.modules[module_name]

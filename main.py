@@ -42,7 +42,7 @@ from weather import WeatherReportThread as weatherReportThread
 from weather import get_unified_weather_alerts, get_alert_image
 from play_audio import play_audio
 from plugin import p_loader
-from utils import restart, stop, share, update_timer, DarkModeWatcher, time_manager, TimeManagerFactory
+from utils import restart, stop, share, update_timer, DarkModeWatcher, TimeManagerFactory
 from file import config_center, schedule_center
 
 if os.name == 'nt':
@@ -218,8 +218,9 @@ def get_start_time() -> None:
                 part_type = 'part'
 
             # 应用时差偏移到课程表时间
-            base_time = dt.datetime.combine(time_manager.get_today(), dt.time(h, m))
-            start_time = base_time + dt.timedelta(seconds=time_manager.get_time_offset())
+            current_time_manager = TimeManagerFactory.get_instance()
+            base_time = dt.datetime.combine(current_time_manager.get_today(), dt.time(h, m))
+            start_time = base_time + dt.timedelta(seconds=current_time_manager.get_time_offset())
             parts_start_time.append(start_time)
             order.append(item_name)
             parts_type.append(part_type)
@@ -285,7 +286,7 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
                 if current_dt <= parts_start_time[i] + time_len:
                     return return_data()
 
-    return parts_start_time[0] + dt.timedelta(seconds=time_manager.get_time_offset()), 0, 'part'
+    return parts_start_time[0] + dt.timedelta(seconds=TimeManagerFactory.get_instance().get_time_offset()), 0, 'part'
 
 def get_excluded_lessons() -> None:
     global excluded_lessons
@@ -715,7 +716,7 @@ class PluginManager:  # 插件管理器
             "Timeline_Data": timeline_data,  # 时间线数据
             "Parts_Start_Time": parts_start_time,  # 节点开始时间
             "Parts_Type": parts_type,  # 节点类型
-            "Time_Offset": time_manager.get_time_offset(),  # 时差偏移
+            "Time_Offset": TimeManagerFactory.get_instance().get_time_offset(),  # 时差偏移
 
             "Schedule_Name": config_center.schedule_name,  # 课程表名称
             "Loaded_Data": loaded_data,  # 加载的课程表数据
@@ -2050,7 +2051,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         if conf.is_temp_week():  # 调休日
             current_week = config_center.read_conf('Temp', 'set_week')
         else:
-            current_week = time_manager.get_current_weekday()
+            current_week = TimeManagerFactory.get_instance().get_current_weekday()
         
         cd_list = get_countdown()
 

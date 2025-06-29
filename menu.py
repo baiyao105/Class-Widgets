@@ -59,7 +59,7 @@ QApplication.setHighDpiScaleFactorRoundingPolicy(
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
-today = time_manager.get_today()
+today = TimeManagerFactory.get_instance().get_today()
 plugin_plaza = None
 
 plugin_dict = {}  # 插件字典
@@ -2118,7 +2118,6 @@ class SettingsMenu(FluentWindow):
             logger.warning(f"NTP服务器URL格式可能不正确: {url}")
     
     def _show_ntp_flyout(self, target_widget, flyout_type: str, message: str, invalid_url: str = None):
-        """显示NTP服务器设置的自定义Flyout提示"""
         if hasattr(self, '_current_ntp_flyout') and self._current_ntp_flyout:
             try:
                 self._current_ntp_flyout.close()
