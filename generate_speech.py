@@ -108,6 +108,26 @@ def get_available_engines() -> Dict[str, str]:
         engines[ENGINE_PYTTSX3] = "系统 TTS (pyttsx3)"
     return engines
 
+
+def get_supported_languages() -> Dict[str, str]:
+    """获取支持的语言列表及其显示名称
+    
+    返回:
+        Dict[str, str]: 语言代码到显示名称的映射
+    """
+    return {
+        LANG_ZH: "中文（简体）",
+        LANG_EN: "English (US)",
+        LANG_JA: "日本語",
+        LANG_KO: "한국어",
+        LANG_FR: "Français",
+        LANG_DE: "Deutsch",
+        LANG_ES: "Español",
+        LANG_IT: "Italiano",
+        LANG_RU: "Русский",
+        LANG_PT: "Português (BR)"
+    }
+
 @contextmanager
 def _pyttsx3_context():
     """安全的pyttsx3引擎上下文管理器"""
@@ -244,8 +264,19 @@ def get_voice_name_by_id(
 # 一些多复用常量
 ENGINE_EDGE = "edge"
 ENGINE_PYTTSX3 = "pyttsx3"
-LANG_ZH = "zh-CN"
-LANG_EN = "en-US"
+
+# 支持的语言常量
+LANG_ZH = "zh-CN"  # 中文（简体）
+LANG_EN = "en-US"  # 英语（美国）
+LANG_JA = "ja-JP"  # 日语
+LANG_KO = "ko-KR"  # 韩语
+LANG_FR = "fr-FR"  # 法语
+LANG_DE = "de-DE"  # 德语
+LANG_ES = "es-ES"  # 西班牙语
+LANG_IT = "it-IT"  # 意大利语
+LANG_RU = "ru-RU"  # 俄语
+LANG_PT = "pt-BR"  # 葡萄牙语（巴西）
+
 CACHE_DIR_NAME = "cache"
 AUDIO_DIR_NAME = "audio"
 DEFAULT_TTS_TIMEOUT = 10.0
@@ -267,7 +298,18 @@ class TTSEngine:
         self._ensure_cache_dir()
         self.engine_priority = [ENGINE_EDGE, ENGINE_PYTTSX3]
         self.voice_mapping = {
-            ENGINE_EDGE: {LANG_ZH: "zh-CN-YunxiNeural", LANG_EN: "en-US-AriaNeural"},
+            ENGINE_EDGE: {
+                LANG_ZH: "zh-CN-YunxiNeural",
+                LANG_EN: "en-US-AriaNeural",
+                LANG_JA: "ja-JP-NanamiNeural",
+                LANG_KO: "ko-KR-SunHiNeural",
+                LANG_FR: "fr-FR-DeniseNeural",
+                LANG_DE: "de-DE-KatjaNeural",
+                LANG_ES: "es-ES-ElviraNeural",
+                LANG_IT: "it-IT-ElsaNeural",
+                LANG_RU: "ru-RU-SvetlanaNeural",
+                LANG_PT: "pt-BR-FranciscaNeural"
+            },
             ENGINE_PYTTSX3: self._get_platform_voices(),
         }
 
@@ -277,7 +319,7 @@ class TTSEngine:
         获取当前平台的默认语音配置
 
         返回：
-        - dict: 包含中英文语音ID的字典，结构为{'zh-CN': voice_id, 'en-US': voice_id}
+        - dict: 包含多语言语音ID的字典
 
         平台支持：
         - Windows: 使用注册表路径标识语音
@@ -288,15 +330,30 @@ class TTSEngine:
         platform_voices = {
             "Windows": {
                 LANG_ZH: "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_ZH-CN_HUIHUI_11.0",
-                # LANG_EN: 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_DAVID_11.0'
+                LANG_EN: "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_ZIRA_11.0",
+                LANG_JA: "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_JA-JP_HARUKA_11.0",
             },
             "Darwin": {  # macOS
                 LANG_ZH: "com.apple.speech.synthesis.voice.ting-ting.premium",
-                # LANG_EN: 'com.apple.speech.synthesis.voice.Alex'
+                LANG_EN: "com.apple.speech.synthesis.voice.Alex",
+                LANG_JA: "com.apple.speech.synthesis.voice.kyoko.premium",
+                LANG_FR: "com.apple.speech.synthesis.voice.thomas.premium",
+                LANG_DE: "com.apple.speech.synthesis.voice.anna.premium",
+                LANG_ES: "com.apple.speech.synthesis.voice.monica.premium",
+                LANG_IT: "com.apple.speech.synthesis.voice.alice.premium",
+                LANG_RU: "com.apple.speech.synthesis.voice.milena.premium",
             },
             "Linux": {
                 LANG_ZH: "zh-CN",
-                # LANG_EN: 'en-US'
+                LANG_EN: "en-US",
+                LANG_JA: "ja-JP",
+                LANG_KO: "ko-KR",
+                LANG_FR: "fr-FR",
+                LANG_DE: "de-DE",
+                LANG_ES: "es-ES",
+                LANG_IT: "it-IT",
+                LANG_RU: "ru-RU",
+                LANG_PT: "pt-BR",
             },
         }
         return platform_voices.get(current_os, platform_voices["Linux"])
@@ -526,16 +583,49 @@ class TTSEngine:
 
     @staticmethod
     def _detect_language(text: str) -> str:
-        """检测文本语言（中文或英文）
+        """检测文本语言，优先使用配置中的语言设置
 
         参数:
             text: 要检测的文本
 
         返回:
-            语言代码: 'zh-CN' 或 'en-US'
+            语言代码: 支持的语言代码之一
         """
+        # 优先从配置中读取语言设置
+        config_language = config_center.read_conf("TTS", "language")
+        if config_language:
+            # 这里不应该是我做,但是我还是留一下吧
+            # 标准化语言代码映射
+            lang_mapping = {
+                "zh-cn": LANG_ZH, "zh": LANG_ZH, "chinese": LANG_ZH,
+                "en-us": LANG_EN, "en": LANG_EN, "english": LANG_EN,
+                "ja-jp": LANG_JA, "ja": LANG_JA, "japanese": LANG_JA,
+                "ko-kr": LANG_KO, "ko": LANG_KO, "korean": LANG_KO,
+                "fr-fr": LANG_FR, "fr": LANG_FR, "french": LANG_FR,
+                "de-de": LANG_DE, "de": LANG_DE, "german": LANG_DE,
+                "es-es": LANG_ES, "es": LANG_ES, "spanish": LANG_ES,
+                "it-it": LANG_IT, "it": LANG_IT, "italian": LANG_IT,
+                "ru-ru": LANG_RU, "ru": LANG_RU, "russian": LANG_RU,
+                "pt-br": LANG_PT, "pt": LANG_PT, "portuguese": LANG_PT
+            }
+            
+            config_lang_lower = config_language.lower().strip()
+            if config_lang_lower in lang_mapping:
+                return lang_mapping[config_lang_lower]
+        # 如果配置中没有设置或无效，则回退到文本检测
+        # 检测中文字符
         if re.search("[一-鿿]", text):
             return LANG_ZH
+        # 检测日文字符（平假名、片假名）
+        elif re.search("[ひ-ゟ]|[ァ-ヿ]", text):
+            return LANG_JA
+        # 检测韩文字符
+        elif re.search("[가-힣]", text):
+            return LANG_KO
+        # 检测俄文字符
+        elif re.search("[а-яё]", text, re.IGNORECASE):
+            return LANG_RU
+        # 默认返回英语
         return LANG_EN
 
     def _validate_pyttsx3_voice(self, voice_id: str, lang: str) -> str:

@@ -32,6 +32,7 @@
   "TTS": {
     "enable": 0,
     "engine": "edge",
+    "language": "zh-CN",
     "voice_id": "",
     "speed": 50,
     "attend_class": "活动开始, {lesson_name}",
