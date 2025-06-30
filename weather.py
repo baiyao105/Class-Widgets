@@ -9,7 +9,7 @@ import sqlite3
 import time
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from loguru import logger
@@ -142,7 +142,7 @@ class WeatherDataCache:
 class WeatherManager:
     """天气管理"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.api_config = self._load_api_config()
         self.cache = WeatherDataCache()
         self.providers = self._initialize_providers()
@@ -819,7 +819,7 @@ class WeatherDataProcessor:
         self.weather_manager = weather_manager
         self._status_cache: Dict[str, Any] = {}
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """清理所有缓存"""
         self._status_cache.clear()
 
@@ -1309,11 +1309,11 @@ class WeatherReportThread(QThread):
 
     weather_signal = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.weather_manager = WeatherManager()
 
-    def run(self):
+    def run(self) -> None:
         """线程运行方法"""
         try:
             weather_data = self.weather_manager.fetch_weather_data()
@@ -1369,8 +1369,16 @@ def get_weather_stylesheet(code: str) -> str:
     return weather_processor.get_weather_stylesheet(code)
 
 
-def get_weather_data(key: str = "temp", weather_data: Dict[str, Any] = None) -> Optional[str]:
-    """获取天气数据"""
+def get_weather_data(key: str = "temp", weather_data: Dict[str, Any] = None) -> Optional[Tuple[str, str]]:
+    """获取天气数据
+
+    Args:
+        key: 要提取的天气数据键, 默认为"temp"
+        weather_data: 天气数据字典, 默认为None
+
+    Returns:
+        包含天气值和单位的元组, 如果提取失败则返回None
+    """
     return weather_processor.extract_weather_data(key, weather_data)
 
 

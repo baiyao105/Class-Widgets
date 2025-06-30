@@ -16,7 +16,6 @@ import utils
 import weather as db
 from conf import base_directory
 from file import config_center
-from weather import WeatherReportThread as weatherReportThread
 
 headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache"}  # 设置请求头
 # proxies = {"http": "http://127.0.0.1:10809", "https": "http://127.0.0.1:10809"}  # 加速访问
@@ -430,7 +429,7 @@ def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
 class scheduleThread(QThread):  # 获取课表
     update_signal = pyqtSignal(dict)
 
-    def __init__(self,url:str, method:str='GET', data:dict=None):
+    def __init__(self, url: str, method: str = 'GET', data: Optional[Dict[str, Any]] = None) -> None:
         super().__init__()
         self.url = url
         self.method = method
@@ -441,7 +440,7 @@ class scheduleThread(QThread):  # 获取课表
                 self.url = self.url.replace(db, list_.schedule_dbs[db])
                 break
 
-    def run(self):
+    def run(self) -> None:
         # 获取
         if self.method == 'GET':
             data = self.get_schedule()

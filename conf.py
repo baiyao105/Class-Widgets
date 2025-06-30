@@ -1,9 +1,7 @@
-import configparser as config
 import configparser
 import json
 import os
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -45,7 +43,8 @@ def load_theme_config(theme: str) -> ThemeInfo:
     default_path = CW_HOME / "ui" / "default" / "theme.json"
     try:
         config_path = next(
-            (dir for theme_dir in THEME_DIRS if (dir := (theme_dir / theme / "theme.json")).exists()), default_path
+            (dir for theme_dir in THEME_DIRS if (dir := (theme_dir / theme / "theme.json")).exists()),
+            default_path,
         )
         return ThemeInfo(path=config_path.parent, config=__load_json(config_path))
     except Exception as e:

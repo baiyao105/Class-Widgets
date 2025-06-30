@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import Any
 import zipfile
 from copy import deepcopy
 from pathlib import Path
@@ -85,7 +86,7 @@ timeline_dict = {}  # 时间线字典
 countdown_dict = {}
 
 
-def open_plaza():
+def open_plaza() -> None:
     global plugin_plaza
     if plugin_plaza is None or not plugin_plaza.isVisible():
         plugin_plaza = PluginPlaza()
@@ -97,7 +98,7 @@ def open_plaza():
         plugin_plaza.activateWindow()
 
 
-def cleanup_plaza():
+def cleanup_plaza() -> None:
     global plugin_plaza
     logger.info("关闭“插件广场”")
     del plugin_plaza
@@ -110,7 +111,7 @@ def get_timeline():
     return loaded_data["timeline"]
 
 
-def open_dir(path: str):
+def open_dir(path: str) -> None:
     if sys.platform.startswith("win32"):
         os.startfile(path)
     elif sys.platform.startswith("linux"):
@@ -126,7 +127,7 @@ def open_dir(path: str):
         msg_box.exec()
 
 
-def switch_checked(section, key, checked):
+def switch_checked(section, key, checked) -> None:
     if checked:
         config_center.write_conf(section, key, "1")
     else:
@@ -138,11 +139,11 @@ def switch_checked(section, key, checked):
             conf.remove_from_startup()
 
 
-def get_theme_name():
+def get_theme_name() -> str:
     return load_theme_config(config_center.read_conf("General", "theme")).path.name
 
 
-def load_schedule_dict(schedule, part, part_name):
+def load_schedule_dict(schedule, part, part_name) -> dict:
     """
     加载课表字典
     """
@@ -177,7 +178,7 @@ def load_schedule_dict(schedule, part, part_name):
     return schedule_dict_
 
 
-def convert_to_dict(data_dict_):
+def convert_to_dict(data_dict_) -> dict:
     data_dict = {}
     for week, item in data_dict_.items():
         cache_list = item
@@ -189,7 +190,7 @@ def convert_to_dict(data_dict_):
     return data_dict
 
 
-def se_load_item():
+def se_load_item() -> None:
     global schedule_dict
     global schedule_even_dict
     global loaded_data
@@ -203,7 +204,7 @@ def se_load_item():
     schedule_even_dict = load_schedule_dict(schedule_even, part, part_name)
 
 
-def cd_load_item():
+def cd_load_item() -> None:
     global countdown_dict
     text = config_center.read_conf("Date", "cd_text_custom").split(",")
     date = config_center.read_conf("Date", "countdown_date").split(",")
@@ -217,7 +218,7 @@ def cd_load_item():
 
 
 class selectCity(MessageBoxBase):  # 选择城市
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         title_label = SubtitleLabel()
         subtitle_label = BodyLabel()
@@ -244,12 +245,12 @@ class selectCity(MessageBoxBase):  # 选择城市
         self.widget.setMinimumWidth(500)
         self.widget.setMinimumHeight(600)
 
-    def search_city(self):
+    def search_city(self) -> None:
         self.city_list.clear()
         self.city_list.addItems(wd.search_by_name(self.search_edit.text()))
         self.city_list.clearSelection()  # 清除选中项
 
-    def get_selected_city(self):
+    def get_selected_city(self) -> None:
         selected_city = self.city_list.findItems(
             wd.search_by_num(str(config_center.read_conf("Weather", "city"))), QtCore.Qt.MatchFlag.MatchExactly
         )
@@ -262,7 +263,7 @@ class selectCity(MessageBoxBase):  # 选择城市
 
 
 class licenseDialog(MessageBoxBase):  # 显示软件许可协议
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         title_label = SubtitleLabel()
         subtitle_label = BodyLabel()
@@ -285,7 +286,7 @@ class licenseDialog(MessageBoxBase):  # 显示软件许可协议
 
 
 class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
-    def __init__(self, plugin_dir=None, parent=None):
+    def __init__(self, plugin_dir=None, parent=None) -> None:
         if plugin_dir not in p_loader.plugins_settings:
             return
 
@@ -295,7 +296,7 @@ class PluginSettingsDialog(MessageBoxBase):  # 插件设置对话框
         self.parent = parent
         self.init_ui()
 
-    def init_ui(self):
+    def init_ui(self) -> None:
         # 加载已定义的UI
         self.plugin_widget = p_loader.plugins_settings[self.plugin_dir]
         self.viewLayout.addWidget(self.plugin_widget)
@@ -320,7 +321,7 @@ class PluginCard(CardWidget):  # 插件卡片
         parent=None,
         enable_settings=None,
         url="",
-    ):
+    ) -> None:
         super().__init__(parent)
         icon_radius = 5
         self.plugin_dir = plugin_dir
@@ -420,7 +421,7 @@ class PluginCard(CardWidget):  # 插件卡片
         self.hBoxLayout.addWidget(self.moreButton, 0, Qt.AlignmentFlag.AlignRight)
         self.setLayout(self.hBoxLayout)
 
-    def set_enable(self):
+    def set_enable(self) -> None:
         global enabled_plugins
         if self.enableButton.isChecked():
             enabled_plugins["enabled_plugins"].append(self.plugin_dir)
@@ -429,12 +430,12 @@ class PluginCard(CardWidget):  # 插件卡片
             enabled_plugins["enabled_plugins"].remove(self.plugin_dir)
             conf.save_plugin_config(enabled_plugins)
 
-    def show_settings(self):
+    def show_settings(self) -> None:
         w = PluginSettingsDialog(self.plugin_dir, self.parent)
         if w:
             w.exec()
 
-    def remove_plugin(self):
+    def remove_plugin(self) -> None:
         alert = MessageBox(f"您确定要删除插件“{self.title}”吗？", "删除此插件后, 将无法恢复。", self.parent)
         alert.yesButton.setText("永久删除")
         alert.yesButton.setStyleSheet("""
@@ -534,7 +535,7 @@ class TextFieldMessageBox(MessageBoxBase):
         # 设置对话框的最小宽度
         self.widget.setMinimumWidth(350)
 
-    def check_text(self):
+    def check_text(self) -> None:
         self.tipsLabel.setTextColor(self.fail_color[0], self.fail_color[1])
         self.yesButton.setEnabled(False)
         if self.textField.text() == "":
@@ -563,7 +564,7 @@ class TTSVoiceLoaderThread(QThread):
         super().__init__(parent)
         self.engine_filter = engine_filter
 
-    def run(self):
+    def run(self) -> None:
         try:
             if self.engine_filter == "pyttsx3" and platform.system() != "Windows":
                 logger.warning("当前系统不是Windows,跳过pyttsx3 TTS预览")
@@ -601,7 +602,7 @@ class TTSPreviewThread(QThread):
         self.engine = engine
         self.voice = voice
 
-    def run(self):
+    def run(self) -> None:
         try:
             if self.engine == "pyttsx3" and platform.system() != "Windows":
                 logger.warning("当前系统不是Windows, 跳过pyttsx3 TTS预览。")
@@ -650,7 +651,7 @@ class TTSPreviewThread(QThread):
 class SettingsMenu(FluentWindow):
     closed = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.tts_voice_loader_thread = None
         self.button_clear_log = None
@@ -689,12 +690,12 @@ class SettingsMenu(FluentWindow):
         self.init_nav()
         self.init_window()
 
-    def init_font(self):  # 设置字体
+    def init_font(self) -> None:  # 设置字体
         self.setStyleSheet("""QLabel {
                     font-family: 'Microsoft YaHei';
                 }""")
 
-    def load_all_item(self):
+    def load_all_item(self) -> None:
         self.setup_timeline_edit()
         self.setup_schedule_edit()
         self.setup_schedule_preview()
@@ -760,7 +761,7 @@ class SettingsMenu(FluentWindow):
         self.load_plugin_cards()
         self.update_plugin_count()
 
-    def load_plugin_cards(self):
+    def load_plugin_cards(self) -> None:
         """加载插件卡片"""
         self.clear_plugin_cards()
         container_widget = self.plugin_card_layout.parentWidget()
@@ -793,7 +794,7 @@ class SettingsMenu(FluentWindow):
         if container_widget:
             container_widget.setUpdatesEnabled(True)
 
-    def clear_plugin_cards(self):
+    def clear_plugin_cards(self) -> None:
         """清空插件卡片"""
         container_widget = self.plugin_card_layout.parentWidget()
         if container_widget:
@@ -806,13 +807,13 @@ class SettingsMenu(FluentWindow):
         if container_widget:
             container_widget.setUpdatesEnabled(True)
 
-    def update_plugin_count(self):
+    def update_plugin_count(self) -> None:
         """更新计数显示"""
         total_count = len(plugin_dict)
         enabled_count = len([p for p in plugin_dict if plugin_dict[p]["name"] in enabled_plugins])
         self.plugin_count_label.setText(f"已安装 {total_count} 个插件, 已启用 {enabled_count} 个")
 
-    def filter_plugins(self):
+    def filter_plugins(self) -> None:
         """根据搜索条件和过滤器过滤插件"""
         search_text = self.plugin_search.text().lower()
         filter_type = self.filter_combo.currentText()
@@ -855,7 +856,7 @@ class SettingsMenu(FluentWindow):
         else:
             self.tips_plugin_empty.hide()
 
-    def refresh_plugin_list(self):
+    def refresh_plugin_list(self) -> None:
         """刷新插件列表"""
         global plugin_dict, enabled_plugins
         enabled_plugins = conf.load_plugin_config()
@@ -873,7 +874,7 @@ class SettingsMenu(FluentWindow):
             parent=self.window(),
         )
 
-    def import_plugin_from_file(self):
+    def import_plugin_from_file(self) -> None:
         """从文件导入插件"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择插件文件", "", "ZIP文件 (*.zip);;JSON配置文件 (*.json);;所有文件 (*)"
@@ -1119,7 +1120,7 @@ class SettingsMenu(FluentWindow):
             parent.switch_enable_TTS = self.widget.findChild(SwitchButton, "switch_enable_tts")
             self.tts_vocab_button = self.widget.findChild(PushButton, "tts_vocab_button")
 
-            def show_vocab_note():
+            def show_vocab_note() -> None:
                 w = MessageBox(
                     "小语法?",
                     "可以使用以下占位符来动态插入信息：\n"
@@ -1246,7 +1247,7 @@ class SettingsMenu(FluentWindow):
 
             MessageBox("TTS生成失败", f"生成或播放语音时出错: {error_message}", self).exec()
 
-    def open_tts_settings(self):
+    def open_tts_settings(self) -> None:
         if not hasattr(self, "TTSSettingsDialog"):
             self.TTSSettingsDialog = None
         if not self.TTSSettingsDialog:
@@ -1318,7 +1319,7 @@ class SettingsMenu(FluentWindow):
         )
         self.tts_voice_loader_thread.start()
 
-    def populate_tts_engines(self):
+    def populate_tts_engines(self) -> None:
         # 填充TTS引擎选项
         self.engine_selector.clear()
         available_engines = generate_speech.get_available_engines()  #  假设 generate_speech 有这个方法
@@ -1345,7 +1346,7 @@ class SettingsMenu(FluentWindow):
             self.engine_selector.setCurrentIndex(0)
             config_center.write_conf("TTS", "engine", self.engine_selector.currentData())
 
-    def show_engine_note(self):
+    def show_engine_note(self) -> None:
         if not hasattr(self, "engine_selector") or not self.engine_selector:
             logger.warning("引擎选择器未初始化")
             return
@@ -1386,7 +1387,7 @@ class SettingsMenu(FluentWindow):
                     self.yesButton.setText("知道啦~")
                     self.cancelButton.hide()
 
-                def _open_settings(self):
+                def _open_settings(self) -> None:
                     QDesktopServices.openUrl(QUrl("file:///C:/Windows/System32/Speech/SpeechUX/sapi.cpl"))
 
             w = CustomMessageBox(
@@ -1584,7 +1585,7 @@ class SettingsMenu(FluentWindow):
         item_widget.setFixedWidth(self.table.gridSize().width())
         return item_widget
 
-    def setup_configs_interface(self):  # 配置界面
+    def setup_configs_interface(self) -> None:  # 配置界面
         self.config_url = self.cfInterface.findChild(LineEdit, "config_url")
 
         self.config_download = self.cfInterface.findChild(PushButton, "config_download")
@@ -1945,7 +1946,7 @@ class SettingsMenu(FluentWindow):
 
         what_is_hide_mode_3 = self.adInterface.findChild(HyperlinkLabel, "what_is_hide_mode_3")
 
-        def what_is_hide_mode_3_clicked():
+        def what_is_hide_mode_3_clicked() -> None:
             w = MessageBox(
                 "灵活模式",
                 "灵活模式为上课时自动隐藏, 可手动改变隐藏状态, 当前课程状态（上课/课间）改变后会清除手动隐藏状态, 重新转为自动隐藏。",

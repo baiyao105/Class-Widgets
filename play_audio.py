@@ -2,7 +2,7 @@ import os
 import pathlib
 import sys
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import pygame
 import pygame.mixer
@@ -11,7 +11,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 import conf
 from file import config_center
-from generate_speech import TTSEngine, on_audio_played
+from generate_speech import on_audio_played
 
 sound_cache: Dict[str, Any] = {}
 

@@ -485,10 +485,10 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
 
         self.hBoxLayout_Author.addWidget(self.authorLabel, 0, Qt.AlignmentFlag.AlignLeft)
 
-    def install(self):
+    def install(self) -> None:
         install_plugin(self.parent, self.p_name, self.data)
 
-    def set_img(self, img):
+    def set_img(self, img) -> None:
         try:
             self.icon = img
             self.iconWidget.setImage(img)
@@ -496,7 +496,7 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
         except Exception as e:
             logger.error(f"设置插件图片失败: {e}")
 
-    def show_detail(self):
+    def show_detail(self) -> None:
         w = PluginDetailPage(
             icon=self.icon,
             title=self.title,
@@ -514,7 +514,7 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
 class PluginPlaza(MSFluentWindow):
     closed = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.splashScreen = None
         self.thread_manager = ThreadManager()
@@ -547,20 +547,20 @@ class PluginPlaza(MSFluentWindow):
         except Exception as e:
             logger.error(f"初始化插件广场时发生错误：{e}")
 
-    def load_all_interface(self):
+    def load_all_interface(self) -> None:
         self.setup_homeInterface()
         self.setup_latestInterface()
         self.setup_settingsInterface()
         self.setup_searchInterface()
 
-    def setup_latestInterface(self):  # 初始化最新更新
+    def setup_latestInterface(self) -> None:  # 初始化最新更新
         latest_scroll = self.latestsInterface.findChild(SmoothScrollArea, "latest_scroll")
         QScroller.grabGesture(latest_scroll.viewport(), QScroller.LeftMouseButtonGesture)
 
-    def setup_searchInterface(self):  # 初始化搜索
+    def setup_searchInterface(self) -> None:  # 初始化搜索
         search_scroll = self.searchInterface.findChild(SmoothScrollArea, "search_scroll")
 
-        def search(keyword):  # 搜索
+        def search(keyword) -> Any | dict:  # 搜索
             if keyword == "/all":
                 return plugins_data
 
@@ -570,21 +570,21 @@ class PluginPlaza(MSFluentWindow):
                     result[key] = value
             return result
 
-        def clear_results():
+        def clear_results() -> None:
             for i in reversed(range(self.search_plugin_grid.count())):
                 widget = self.search_plugin_grid.itemAt(i).widget()
                 if widget:
                     widget.setParent(None)  # 移除控件
                     widget.destroy()  # 销毁控件
 
-        def search_plugins():  # 搜索插件
+        def search_plugins() -> None:  # 搜索插件
             if not plugins_data:
                 return
             clear_results()
 
             if self.search_plugin.text():
 
-                def set_plugin_image(plugin_card, data):
+                def set_plugin_image(plugin_card, data) -> None:
                     pixmap = QPixmap()
                     pixmap.loadFromData(data)
                     plugin_card.set_img(pixmap)
@@ -806,7 +806,7 @@ class PluginPlaza(MSFluentWindow):
         self.thread_manager.add_thread(self.banner_list_thread)
         self.banner_list_thread.start()
 
-    def restart_tips(self):
+    def restart_tips(self) -> None:
         global restart_tips_flag
         restart_tips_flag = True
         w = InfoBar.info(
@@ -823,10 +823,10 @@ class PluginPlaza(MSFluentWindow):
         w.addWidget(restart_btn)
         w.show()
 
-    def get_pp_data(self):
+    def get_pp_data(self) -> None:
         global plugins_data
 
-        def callback(data):
+        def callback(data) -> None:
             global plugins_data
             plugins_data = data  # 保存插件数据
             self.load_plugins(data, "latest")
@@ -837,7 +837,7 @@ class PluginPlaza(MSFluentWindow):
         self.thread_manager.add_thread(self.get_plugin_list_thread)
         self.get_plugin_list_thread.start()
 
-    def get_tags_data(self):
+    def get_tags_data(self) -> None:
         self.get_tags_list_thread = nt.getTags()
         self.get_tags_list_thread.repo_signal.connect(self.set_tags_data)
         self.thread_manager.add_thread(self.get_tags_list_thread)
@@ -847,7 +847,7 @@ class PluginPlaza(MSFluentWindow):
         self.thread_manager.stop_all_threads()
         super().closeEvent(event)
 
-    def switch_banners(self):  # 切换Banner
+    def switch_banners(self) -> None:  # 切换Banner
         if self.banner_view.currentIndex() == len(self.img_list) - 1:
             self.banner_view.scrollToIndex(0)
             self.banner_pager.setCurrentIndex(0)
@@ -855,7 +855,7 @@ class PluginPlaza(MSFluentWindow):
             self.banner_view.scrollNext()
             self.banner_pager.setCurrentIndex(self.banner_view.currentIndex())
 
-    def init_nav(self):
+    def init_nav(self) -> None:
         self.addSubInterface(self.homeInterface, fIcon.HOME, "首页", fIcon.HOME_FILL)
         self.addSubInterface(self.latestsInterface, fIcon.LIBRARY, "分类", fIcon.LIBRARY_FILL)
         self.addSubInterface(self.searchInterface, fIcon.SEARCH, "搜索", position=NavigationItemPosition.BOTTOM)
@@ -888,7 +888,7 @@ class PluginPlaza(MSFluentWindow):
                     font-family: 'Microsoft YaHei';
                 }""")
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         self.closed.emit()
         event.accept()
 
