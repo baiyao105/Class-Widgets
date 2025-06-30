@@ -1,5 +1,4 @@
 import platform
-import platform
 import sys
 from shutil import copy
 from typing import List
