@@ -7,50 +7,27 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 from PyQt5 import uic
-from PyQt5.QtCore import QSize, QStringListModel, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt5.QtCore import (QSize, QStringListModel, Qt, QThread, QTimer, QUrl,
+                          pyqtSignal)
 from PyQt5.QtGui import QDesktopServices, QIcon, QPixmap
-from PyQt5.QtWidgets import (
-    QApplication,
-    QCompleter,
-    QGridLayout,
-    QHBoxLayout,
-    QScroller,
-    QSizePolicy,
-    QSpacerItem,
-    QVBoxLayout,
-    QWidget,
-)
-from qfluentwidgets import Action, BodyLabel, CaptionLabel, CardWidget, ComboBox
+from PyQt5.QtWidgets import (QApplication, QCompleter, QGridLayout,
+                             QHBoxLayout, QScroller, QSizePolicy, QSpacerItem,
+                             QVBoxLayout, QWidget)
+from qfluentwidgets import (Action, BodyLabel, CaptionLabel, CardWidget,
+                            ComboBox)
 from qfluentwidgets import FluentIcon as fIcon
-from qfluentwidgets import (
-    HorizontalFlipView,
-    HyperlinkButton,
-    HyperlinkLabel,
-    ImageLabel,
-    IndeterminateProgressRing,
-    InfoBar,
-    InfoBarPosition,
-    MessageBox,
-    MessageBoxBase,
-    MSFluentWindow,
-    NavigationItemPosition,
-    PipsPager,
-    PrimaryPushButton,
-    PrimarySplitPushButton,
-    ProgressBar,
-    RoundMenu,
-    SearchLineEdit,
-    SmoothScrollArea,
-    SplashScreen,
-    StrongBodyLabel,
-    SubtitleLabel,
-    SwitchButton,
-    TextBrowser,
-    TitleLabel,
-    TransparentToolButton,
-)
+from qfluentwidgets import (HorizontalFlipView, HyperlinkButton,
+                            HyperlinkLabel, ImageLabel,
+                            IndeterminateProgressRing, InfoBar,
+                            InfoBarPosition, MessageBox, MessageBoxBase,
+                            MSFluentWindow, NavigationItemPosition, PipsPager,
+                            PrimaryPushButton, PrimarySplitPushButton,
+                            ProgressBar, RoundMenu, SearchLineEdit,
+                            SmoothScrollArea, SplashScreen, StrongBodyLabel,
+                            SubtitleLabel, SwitchButton, TextBrowser,
+                            TitleLabel, TransparentToolButton)
 
-import conf
+
 import list_ as l
 import network_thread as nt
 from conf import base_directory

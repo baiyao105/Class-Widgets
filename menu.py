@@ -14,76 +14,30 @@ from shutil import rmtree
 from loguru import logger
 from packaging.version import Version
 from PyQt5 import QtCore, uic
-from PyQt5.QtCore import QDate, QObject, QSize, Qt, QThread, QTime, QTimer, QUrl, pyqtSignal
+from PyQt5.QtCore import (QDate, QObject, QSize, Qt, QThread, QTime,
+                          QTimer, QUrl, pyqtSignal)
 from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter
-from PyQt5.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QFrame,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QListWidgetItem,
-    QScroller,
-    QSizePolicy,
-    QSpacerItem,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
-from qfluentwidgets import (
-    Action,
-    BodyLabel,
-    CalendarPicker,
-    CaptionLabel,
-    CardWidget,
-    ColorDialog,
-    ComboBox,
-    Dialog,
-    DropDownToolButton,
-    EditableComboBox,
-)
+from PyQt5.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout,
+                             QHeaderView, QLabel, QListWidgetItem, QScroller,
+                             QSizePolicy, QSpacerItem,
+                             QTableWidgetItem, QVBoxLayout, QWidget)
+from qfluentwidgets import (Action, BodyLabel, CalendarPicker, CaptionLabel,
+                            CardWidget, ColorDialog, ComboBox, Dialog,
+                            DropDownToolButton, EditableComboBox)
 from qfluentwidgets import FluentIcon as fIcon
-from qfluentwidgets import (
-    FluentWindow,
-    Flyout,
-    FlyoutAnimationType,
-    FlyoutViewBase,
-    HyperlinkLabel,
-    ImageLabel,
-    InfoBar,
-    InfoBarIcon,
-    InfoBarPosition,
-    LineEdit,
-    ListWidget,
-    MessageBox,
-    MessageBoxBase,
-    NavigationItemPosition,
-    PlainTextEdit,
-    PrimaryDropDownPushButton,
-    PrimaryPushButton,
-    PushButton,
-    RadioButton,
-    RoundMenu,
-    SearchLineEdit,
-    Slider,
-    SmoothScrollArea,
-    SpinBox,
-    StrongBodyLabel,
-    SubtitleLabel,
-    SwitchButton,
-    TableWidget,
-    Theme,
-    TimeEdit,
-    ToolButton,
-    ToolTipFilter,
-    ToolTipPosition,
-    TransparentDropDownToolButton,
-    TransparentToolButton,
-    isDarkTheme,
-    setTheme,
-    themeColor,
-)
+from qfluentwidgets import (FluentWindow, Flyout, FlyoutAnimationType,
+                            FlyoutViewBase, HyperlinkLabel,
+                            ImageLabel, InfoBar, InfoBarIcon, InfoBarPosition,
+                            LineEdit, ListWidget, MessageBox, MessageBoxBase,
+                            NavigationItemPosition, PlainTextEdit,
+                            PrimaryDropDownPushButton, PrimaryPushButton,
+                            PushButton, RadioButton, RoundMenu, SearchLineEdit,
+                            Slider, SmoothScrollArea, SpinBox, StrongBodyLabel,
+                            SubtitleLabel, SwitchButton, TableWidget, Theme,
+                            TimeEdit, ToolButton, ToolTipFilter,
+                            ToolTipPosition, TransparentDropDownToolButton,
+                            TransparentToolButton, isDarkTheme, setTheme,
+                            themeColor)
 from qfluentwidgets.common import themeColor
 from qfluentwidgets.components.widgets import ListItemDelegate
 

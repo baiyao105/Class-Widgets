@@ -11,18 +11,9 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QScroller
 from qfluentwidgets import ComboBox
 from qfluentwidgets import FluentIcon as fIcon
-from qfluentwidgets import (
-    FluentWindow,
-    Flyout,
-    FlyoutAnimationType,
-    HyperlinkButton,
-    InfoBarIcon,
-    LineEdit,
-    ListWidget,
-    PrimaryPushButton,
-    SmoothScrollArea,
-    ToolButton,
-)
+from qfluentwidgets import (FluentWindow, Flyout, FlyoutAnimationType,
+                            HyperlinkButton, InfoBarIcon, LineEdit, ListWidget,
+                            PrimaryPushButton, SmoothScrollArea, ToolButton)
 
 import conf
 import file

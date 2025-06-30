@@ -15,62 +15,25 @@ import psutil
 from loguru import logger
 from packaging.version import Version
 from PyQt5 import uic
-from PyQt5.QtCore import (
-    QEasingCurve,
-    QParallelAnimationGroup,
-    QPoint,
-    QPropertyAnimation,
-    QRect,
-    QSize,
-    Qt,
-    QTimer,
-    QUrl,
-)
-from PyQt5.QtGui import (
-    QCloseEvent,
-    QColor,
-    QDesktopServices,
-    QFocusEvent,
-    QFontDatabase,
-    QHideEvent,
-    QIcon,
-    QMouseEvent,
-    QPainter,
-    QPixmap,
-    QShowEvent,
-)
+from PyQt5.QtCore import (QEasingCurve, QParallelAnimationGroup,
+                          QPoint, QPropertyAnimation, QRect, QSize, Qt, QTimer,
+                          QUrl)
+from PyQt5.QtGui import (QCloseEvent, QColor, QDesktopServices, QFocusEvent,
+                         QFontDatabase, QHideEvent, QIcon, QMouseEvent,
+                         QPainter, QPixmap, QShowEvent)
 from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import (
-    QApplication,
-    QFrame,
-    QGraphicsBlurEffect,
-    QGraphicsDropShadowEffect,
-    QGraphicsOpacityEffect,
-    QHBoxLayout,
-    QLabel,
-    QProgressBar,
-    QPushButton,
-    QSystemTrayIcon,
-    QWidget,
-)
+from PyQt5.QtWidgets import (QApplication, QFrame, QGraphicsBlurEffect,
+                             QGraphicsDropShadowEffect, QGraphicsOpacityEffect,
+                             QHBoxLayout, QLabel, QProgressBar, QPushButton,
+                             QSystemTrayIcon, QWidget)
 from qfluentwidgets import Action, CheckBox, Dialog
 from qfluentwidgets import FluentIcon as fIcon
-from qfluentwidgets import (
-    Flyout,
-    FlyoutAnimationType,
-    IconWidget,
-    ImageLabel,
-    InfoBarIcon,
-    PlainTextEdit,
-    PrimaryPushButton,
-    ProgressRing,
-    PushButton,
-    SystemTrayMenu,
-    Theme,
-    isDarkTheme,
-    setTheme,
-    setThemeColor,
-)
+from qfluentwidgets import (Flyout, FlyoutAnimationType, IconWidget,
+                            ImageLabel, InfoBarIcon, PlainTextEdit,
+                            PrimaryPushButton, ProgressRing, PushButton,
+                            SystemTrayMenu, Theme, isDarkTheme, setTheme,
+                            setThemeColor)
+
 
 import conf
 import list_
