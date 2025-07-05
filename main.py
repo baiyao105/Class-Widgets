@@ -839,7 +839,7 @@ class PluginMethod:  # 插件方法
         return generate_speech_sync(
             text=text,
             engine=engine,
-            voice=voice,
+            voice_id=voice,
             auto_fallback=auto_fallback,
             timeout=timeout
         )
