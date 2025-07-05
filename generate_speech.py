@@ -27,46 +27,80 @@ MIN_VALID_FILE_SIZE = 10
 CACHE_MAX_AGE = 86400  # 缓存最大保存时间(秒)
 
 
-async def _get_edge_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]:
-    """获取Edge TTS语音列表,优先大陆"""
+async def _get_edge_voices_async(language_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    """获取Edge TTS语音列表，支持按语言筛选
+
+    Args:
+        language_filter: 语言代码筛选器，如 'zh-CN', 'en-US' 等。None表示获取所有语音，'zh-CN'表示获取中文语音
+    """
     try:
         edge_voices = await edge_tts.list_voices()
-        zh_voices = [
-            {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}", "locale": voice["Locale"]}
-            for voice in edge_voices
-            if _is_zh_voice(voice["Locale"])        ]
-        def sort_key(voice: Dict[str, str]) -> int:
-            name_lower = voice["name"].lower()
-            locale_lower = voice["locale"].lower()
-            if "mainland" in locale_lower or "cn" in locale_lower:
-                if "xiaoxiao" in name_lower:
-                    return 0
-                return 1
-            elif "hongkong" in locale_lower or "hk" in locale_lower:
-                return 2
-            elif "taiwan" in locale_lower or "tw" in locale_lower:
-                return 3
-            return 4
-        zh_voices.sort(key=sort_key)
-        return [{"name": v["name"], "id": v["id"]} for v in zh_voices], None
+
+        if language_filter is None:
+            filtered_voices = [
+                {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}", "locale": voice["Locale"]}
+                for voice in edge_voices
+            ]
+        else:
+            # 根据指定语言筛选
+            filtered_voices = [
+                {"name": voice["FriendlyName"], "id": f"edge:{voice['Name']}", "locale": voice["Locale"]}
+                for voice in edge_voices
+                if _is_language_voice(voice["Locale"], language_filter)
+            ]
+
+        # 对中文语音进行特殊排序，其他语言按名称排序
+        if language_filter is None or language_filter.startswith('zh'):
+            def sort_key(voice: Dict[str, str]) -> int:
+                name_lower = voice["name"].lower()
+                locale_lower = voice["locale"].lower()
+                if "mainland" in locale_lower or "cn" in locale_lower:
+                    if "xiaoxiao" in name_lower:
+                        return 0
+                    return 1
+                elif "hongkong" in locale_lower or "hk" in locale_lower:
+                    return 2
+                elif "taiwan" in locale_lower or "tw" in locale_lower:
+                    return 3
+                return 4
+            filtered_voices.sort(key=sort_key)
+        else:
+            filtered_voices.sort(key=lambda v: v["name"])
+
+        return [{"name": v["name"], "id": v["id"]} for v in filtered_voices], None
     except Exception as e:
         error_message = f"获取 Edge TTS 语音列表失败: {e}"
         return [], error_message
 
 
-async def _get_pyttsx3_voices_async() -> Tuple[List[Dict[str, str]], Optional[str]]:
-    """获取Pyttsx3语音列表"""
+async def _get_pyttsx3_voices_async(language_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    """获取Pyttsx3语音列表，支持按语言筛选
+    
+    Args:
+        language_filter: 语言代码筛选器，如 'zh-CN', 'en-US' 等。None表示获取所有语音，'zh-CN'表示获取中文语音
+    """
     try:
         with _pyttsx3_context() as engine:
             if not engine:
                 return [], "pyttsx3引擎初始化失败或不可用"
             loop = asyncio.get_running_loop()
             voices_available = await loop.run_in_executor(None, engine.getProperty, "voices")
-            return [
-                {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
-                for voice in voices_available
-                if _is_zh_pyttsx3_voice(voice)
-            ], None
+            
+            # 如果没有指定语言筛选器，返回所有语音
+            if language_filter is None:
+                filtered_voices = [
+                    {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
+                    for voice in voices_available
+                ]
+            else:
+                # 根据指定语言筛选
+                filtered_voices = [
+                    {"name": voice.name, "id": f"pyttsx3:{voice.id}"}
+                    for voice in voices_available
+                    if _is_language_pyttsx3_voice(voice, language_filter)
+                ]
+            
+            return filtered_voices, None
     except OSError as oe:
         error_message = ""
         if hasattr(oe, 'winerror') and oe.winerror == -2147221005:
@@ -86,6 +120,28 @@ def _is_zh_voice(locale: str) -> bool:
     return "zh" in locale.lower()
 
 
+def _is_language_voice(locale: str, language_code: str) -> bool:
+    """检查语音是否匹配指定语言代码
+
+    Args:
+        locale: 语音的locale信息，如 'zh-CN', 'en-US'
+        language_code: 要匹配的语言代码，如 'zh-CN', 'en-US'
+
+    Returns:
+        bool: 是否匹配
+    """
+    if not locale or not language_code:
+        return False
+    locale_lower = locale.lower()
+    lang_lower = language_code.lower()
+    if locale_lower == lang_lower:
+        return True
+    if locale_lower.startswith(lang_lower.split('-')[0]):
+        return True
+
+    return False
+
+
 def _is_zh_pyttsx3_voice(voice: Voice) -> bool:
     """检查pyttsx3中文语音"""
     name = voice.name.lower()
@@ -93,6 +149,50 @@ def _is_zh_pyttsx3_voice(voice: Voice) -> bool:
         return any("zh" in lang.lower() for lang in voice.languages)
     if "chinese" in name or "mandarin" in name:
         return True
+    return False
+
+
+def _is_language_pyttsx3_voice(voice: Voice, language_code: str) -> bool:
+    """检查pyttsx3语音是否匹配指定语言代码
+    
+    Args:
+        voice: pyttsx3语音对象
+        language_code: 要匹配的语言代码，如 'zh-CN', 'en-US'
+    
+    Returns:
+        bool: 是否匹配
+    """
+    if not language_code:
+        return False
+    
+    name = voice.name.lower()
+    lang_lower = language_code.lower()
+    if hasattr(voice, "languages") and voice.languages:
+        for lang in voice.languages:
+            if _is_language_voice(lang, language_code):
+                return True
+    # if地狱
+    if lang_lower.startswith('zh'):
+        return "chinese" in name or "mandarin" in name or "zh" in name
+    elif lang_lower.startswith('en'):
+        return "english" in name or "en" in name or "us" in name or "uk" in name
+    elif lang_lower.startswith('ja'):
+        return "japanese" in name or "ja" in name
+    elif lang_lower.startswith('ko'):
+        return "korean" in name or "ko" in name
+    elif lang_lower.startswith('fr'):
+        return "french" in name or "fr" in name
+    elif lang_lower.startswith('de'):
+        return "german" in name or "de" in name
+    elif lang_lower.startswith('es'):
+        return "spanish" in name or "es" in name
+    elif lang_lower.startswith('it'):
+        return "italian" in name or "it" in name
+    elif lang_lower.startswith('ru'):
+        return "russian" in name or "ru" in name
+    elif lang_lower.startswith('pt'):
+        return "portuguese" in name or "pt" in name or "brazil" in name
+    
     return False
 
 ENGINE_EDGE = "edge"
@@ -174,12 +274,16 @@ _tts_voices_cache: Dict[str, Dict[str, Any]] = {
     "pyttsx3": {"voices": [], "timestamp": 0.0},
 }
 
-async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
-    """异步获取可用的TTS语音列表(中文)，包括Edge和Pyttsx3.
+async def get_tts_voices(engine_filter: Optional[str] = None, language_filter: Optional[str] = None) -> Tuple[List[Dict[str, str]], Optional[str]]:
+    """异步获取可用的TTS语音列表
+
     Args:
-        engine_filter (Optional[str], optional): 指定引擎 ("edge" or "pyttsx3"). Defaults to None (获取所有).
+        engine_filter: 指定引擎 ("edge" or "pyttsx3"). Defaults to None (获取所有)
+        language_filter: 指定语言代码，如 'zh-CN', 'en-US' 等。Defaults to None (获取中文语音，保持向后兼容)
+
     Returns:
-        list: 语音列表,每个元素是 {'name': '显示名称', 'id': '引擎:语音ID'}
+        Tuple[List[Dict[str, str]], Optional[str]]: 语音列表和可能的错误信息
+        语音列表每个元素是 {'name': '显示名称', 'id': '引擎:语音ID'}
     """
     current_time = time.time()
     if engine_filter and engine_filter in _tts_voices_cache:
@@ -204,22 +308,24 @@ async def get_tts_voices(engine_filter: Optional[str] = None) -> Tuple[List[Dict
     overall_error = None
 
     if engine_filter is None or engine_filter == ENGINE_EDGE:
-        edge_voices, edge_error = await _get_edge_voices_async()
+        edge_voices, edge_error = await _get_edge_voices_async(language_filter)
         if edge_voices:
             voices.extend(edge_voices)
-            _tts_voices_cache[ENGINE_EDGE]["voices"] = edge_voices
-            _tts_voices_cache[ENGINE_EDGE]["timestamp"] = current_time
+            if language_filter is None:
+                _tts_voices_cache[ENGINE_EDGE]["voices"] = edge_voices
+                _tts_voices_cache[ENGINE_EDGE]["timestamp"] = current_time
         else:
             logger.warning("Edge语音获取失败，不缓存其结果。")
             if edge_error:
                 overall_error = overall_error or edge_error
 
     if engine_filter is None or engine_filter == ENGINE_PYTTSX3:
-        pyttsx3_voices, pyttsx3_error = await _get_pyttsx3_voices_async()
+        pyttsx3_voices, pyttsx3_error = await _get_pyttsx3_voices_async(language_filter)
         if pyttsx3_voices:
             voices.extend(pyttsx3_voices)
-            _tts_voices_cache[ENGINE_PYTTSX3]["voices"] = pyttsx3_voices
-            _tts_voices_cache[ENGINE_PYTTSX3]["timestamp"] = current_time
+            if language_filter is None:
+                _tts_voices_cache[ENGINE_PYTTSX3]["voices"] = pyttsx3_voices
+                _tts_voices_cache[ENGINE_PYTTSX3]["timestamp"] = current_time
         else:
             logger.warning("pyttsx3语音获取失败，不缓存其结果。")
             if pyttsx3_error:
@@ -263,6 +369,22 @@ async def get_voice_name_by_id(
     else:
         voices, _ = await get_tts_voices()
     return next((v["name"] for v in voices if v["id"] == voice_id), None)
+
+
+def get_voice_name_by_id_sync(
+    voice_id: str, available_voices: Optional[List[Dict[str, str]]] = None
+) -> Optional[str]:
+    """
+    根据语音ID查找语音名称（同步版本）
+    参数：
+        voice_id (str): 语音ID
+        available_voices (list, optional): 预先获取的语音列表,如果为None则返回None
+    返回：
+        str 或 None: 语音名称,如果未找到则返回None
+    """
+    if available_voices is None:
+        return None
+    return next((v["name"] for v in available_voices if v["id"] == voice_id), None)
 
 
 # 一些多复用常量
