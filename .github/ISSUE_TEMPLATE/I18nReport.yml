@@ -26,9 +26,9 @@ body:
           required: true
 
   - type: markdown
-    attributes: 
+    attributes:
       value: |
-        ## Bug 信息
+        ## I18N 信息
 
   - type: checkboxes
     id: i18n-type
@@ -40,18 +40,16 @@ body:
         - label: 翻译缺失
         - label: 语言新增
         - label: 翻译优化
-    validations:
-      required: true
 
   - type: markdown
-    attributes: 
+    attributes:
       value: |
         描述您遇到的I18N相关问题。您可以附上截图、录屏等材料。
         
         > [!WARNING]
         > 若您要上传材料，请等待材料文件上传完成后再发布 Issue。
         >
-        > 若显示为 `![Uploading 文件名]()` 即为上传中，请等待链接变动后再提交。  
+        > 若显示为 `![Uploading 文件名]()` 即为上传中，请等待链接变动后再提交。
 
   - type: textarea
     id: description
