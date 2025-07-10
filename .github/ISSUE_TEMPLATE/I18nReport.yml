@@ -1,0 +1,80 @@
+name: I18N / 国际化相关
+title: "[I18N] "
+description: 对i18n(国际化)提出相关问题或建议。
+labels: ["i18n"]
+type: "Task"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        此模板用于提交翻译错误、缺失、建议或新增语言请求。
+        ### 检查清单
+
+        在提出建议之前，请先确认以下所有事项：
+        
+        1. 我已更新到最新版 ![GitHub Release](https://img.shields.io/github/v/release/Class-Widgets/Class-Widgets?include_prereleases)，并看过[最新提交](https://github.com/RinLit-233-shiroko/Class-Widgets/commits/main/)
+        2. 我已在 [Issues](https://github.com/Class-Widgets/Class-Widgets/issues?q=label:i18n) 中检索，确认这一类似的建议 / 问题 **未被提交过**。
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 确认检查清单
+      description: 在反馈此问题之前，请先确认一下事项是否满足：
+      options:
+        - label: 我已阅读以上清单并确认。
+          required: true
+
+  - type: markdown
+    attributes: 
+      value: |
+        ## Bug 信息
+
+  - type: checkboxes
+    id: i18n-type
+    attributes:
+      label: 问题类型 / Issue Type
+      description: 请选择issue类型（可多选）
+      options:
+        - label: 翻译有误
+        - label: 翻译缺失
+        - label: 语言新增
+        - label: 翻译优化
+    validations:
+      required: true
+
+  - type: markdown
+    attributes: 
+      value: |
+        描述您遇到的I18N相关问题。您可以附上截图、录屏等材料。
+        
+        > [!WARNING]
+        > 若您要上传材料，请等待材料文件上传完成后再发布 Issue。
+        >
+        > 若显示为 `![Uploading 文件名]()` 即为上传中，请等待链接变动后再提交。  
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 详细描述你的 I18N 问题或建议
+      placeholder: 如:在...中的...存在问题...
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: 受影响的语言
+      description: 例如 zh-cn, en-us, jp ...
+      placeholder: zh-cn...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 附加信息
+      description: 若是翻译的修正或建议请求，请填写相关内容
+    validations:
+      required: false
