@@ -459,33 +459,12 @@ jobs:
               echo "使用${platform}构建版本"
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
-                   echo "  [DEBUG] Found build zip file: $zip_file" # Debug log
-                   echo "  [DEBUG] Attempting to copy '$zip_file' to 'final-packages/'..." # Debug log
-                   # 尝试复制文件，并立即检查退出状态
                    cp -fv "$zip_file" final-packages/
-                   COPY_STATUS=$? # 获取上一个命令的退出状态
-                   if [ $COPY_STATUS -ne 0 ]; then
-                     echo "  [ERROR] Failed to copy '$zip_file'. cp command exited with status $COPY_STATUS." # Debug log
-                     echo "  [ERROR] Please check file existence, permissions, and integrity." # Debug log
-                     exit 1 # 明确退出，以便更早发现问题
-                   fi
-                   echo "  [DEBUG] Successfully copied '$zip_file'." # Debug log
                    ((package_count++))
                    filename=$(basename "$zip_file")
-                   if [ "$RUNNER_OS" = "Windows" ]; then
-                     file_size=$(powershell -Command "(Get-Item '$zip_file').Length" || echo "未知")
-                     file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
-                     file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" || echo "未知")
-                   else
-                     echo "  [DEBUG] Calculating file_size for $zip_file on non-Windows." # Debug log
-                     file_size=$(stat -c%s "$zip_file" || echo "未知")
-                     echo "  [DEBUG] Calculated file_size: $file_size" # Debug log
-                     echo "  [DEBUG] Calculating file_md5 for $zip_file on non-Windows." # Debug log
-                     file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                     echo "  [DEBUG] Calculated file_md5: $file_md5" # Debug log
-                     file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
-                     echo "  [DEBUG] Calculated file_size_mb: $file_size_mb" # Debug log
-                   fi
+                   file_size=$(stat -c%s "$zip_file" || echo "未知")
+                   file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                   file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
                    {
                      echo ""
                      echo "---"
