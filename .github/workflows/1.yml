@@ -460,11 +460,16 @@ jobs:
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
                    echo "  [DEBUG] Found build zip file: $zip_file" # Debug log
-                   cp -f "$zip_file" final-packages/
-                   if [ $? -ne 0 ]; then # Check if cp command failed
-                     echo "  [ERROR] Failed to copy $zip_file to final-packages/. Exiting." # Debug log
-                     exit 1
+                   echo "  [DEBUG] Attempting to copy '$zip_file' to 'final-packages/'..." # Debug log
+                   # 尝试复制文件，并立即检查退出状态
+                   cp -fv "$zip_file" final-packages/
+                   COPY_STATUS=$? # 获取上一个命令的退出状态
+                   if [ $COPY_STATUS -ne 0 ]; then
+                     echo "  [ERROR] Failed to copy '$zip_file'. cp command exited with status $COPY_STATUS." # Debug log
+                     echo "  [ERROR] Please check file existence, permissions, and integrity." # Debug log
+                     exit 1 # 明确退出，以便更早发现问题
                    fi
+                   echo "  [DEBUG] Successfully copied '$zip_file'." # Debug log
                    ((package_count++))
                    filename=$(basename "$zip_file")
                    if [ "$RUNNER_OS" = "Windows" ]; then
