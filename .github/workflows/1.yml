@@ -460,11 +460,15 @@ jobs:
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
                   cp -fv "$zip_file" final-packages/
+                  echo "[DEBUG] package_count before: $package_count"
                   ((package_count++))
+                  echo "[DEBUG] package_count after: $package_count"
                   filename=$(basename "$zip_file")
+                  echo "喵"
                   file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+                  echo "喵"
                   file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
+                  echo "喵"
                   if [[ "$file_size" != "未知" ]]; then
                     file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
                   else
