@@ -346,8 +346,7 @@ jobs:
 
   package:
     needs: [build, sign]
-    # 依旧意义不明。
-    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped' || needs.build.result == 'failure') && (needs.sign.result == 'success' || needs.sign.result == 'skipped' || needs.sign.result == 'failure')
+    if: (needs.build.result == 'success') && (needs.sign.result == 'success' || needs.sign.result == 'failure')
     runs-on: ubuntu-latest
     outputs:
       package-count: ${{ steps.organize.outputs.package-count }}
@@ -427,7 +426,7 @@ jobs:
               fi
             fi
           done
-          # love for gpt
+          # love comes from gpt
           process_file() {
             local zip_file=$1
             local platform=$2
@@ -442,19 +441,7 @@ jobs:
             else
               file_size_mb="未知"
             fi
-            {
-              echo ""
-              echo "---"
-              echo ""
-              echo "## 📦 文件信息 ($platform - $signed)"
-              echo ""
-              echo "| 属性 | 值 |"
-              echo "|------|----| "
-              echo "| 📁 文件名 | $filename |"
-              echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-              echo "| 🔐 MD5 | $file_md5 |"
-              echo ""
-            } >> $GITHUB_STEP_SUMMARY
+            echo "[DEBUG] ($platform - $signed): $filename, $file_size_mb MB, $file_size bytes, $file_md5"
           }
           for platform in "${platforms[@]}"; do
             signed_key="${platform}-signed"
