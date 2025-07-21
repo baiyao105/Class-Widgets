@@ -189,7 +189,7 @@ jobs:
           echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
           echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
 
-      - name: Build Windows(pyinstaller)
+      - name: Build Windows (pyinstaller)
         if: startsWith(matrix.os, 'windows')
         shell: bash
         run: |
@@ -221,7 +221,7 @@ jobs:
           fi
           ./zip.exe -r -q "packages/${zip_name}.zip" dist/ClassWidgets/*
 
-      - name: Build macOS(pyinstaller)
+      - name: Build macOS (pyinstaller)
         if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
@@ -249,7 +249,7 @@ jobs:
           fi
           zip -r -q "packages/${zip_name}.zip" "Class Widgets.app"
 
-      - name: Build (Linux - PyInstaller)
+      - name: Build Linux (pyinstaller)
         if: matrix.platform == 'linux-x64'
         shell: bash
         run: |
@@ -459,32 +459,38 @@ jobs:
               echo "使用${platform}构建版本"
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
-                   cp -fv "$zip_file" final-packages/
-                   ((package_count++))
-                   filename=$(basename "$zip_file")
-                   file_size=$(stat -c%s "$zip_file" || echo "未知")
-                   file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                   file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
-                   {
-                     echo ""
-                     echo "---"
-                     echo ""
-                     echo "## 📦 文件信息 ($platform)"
-                     echo ""
-                     echo "| 属性 | 值 |"
-                     echo "|------|----| "
-                     echo "| 📁 文件名 | $filename |"
-                     echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-                     echo "| 🔐 MD5 | $file_md5 |"
-                     echo ""
-                   } >> $GITHUB_STEP_SUMMARY
-                 else
-                   echo "  [DEBUG] File does not exist: $zip_file" # Debug log
-                 fi
-               done
-             else
-               echo "${platform}版本未找到"
-             fi
+                  cp -fv "$zip_file" final-packages/
+                  ((package_count++))
+                  filename=$(basename "$zip_file")
+                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
+                  if [[ "$file_size" != "未知" ]]; then
+                    file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
+                  else
+                    file_size_mb="未知"
+                  fi
+                  echo "[DEBUG] size: ${file_size_mb},${file_size}; md5: $file_md5; name: $filename"
+                  {
+                    echo ""
+                    echo "---"
+                    echo ""
+                    echo "## 📦 文件信息 ($platform)"
+                    echo ""
+                    echo "| 属性 | 值 |"
+                    echo "|------|----| "
+                    echo "| 📁 文件名 | $filename |"
+                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+                    echo "| 🔐 MD5 | $file_md5 |"
+                    echo ""
+                  } >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "[DEBUG] 文件不存在: $zip_file"
+                fi
+              done
+            else
+              echo "[DEBUG] ${platform}版本未找到"
+            fi
           done
           echo "package-count=$package_count" >> $GITHUB_OUTPUT
           if [[ $package_count -eq 0 ]]; then
