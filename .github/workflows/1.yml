@@ -52,8 +52,6 @@ jobs:
         uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements.txt'
 
       - name: Python Syntax Check
         id: syntax_check
@@ -129,8 +127,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.arch }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements.txt'
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
@@ -140,7 +136,7 @@ jobs:
         with:
           path: |
             ~/.cache/uv
-            ~\\AppData\\Local\\uv
+            ~\AppData\Local\uv
             .venv
           key: ${{ runner.os }}-${{ matrix.arch }}-uv-cache-${{ hashFiles('requirements.txt') }}
           restore-keys: |
@@ -415,7 +411,7 @@ jobs:
         id: organize
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
+          if [ "$RUNNER_OS" = "Windows" ]; then
             mkdir -p final-packages 2>/dev/null || powershell -Command "New-Item -Path final-packages -ItemType Directory -Force"
           else
             mkdir -p final-packages
@@ -442,7 +438,7 @@ jobs:
                   cp "$zip_file" final-packages/ 2>/dev/null
                   ((package_count++))
                   filename=$(basename "$zip_file")
-                  if [[ "$RUNNER_OS" == "Windows" ]]; then
+                  if [ "$RUNNER_OS" = "Windows" ]; then
                     file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
                     file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
                     file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
@@ -473,7 +469,7 @@ jobs:
                   cp "$zip_file" final-packages/ 2>/dev/null
                   ((package_count++))
                   filename=$(basename "$zip_file")
-                  if [[ "$RUNNER_OS" == "Windows" ]]; then
+                  if [ "$RUNNER_OS" = "Windows" ]; then
                     file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
                     file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
                     file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
@@ -523,7 +519,7 @@ jobs:
           for zip_file in final-packages/*.zip; do
             if [[ -f "$zip_file" ]]; then
               filename=$(basename "$zip_file")
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
+              if [ "$RUNNER_OS" = "Windows" ]; then
                 file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
                 file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
                 file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
