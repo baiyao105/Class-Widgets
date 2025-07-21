@@ -427,73 +427,58 @@ jobs:
               fi
             fi
           done
+          # love for gpt
+          process_file() {
+            local zip_file=$1
+            local platform=$2
+            local signed=$3
+            cp -f "$zip_file" final-packages/
+            package_count=$(($package_count + 1))
+            filename=$(basename "$zip_file")
+            file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+            file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+            if [[ "$file_size" != "未知" ]]; then
+              file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
+            else
+              file_size_mb="未知"
+            fi
+            {
+              echo ""
+              echo "---"
+              echo ""
+              echo "## 📦 文件信息 ($platform - $signed)"
+              echo ""
+              echo "| 属性 | 值 |"
+              echo "|------|----| "
+              echo "| 📁 文件名 | $filename |"
+              echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+              echo "| 🔐 MD5 | $file_md5 |"
+              echo ""
+            } >> $GITHUB_STEP_SUMMARY
+          }
           for platform in "${platforms[@]}"; do
             signed_key="${platform}-signed"
             build_key="${platform}-build"
             if [[ -n "${artifact_cache[$signed_key]:-}" ]]; then
-              echo "使用${platform}签名版本"
+              echo "使用 ${platform} 签名版本"
               for zip_file in "${artifact_cache[$signed_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
-                  cp -f "$zip_file" final-packages/
-                  ((package_count++))
-                  filename=$(basename "$zip_file")
-                  file_size=$(stat -c%s "$zip_file" || wc -c < "$zip_file" || echo "未知")
-                  file_md5=$(md5sum "$zip_file" | cut -d' ' -f1 || echo "未知")
-                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
-                  {
-                    echo ""
-                    echo "---"
-                    echo ""
-                    echo "## 📦 文件信息 ($platform - 已签名)"
-                    echo ""
-                    echo "| 属性 | 值 |"
-                    echo "|------|----| "
-                    echo "| 📁 文件名 | $filename |"
-                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-                    echo "| 🔐 MD5 | $file_md5 |"
-                    echo ""
-                  } >> $GITHUB_STEP_SUMMARY
+                  process_file "$zip_file" "$platform" "已签名"
+                else
+                  echo "[DEBUG] ${platform} 签名版本文件不存在: $zip_file"
                 fi
               done
             elif [[ -n "${artifact_cache[$build_key]:-}" ]]; then
-              echo "使用${platform}构建版本"
+              echo "使用 ${platform} 构建版本"
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
-                  cp -fv "$zip_file" final-packages/
-                  echo "[DEBUG] package_count before: $package_count"
-                  ((package_count++))
-                  echo "[DEBUG] package_count after: $package_count"
-                  filename=$(basename "$zip_file")
-                  echo "喵"
-                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
-                  echo "喵"
-                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                  echo "喵"
-                  if [[ "$file_size" != "未知" ]]; then
-                    file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
-                  else
-                    file_size_mb="未知"
-                  fi
-                  echo "[DEBUG] size: ${file_size_mb},${file_size}; md5: $file_md5; name: $filename"
-                  {
-                    echo ""
-                    echo "---"
-                    echo ""
-                    echo "## 📦 文件信息 ($platform)"
-                    echo ""
-                    echo "| 属性 | 值 |"
-                    echo "|------|----| "
-                    echo "| 📁 文件名 | $filename |"
-                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-                    echo "| 🔐 MD5 | $file_md5 |"
-                    echo ""
-                  } >> $GITHUB_STEP_SUMMARY
+                  process_file "$zip_file" "$platform" "构建"
                 else
-                  echo "[DEBUG] 文件不存在: $zip_file"
+                  echo "[DEBUG] ${platform} 构建版本文件不存在: $zip_file"
                 fi
               done
             else
-              echo "[DEBUG] ${platform}版本未找到"
+              echo "[DEBUG] ${platform} 版本未找到"
             fi
           done
           echo "package-count=$package_count" >> $GITHUB_OUTPUT
