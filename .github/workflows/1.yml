@@ -125,7 +125,7 @@ jobs:
           {
             echo "## 📋 构建信息"
             echo "| 项目 | 值 |"
-            echo "|------|----|" 
+            echo "|------|----|"
             echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
             echo "| 🔗 提交哈希 | $build_commit |"
             echo "| 🌿 分支 | $build_branch |"
@@ -163,9 +163,7 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             platform: linux-x64
-    env:
-        PYTHON_VERSION: 3.8
-    
+
     steps:
       - name: Install dependencies (Linux)
         if: matrix.platform == 'linux-x64'
@@ -256,7 +254,7 @@ jobs:
             --add-data LICENSE:. \
             --add-data i18n:i18n \
             --hidden-import darkdetect
-          
+
           if [[ "$IS_RELEASE" == "true" ]]; then
             zip_name="ClassWidgets-Windows-${{ matrix.arch }}"
           else
@@ -283,7 +281,7 @@ jobs:
             --add-data "i18n:i18n" \
             --add-data "LICENSE:." \
             --hidden-import darkdetect
-          
+
           cp -R dist/"Class Widgets.app" .
           if [[ "$IS_RELEASE" == "true" ]]; then
             zip_name="ClassWidgets-macOS-${{ matrix.arch }}"
@@ -310,7 +308,7 @@ jobs:
             --add-data LICENSE:. \
             --add-data i18n:i18n \
             --hidden-import darkdetect
-        
+
           if [[ "$IS_RELEASE" == "true" ]]; then
             zip_name="ClassWidgets-Linux-x64"
           else
@@ -324,7 +322,7 @@ jobs:
           for zip_file in packages/*.zip; do
             if [[ -f "$zip_file" ]]; then
               filename=$(basename "$zip_file")
-              
+
               if [[ "$(uname)" == "Darwin" ]]; then
                 file_size=$(stat -f%z "$zip_file" 2>/dev/null || echo "未知")
                 file_md5=$(md5 -q "$zip_file" 2>/dev/null || echo "未知")
@@ -332,7 +330,7 @@ jobs:
                 file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
                 file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
               fi
-              
+
               if [[ "$file_size" != "未知" ]]; then
                 if command -v bc >/dev/null 2>&1; then
                   file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
@@ -342,7 +340,6 @@ jobs:
               else
                 file_size_mb="未知"
               fi
-              
               {
                 echo ""
                 echo "---"
@@ -411,13 +408,13 @@ jobs:
         run: |
           $signedExe = Get-ChildItem -Path ./signed -Filter "ClassWidgets.exe" | Select-Object -First 1
           $targetExe = Get-ChildItem -Path ./extracted -Filter "ClassWidgets.exe" -Recurse | Select-Object -First 1
-          
+
           if ($signedExe -and $targetExe) {
             Copy-Item $signedExe.FullName -Destination $targetExe.FullName -Force
           } else {
             exit 1
           }
-          
+
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           New-Item -ItemType Directory -Path "signed-packages" -Force
           ./zip.exe -r -q "signed-packages/ClassWidgets-Windows-${{ matrix.arch }}.zip" extracted/*
@@ -429,7 +426,7 @@ jobs:
           path: ./signed-packages
 
   package:
-    needs: [build, sign]
+    needs: [build]
     if: always() && (needs.build.result == 'success')
     runs-on: ubuntu-latest
     outputs:
@@ -477,7 +474,6 @@ jobs:
             echo "请输入文本。"
             exit 1
           fi
-          
           ls -la final-packages/
 
       - name: Calculate package properties
@@ -487,19 +483,18 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "## 📦 最终包信息 (${{ steps.organize.outputs.package-count }}个文件)"
+            echo "## 包信息 (${{ steps.organize.outputs.package-count }}个文件)"
             echo ""
             echo "| 文件名 | 大小(MB) | 大小(字节) | MD5 |"
             echo "|--------|----------|------------|-----|"
           } >> $GITHUB_STEP_SUMMARY
-          
+
           for zip_file in final-packages/*.zip; do
             if [[ -f "$zip_file" ]]; then
               filename=$(basename "$zip_file")
               file_size=$(stat -c%s "$zip_file")
               file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}")
               file_md5=$(md5sum "$zip_file" | cut -d' ' -f1)
-              
               echo "| $filename | $file_size_mb | $file_size | $file_md5 |" >> $GITHUB_STEP_SUMMARY
             fi
           done
