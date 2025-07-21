@@ -48,9 +48,11 @@ jobs:
         uses: actions/checkout@v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@v5.3.0
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.8'
+          cache: 'pip'
+          cache-dependency-path: '**/requirements.txt'
 
       - name: Python Syntax Check
         id: syntax_check
@@ -114,27 +116,32 @@ jobs:
       - name: Install gettext (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
-          brew install gettext
-          brew link --force gettext
+          if ! brew list gettext &>/dev/null; then
+            brew install gettext
+          fi
+          brew link --overwrite --force gettext
 
       - name: Setup Python
-        uses: actions/setup-python@v5.3.0
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ (startsWith(matrix.os, 'macos') || matrix.platform == 'linux-x64') && '3.12' || '3.8' }}
           architecture: ${{ matrix.arch }}
+          cache: 'pip'
+          cache-dependency-path: '**/requirements.txt'
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
 
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/uv
-            ~\AppData\Local\uv
+            ~\\AppData\\Local\\uv
             .venv
-          key: ${{ runner.os }}-${{ matrix.arch }}-uv-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-uv-${{ hashFiles('requirements.txt') }}
           restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-uv-cache-${{ hashFiles('requirements.txt') }}
             ${{ runner.os }}-${{ matrix.arch }}-uv-
 
       - name: Create venv and install dependencies
@@ -147,7 +154,7 @@ jobs:
             source .venv/bin/activate
           fi
           uv pip install -r requirements.txt
-          uv pip install pyinstaller  # 所有平台都使用PyInstaller
+          uv pip install pyinstaller
 
       - name: Prepare output directory
         run: |
@@ -260,10 +267,10 @@ jobs:
           zip -r -q "packages/${zip_name}.zip" dist/ClassWidgets/*
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4.3.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ matrix.platform }}-build
-          path: ./packages
+          path: ./packages/*.zip
 
   sign:
     needs: build
@@ -296,7 +303,7 @@ jobs:
           }
 
       - name: Sign application
-        uses: signpath/github-action-submit-signing-request@v1.1
+        uses: signpath/github-action-submit-signing-request@v1.2
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
           organization-id: '2e13633d-4e7d-4462-9091-27536751c84c'
@@ -323,14 +330,15 @@ jobs:
           ./zip.exe -r -q "signed-packages/ClassWidgets-Windows-${{ matrix.arch }}.zip" extracted/*
 
       - name: Upload signed application
-        uses: actions/upload-artifact@v4.3.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: windows-${{ matrix.arch }}-signed
           path: ./signed-packages
 
   package:
-    needs: [build]
-    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped' || needs.build.result == 'failure')
+    needs: [build, sign]
+    # 依旧意义不明。
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped' || needs.build.result == 'failure') && (needs.sign.result == 'success' || needs.sign.result == 'skipped' || needs.sign.result == 'failure')
     runs-on: ubuntu-latest
     outputs:
       package-count: ${{ steps.organize.outputs.package-count }}
@@ -397,7 +405,11 @@ jobs:
         id: organize
         shell: bash
         run: |
-          mkdir -p final-packages
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            mkdir -p final-packages 2>/dev/null || powershell -Command "New-Item -Path final-packages -ItemType Directory -Force"
+          else
+            mkdir -p final-packages
+          fi
           package_count=0
           platforms=("windows-x64" "windows-x86" "macos-x64" "macos-arm64" "linux-x64")
           declare -A artifact_cache
@@ -410,21 +422,6 @@ jobs:
               fi
             fi
           done
-          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
-          build_commit="${GITHUB_SHA:0:7}"
-          build_branch="${GITHUB_REF_NAME}"
-          build_runid="${GITHUB_RUN_ID}"
-          {
-            echo "## 📋 构建信息"
-            echo "| 项目 | 值 |"
-            echo "|------|----|"
-            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
-            echo "| 🔗 提交哈希 | $build_commit |"
-            echo "| 🌿 分支 | $build_branch |"
-            echo "| 🆔 运行 ID | $build_runid |"
-            echo "| 🧪 构建类型 | $BUILD_TYPE |"
-            echo "| 🚀 是否发布 | $IS_RELEASE |"
-          } >> $GITHUB_STEP_SUMMARY
           for platform in "${platforms[@]}"; do
             signed_key="${platform}-signed"
             build_key="${platform}-build"
@@ -460,9 +457,15 @@ jobs:
                   cp "$zip_file" final-packages/ 2>/dev/null
                   ((package_count++))
                   filename=$(basename "$zip_file")
-                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
-                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
+                  if [[ "$RUNNER_OS" == "Windows" ]]; then
+                    file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
+                    file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
+                    file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
+                  else
+                    file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+                    file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                    file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
+                  fi
                   {
                     echo ""
                     echo "---"
@@ -504,9 +507,15 @@ jobs:
           for zip_file in final-packages/*.zip; do
             if [[ -f "$zip_file" ]]; then
               filename=$(basename "$zip_file")
-              file_size=$(stat -c%s "$zip_file")
-              file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}")
-              file_md5=$(md5sum "$zip_file" | cut -d' ' -f1)
+              if [[ "$RUNNER_OS" == "Windows" ]]; then
+                file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
+                file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
+                file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
+              else
+                file_size=$(stat -c%s "$zip_file")
+                file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}")
+                file_md5=$(md5sum "$zip_file" | cut -d' ' -f1)
+              fi
               echo "| $filename | $file_size_mb | $file_size | $file_md5 |" >> $GITHUB_STEP_SUMMARY
             fi
           done
