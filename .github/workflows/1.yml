@@ -76,73 +76,9 @@ jobs:
             echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
           fi
 
-  update-build-info:
-    needs: check
-    runs-on: ubuntu-latest
-    outputs:
-      is_release: ${{ steps.build-info.outputs.is_release }}
-      build_type: ${{ steps.build-info.outputs.build_type }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4.2.2
-
-      - name: Set Build Info
-        id: build-info
-        shell: bash
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
-          PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}:${{ github.event.pull_request.head.ref || github.ref_name }}
-        run: |
-          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
-          build_commit="${GITHUB_SHA:0:7}"
-          build_branch="${GITHUB_REF_NAME}"
-          build_runid="${GITHUB_RUN_ID}"
-          is_release=false
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
-            is_release=true
-            build_type="PyInstaller - Release"
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.is_release }}" == "true" ]]; then
-            is_release=true
-            build_type="PyInstaller - Release"
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            build_branch="$PR_BRANCH"
-            build_type="PyInstaller - Debug (PR-#${PR_NUMBER})"
-          else
-            build_type="PyInstaller - Debug"
-          fi
-          config_path="config/default_config.json"
-          config_text=$(cat "$config_path")
-          config_text="${config_text//__BUILD_TIME__/$build_time}"
-          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
-          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
-          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
-          config_text="${config_text//__BUILD_TYPE__/$build_type}"
-          printf "%s" "$config_text" > "$config_path"
-          echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
-          echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
-          echo "is_release=$is_release" >> $GITHUB_OUTPUT
-          echo "build_type=$build_type" >> $GITHUB_OUTPUT
-          {
-            echo "## 📋 构建信息"
-            echo "| 项目 | 值 |"
-            echo "|------|----|"
-            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
-            echo "| 🔗 提交哈希 | $build_commit |"
-            echo "| 🌿 分支 | $build_branch |"
-            echo "| 🆔 运行 ID | $build_runid |"
-            echo "| 🧪 构建类型 | $build_type |"
-            echo "| 🚀 是否发布 | $is_release |"
-          } >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload updated config
-        uses: actions/upload-artifact@v4.3.0
-        with:
-          name: updated-config
-          path: config/default_config.json
-
   build:
-    needs: [check, update-build-info]
-    if: needs.check.result == 'success' && needs.update-build-info.result == 'success'
+    needs: check
+    if: needs.check.result == 'success'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -175,12 +111,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Download updated config
-        uses: actions/download-artifact@v4.3.0
-        with:
-          name: updated-config
-          path: config/
-
       - name: Install gettext (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
@@ -190,7 +120,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5.3.0
         with:
-          python-version: '3.8'
+          python-version: ${{ (startsWith(matrix.os, 'macos') || matrix.platform == 'linux-x64') && '3.12' || '3.8' }}
           architecture: ${{ matrix.arch }}
 
       - name: Setup uv
@@ -225,10 +155,23 @@ jobs:
 
       - name: Set environment variables
         shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
         run: |
-          # 从update-build-info job获取构建信息
-          echo "IS_RELEASE=${{ needs.update-build-info.outputs.is_release }}" >> $GITHUB_ENV
-          echo "BUILD_TYPE=${{ needs.update-build-info.outputs.build_type }}" >> $GITHUB_ENV
+          is_release=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
+            is_release=true
+            build_type="PyInstaller - Release"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.is_release }}" == "true" ]]; then
+            is_release=true
+            build_type="PyInstaller - Release"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            build_type="PyInstaller - Debug (PR-#${PR_NUMBER})"
+          else
+            build_type="PyInstaller - Debug"
+          fi
+          echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
+          echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
 
       - name: Build Windows(pyinstaller)
         if: startsWith(matrix.os, 'windows')
@@ -316,46 +259,6 @@ jobs:
           fi
           zip -r -q "packages/${zip_name}.zip" dist/ClassWidgets/*
 
-      - name: Calculate file properties
-        shell: bash
-        run: |
-          for zip_file in packages/*.zip; do
-            if [[ -f "$zip_file" ]]; then
-              filename=$(basename "$zip_file")
-
-              if [[ "$(uname)" == "Darwin" ]]; then
-                file_size=$(stat -f%z "$zip_file" 2>/dev/null || echo "未知")
-                file_md5=$(md5 -q "$zip_file" 2>/dev/null || echo "未知")
-              else
-                file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
-                file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-              fi
-
-              if [[ "$file_size" != "未知" ]]; then
-                if command -v bc >/dev/null 2>&1; then
-                  file_size_mb=$(echo "scale=2; $file_size / 1024 / 1024" | bc 2>/dev/null || echo "未知")
-                else
-                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
-                fi
-              else
-                file_size_mb="未知"
-              fi
-              {
-                echo ""
-                echo "---"
-                echo ""
-                echo "## 📦 文件信息 (${{ matrix.platform }})"
-                echo ""
-                echo "| 属性 | 值 |"
-                echo "|------|----| "
-                echo "| 📁 文件名 | $filename |"
-                echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-                echo "| 🔐 MD5 | $file_md5 |"
-                echo ""
-              } >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4.3.0
         with:
@@ -427,11 +330,64 @@ jobs:
 
   package:
     needs: [build]
-    if: always() && (needs.build.result == 'success')
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped' || needs.build.result == 'failure')
     runs-on: ubuntu-latest
     outputs:
       package-count: ${{ steps.organize.outputs.package-count }}
+      is_release: ${{ steps.build-info.outputs.is_release }}
+      build_type: ${{ steps.build-info.outputs.build_type }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set Build Info
+        id: build-info
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+          PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}:${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          build_runid="${GITHUB_RUN_ID}"
+          is_release=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
+            is_release=true
+            build_type="PyInstaller - Release"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.is_release }}" == "true" ]]; then
+            is_release=true
+            build_type="PyInstaller - Release"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            build_branch="$PR_BRANCH"
+            build_type="PyInstaller - Debug (PR-#${PR_NUMBER})"
+          else
+            build_type="PyInstaller - Debug"
+          fi
+          config_path="config/default_config.json"
+          config_text=$(cat "$config_path")
+          config_text="${config_text//__BUILD_TIME__/$build_time}"
+          config_text="${config_text//__BUILD_COMMIT__/$build_commit}"
+          config_text="${config_text//__BUILD_BRANCH__/$build_branch}"
+          config_text="${config_text//__BUILD_RUNID__/$build_runid}"
+          config_text="${config_text//__BUILD_TYPE__/$build_type}"
+          printf "%s" "$config_text" > "$config_path"
+          echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
+          echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
+          echo "is_release=$is_release" >> $GITHUB_OUTPUT
+          echo "build_type=$build_type" >> $GITHUB_OUTPUT
+          {
+            echo "## 📋 构建信息"
+            echo "| 项目 | 值 |"
+            echo "|------|----|"
+            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
+            echo "| 🔗 提交哈希 | $build_commit |"
+            echo "| 🌿 分支 | $build_branch |"
+            echo "| 🆔 运行 ID | $build_runid |"
+            echo "| 🧪 构建类型 | $build_type |"
+            echo "| 🚀 是否发布 | $is_release |"
+          } >> $GITHUB_STEP_SUMMARY
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4.3.0
         with:
@@ -443,7 +399,7 @@ jobs:
         run: |
           mkdir -p final-packages
           package_count=0
-          platforms=("windows-x64" "windows-x86" "macos" "linux")
+          platforms=("windows-x64" "windows-x86" "macos-x64" "macos-arm64" "linux-x64")
           declare -A artifact_cache
           for artifact_dir in ./all-artifacts/*/; do
             if [[ -d "$artifact_dir" ]]; then
@@ -454,25 +410,81 @@ jobs:
               fi
             fi
           done
+          build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
+          build_commit="${GITHUB_SHA:0:7}"
+          build_branch="${GITHUB_REF_NAME}"
+          build_runid="${GITHUB_RUN_ID}"
+          {
+            echo "## 📋 构建信息"
+            echo "| 项目 | 值 |"
+            echo "|------|----|"
+            echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
+            echo "| 🔗 提交哈希 | $build_commit |"
+            echo "| 🌿 分支 | $build_branch |"
+            echo "| 🆔 运行 ID | $build_runid |"
+            echo "| 🧪 构建类型 | $BUILD_TYPE |"
+            echo "| 🚀 是否发布 | $IS_RELEASE |"
+          } >> $GITHUB_STEP_SUMMARY
           for platform in "${platforms[@]}"; do
             signed_key="${platform}-signed"
             build_key="${platform}-build"
             if [[ -n "${artifact_cache[$signed_key]:-}" ]]; then
               echo "使用${platform}签名版本"
-              cp "${artifact_cache[$signed_key]}"/*.zip final-packages/ 2>/dev/null
-              ((package_count++))
+              for zip_file in "${artifact_cache[$signed_key]}"/*.zip; do
+                if [[ -f "$zip_file" ]]; then
+                  cp "$zip_file" final-packages/ 2>/dev/null
+                  ((package_count++))
+                  filename=$(basename "$zip_file")
+                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
+                  {
+                    echo ""
+                    echo "---"
+                    echo ""
+                    echo "## 📦 文件信息 ($platform - 已签名)"
+                    echo ""
+                    echo "| 属性 | 值 |"
+                    echo "|------|----| "
+                    echo "| 📁 文件名 | $filename |"
+                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+                    echo "| 🔐 MD5 | $file_md5 |"
+                    echo ""
+                  } >> $GITHUB_STEP_SUMMARY
+                fi
+              done
             elif [[ -n "${artifact_cache[$build_key]:-}" ]]; then
               echo "使用${platform}构建版本"
-              cp "${artifact_cache[$build_key]}"/*.zip final-packages/ 2>/dev/null
-              ((package_count++))
+              for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
+                if [[ -f "$zip_file" ]]; then
+                  cp "$zip_file" final-packages/ 2>/dev/null
+                  ((package_count++))
+                  filename=$(basename "$zip_file")
+                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
+                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
+                  {
+                    echo ""
+                    echo "---"
+                    echo ""
+                    echo "## 📦 文件信息 ($platform)"
+                    echo ""
+                    echo "| 属性 | 值 |"
+                    echo "|------|----| "
+                    echo "| 📁 文件名 | $filename |"
+                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+                    echo "| 🔐 MD5 | $file_md5 |"
+                    echo ""
+                  } >> $GITHUB_STEP_SUMMARY
+                fi
+              done
             else
               echo "${platform}版本未找到"
             fi
           done
           echo "package-count=$package_count" >> $GITHUB_OUTPUT
           if [[ $package_count -eq 0 ]]; then
-            echo "请输入文本。"
-            exit 1
+            echo "没有找到任何包文件"
           fi
           ls -la final-packages/
 
@@ -504,11 +516,9 @@ jobs:
         with:
           name: ClassWidgets-Packages
           path: final-packages
-
-  # Job 7: 发布版本
   release:
     needs: [package]
-    if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.is_release == 'true')) && needs.package.result == 'success'
+    if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.is_release == 'true')) && needs.package.result == 'success' && needs.package.outputs.package-count > 0
     uses: ./.github/workflows/release.yml
     with:
       run_id: ${{ github.run_id }}
