@@ -43,6 +43,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [windows-latest, macos-15, ubuntu-latest]
+        python-version: [3.8.10, 3.12.3]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -50,7 +51,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5.6.0
         with:
-          python-version: '3.8'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
           cache-dependency-path: 'requirements.txt'
 
@@ -101,6 +102,8 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             platform: linux-x64
+    env:
+      PYTHON_VERSION: ${{ (startsWith(matrix.os, 'macos') || matrix.platform == 'linux-x64') && '3.12' || '3.8' }}
 
     steps:
       - name: Install dependencies (Linux)
@@ -124,7 +127,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5.6.0
         with:
-          python-version: ${{ (startsWith(matrix.os, 'macos') || matrix.platform == 'linux-x64') && '3.12' || '3.8' }}
+          python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.arch }}
           cache: 'pip'
           cache-dependency-path: 'requirements.txt'
