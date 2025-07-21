@@ -146,7 +146,7 @@ jobs:
       - name: Create venv and install dependencies
         shell: bash
         run: |
-          if [ ! -e ".venv/bin/python3" ] || [ ! -e ".venv/Scripts/python.exe" ]; then
+          if [ ! -e ".venv/bin/python3" ] && [ ! -e ".venv/Scripts/python.exe" ]; then
             echo "fuck cache"
             rm -rf .venv
           fi
@@ -459,36 +459,48 @@ jobs:
               echo "使用${platform}构建版本"
               for zip_file in "${artifact_cache[$build_key]}"/*.zip; do
                 if [[ -f "$zip_file" ]]; then
-                  cp -f "$zip_file" final-packages/
-                  ((package_count++))
-                  filename=$(basename "$zip_file")
-                  if [ "$RUNNER_OS" = "Windows" ]; then
-                    file_size=$(powershell -Command "(Get-Item '$zip_file').Length" || echo "未知")
-                    file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
-                    file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" || echo "未知")
-                  else
-                    file_size=$(stat -c%s "$zip_file" || echo "未知")
-                    file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                    file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
-                  fi
-                  {
-                    echo ""
-                    echo "---"
-                    echo ""
-                    echo "## 📦 文件信息 ($platform)"
-                    echo ""
-                    echo "| 属性 | 值 |"
-                    echo "|------|----| "
-                    echo "| 📁 文件名 | $filename |"
-                    echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
-                    echo "| 🔐 MD5 | $file_md5 |"
-                    echo ""
-                  } >> $GITHUB_STEP_SUMMARY
-                fi
-              done
-            else
-              echo "${platform}版本未找到"
-            fi
+                   echo "  [DEBUG] Found build zip file: $zip_file" # Debug log
+                   cp -f "$zip_file" final-packages/
+                   if [ $? -ne 0 ]; then # Check if cp command failed
+                     echo "  [ERROR] Failed to copy $zip_file to final-packages/. Exiting." # Debug log
+                     exit 1
+                   fi
+                   ((package_count++))
+                   filename=$(basename "$zip_file")
+                   if [ "$RUNNER_OS" = "Windows" ]; then
+                     file_size=$(powershell -Command "(Get-Item '$zip_file').Length" || echo "未知")
+                     file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
+                     file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" || echo "未知")
+                   else
+                     echo "  [DEBUG] Calculating file_size for $zip_file on non-Windows." # Debug log
+                     file_size=$(stat -c%s "$zip_file" || echo "未知")
+                     echo "  [DEBUG] Calculated file_size: $file_size" # Debug log
+                     echo "  [DEBUG] Calculating file_md5 for $zip_file on non-Windows." # Debug log
+                     file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                     echo "  [DEBUG] Calculated file_md5: $file_md5" # Debug log
+                     file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" || echo "未知")
+                     echo "  [DEBUG] Calculated file_size_mb: $file_size_mb" # Debug log
+                   fi
+                   {
+                     echo ""
+                     echo "---"
+                     echo ""
+                     echo "## 📦 文件信息 ($platform)"
+                     echo ""
+                     echo "| 属性 | 值 |"
+                     echo "|------|----| "
+                     echo "| 📁 文件名 | $filename |"
+                     echo "| 📏 文件大小 | ${file_size_mb} MB (${file_size} bytes) |"
+                     echo "| 🔐 MD5 | $file_md5 |"
+                     echo ""
+                   } >> $GITHUB_STEP_SUMMARY
+                 else
+                   echo "  [DEBUG] File does not exist: $zip_file" # Debug log
+                 fi
+               done
+             else
+               echo "${platform}版本未找到"
+             fi
           done
           echo "package-count=$package_count" >> $GITHUB_OUTPUT
           if [[ $package_count -eq 0 ]]; then
