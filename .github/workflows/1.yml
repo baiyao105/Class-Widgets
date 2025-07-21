@@ -146,6 +146,10 @@ jobs:
       - name: Create venv and install dependencies
         shell: bash
         run: |
+          if [ -e ".venv/bin/python3" ] || [ -e ".venv/Scripts/python.exe" ]; then
+            echo "fuck cache"
+            rm -rf .venv
+          fi
           if [[ "${{ runner.os }}" == "Windows" ]] && [ -d ".venv/Scripts" ]; then
             source .venv/Scripts/activate
           elif [ -d ".venv/bin" ]; then
@@ -410,11 +414,7 @@ jobs:
         id: organize
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            mkdir -p final-packages 2>/dev/null || powershell -Command "New-Item -Path final-packages -ItemType Directory -Force"
-          else
-            mkdir -p final-packages
-          fi
+          mkdir -p final-packages 2>/dev/null || { rm -rf final-packages; mkdir final-packages; }
           package_count=0
           platforms=("windows-x64" "windows-x86" "macos-x64" "macos-arm64" "linux-x64")
           declare -A artifact_cache
@@ -437,15 +437,9 @@ jobs:
                   cp "$zip_file" final-packages/ 2>/dev/null
                   ((package_count++))
                   filename=$(basename "$zip_file")
-                  if [ "$RUNNER_OS" = "Windows" ]; then
-                    file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
-                    file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
-                    file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
-                  else
-                    file_size=$(stat -c%s "$zip_file" 2>/dev/null || echo "未知")
-                    file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
-                    file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
-                  fi
+                  file_size=$(stat -c%s "$zip_file" 2>/dev/null || wc -c < "$zip_file" 2>/dev/null || echo "未知")
+                  file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+                  file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
                   {
                     echo ""
                     echo "---"
@@ -518,15 +512,9 @@ jobs:
           for zip_file in final-packages/*.zip; do
             if [[ -f "$zip_file" ]]; then
               filename=$(basename "$zip_file")
-              if [ "$RUNNER_OS" = "Windows" ]; then
-                file_size=$(powershell -Command "(Get-Item '$zip_file').Length" 2>/dev/null || echo "未知")
-                file_md5=$(certutil -hashfile "$zip_file" MD5 | grep -v "^\s*$" | grep -v "MD5" | tr -d " " || echo "未知")
-                file_size_mb=$(powershell -Command "[math]::Round(($file_size / 1MB), 2)" 2>/dev/null || echo "未知")
-              else
-                file_size=$(stat -c%s "$zip_file")
-                file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}")
-                file_md5=$(md5sum "$zip_file" | cut -d' ' -f1)
-              fi
+              file_size=$(stat -c%s "$zip_file" 2>/dev/null || wc -c < "$zip_file" 2>/dev/null || echo "未知")
+              file_md5=$(md5sum "$zip_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
+              file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
               echo "| $filename | $file_size_mb | $file_size | $file_md5 |" >> $GITHUB_STEP_SUMMARY
             fi
           done
