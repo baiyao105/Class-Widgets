@@ -29,7 +29,7 @@ on:
       - '.github/PULL_REQUEST_TEMPLATE*'
 
 concurrency:
-  group: ${{ github.event_name }}-${{ github.ref }}
+  group: build-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -87,7 +87,7 @@ jobs:
           {
             echo "## 📋 构建信息"
             echo "| 项目 | 值 |"
-            echo "|------|----|"  
+            echo "|------|----|"
             echo "| ⏰ 构建时间 (UTC+8) | $build_time |"
             echo "| 🔗 提交哈希 | $build_commit |"
             echo "| 🌿 分支 | $build_branch |"
@@ -259,7 +259,6 @@ jobs:
             source .venv/Scripts/activate
             curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           fi
-
           pyinstaller main.py \
             -w \
             -i ./img/favicon.ico \
