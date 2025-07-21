@@ -29,7 +29,7 @@ on:
       - '.github/PULL_REQUEST_TEMPLATE*'
 
 concurrency:
-  group: build-unified-${{ github.ref }}
+  group: ${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -327,13 +327,11 @@ jobs:
         run: |
           $signedExe = Get-ChildItem -Path ./signed -Filter "ClassWidgets.exe" | Select-Object -First 1
           $targetExe = Get-ChildItem -Path ./extracted -Filter "ClassWidgets.exe" -Recurse | Select-Object -First 1
-
           if ($signedExe -and $targetExe) {
             Copy-Item $signedExe.FullName -Destination $targetExe.FullName -Force
           } else {
             exit 1
           }
-
           curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           New-Item -ItemType Directory -Path "signed-packages" -Force
           ./zip.exe -r -q "signed-packages/ClassWidgets-Windows-${{ matrix.arch }}.zip" extracted/*
@@ -502,10 +500,12 @@ jobs:
         with:
           name: ClassWidgets-Packages
           path: final-packages
-  release:
+
+  publish:
+    name: Publish
     needs: [package]
     if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.is_release == 'true')) && needs.package.result == 'success' && needs.package.outputs.package-count > 0
     uses: ./.github/workflows/release.yml
     with:
-      run_id: ${{ github.run_id }}
+      run_id: '${{ github.run_id }}'
     secrets: inherit
