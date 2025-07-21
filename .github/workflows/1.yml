@@ -146,7 +146,7 @@ jobs:
       - name: Create venv and install dependencies
         shell: bash
         run: |
-          if [ -e ".venv/bin/python3" ] || [ -e ".venv/Scripts/python.exe" ]; then
+          if [ ! -e ".venv/bin/python3" ] || [ ! -e ".venv/Scripts/python.exe" ]; then
             echo "fuck cache"
             rm -rf .venv
           fi
