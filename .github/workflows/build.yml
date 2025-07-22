@@ -67,7 +67,9 @@ jobs:
                 skip_ci=true
               fi
             fi
+          fi
           echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
+          echo "[DEBUG] commit-message: $commit_message"
           echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
       - name: Set Build Info
