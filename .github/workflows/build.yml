@@ -363,7 +363,7 @@ jobs:
           organization-id: '2e13633d-4e7d-4462-9091-27536751c84c'
           project-slug: 'Class-Widgets.git'
           signing-policy-slug: 'release-signing'
-          artifact-configuration-file-path: './ClassWidgets.exe'
+          github-artifact-id: windows-${{ matrix.arch }}-build
           wait-for-completion: true
           output-artifact-directory: './signed'
 
