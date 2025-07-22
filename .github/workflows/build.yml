@@ -66,6 +66,7 @@ jobs:
               if echo "$commit_message" | grep -i -q "skip[[:space:]]*ci"; then
                 skip_ci=true
               fi
+            fi
           echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
           echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
