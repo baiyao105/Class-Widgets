@@ -96,51 +96,12 @@ jobs:
             echo "| 🚀 是否发布 | $is_release |"
           } >> $GITHUB_STEP_SUMMARY
 
-  check:
+  build:
+    needs: [prepare]
+    if: needs.prepare.result == 'success'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
-      matrix:
-        os: [windows-latest, macos-15, ubuntu-latest]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4.2.2
-
-      - name: Setup Python
-        uses: actions/setup-python@v5.6.0
-        with:
-          python-version: 3.8
-
-      - name: Python Syntax Check
-        id: syntax_check
-        shell: bash
-        run: |
-          python_files=$(find . -name "*.py" -not -path "*/__pycache__/*" -not -path "*/.venv/*" -not -path "*/build/*" -not -path "*/dist/*")
-          has_errors=false
-          error_report="## 🔍 Python 语法检查 (${{ matrix.os }})\n\n"
-          for file in $python_files; do
-            echo "检查文件: $file"
-            if ! python -m py_compile "$file" 2>/dev/null; then
-              echo "❌ 语法错误在文件 $file"
-              error_output=$(python -m py_compile "$file" 2>&1)
-              has_errors=true
-              error_report+="### ❌ 语法错误: \`$file\`\n\n"
-              error_report+="\`\`\`\n$error_output\n\`\`\`\n\n"
-            fi
-          done
-          if [ "$has_errors" = true ]; then
-            echo "has_syntax_errors=true" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
-          fi
-
-  build:
-    needs: [prepare, check]
-    if: needs.check.result == 'success'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -187,6 +148,30 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.arch }}
+
+      - name: Python Syntax Check
+        id: syntax_check
+        shell: bash
+        run: |
+          python_files=$(find . -name "*.py" -not -path "*/__pycache__/*" -not -path "*/.venv/*" -not -path "*/build/*" -not -path "*/dist/*")
+          has_errors=false
+          error_report="## 🔍 Python 语法检查 (${{ matrix.os }})\n\n"
+          for file in $python_files; do
+            echo "检查文件: $file"
+            if ! python -m py_compile "$file" 2>/dev/null; then
+              echo "❌ 语法错误在文件 $file"
+              error_output=$(python -m py_compile "$file" 2>&1)
+              has_errors=true
+              error_report+="### ❌ 语法错误: \`$file\`\n\n"
+              error_report+="\`\`\`\n$error_output\n\`\`\`\n\n"
+            fi
+          done
+          if [ "$has_errors" = true ]; then
+            echo "has_syntax_errors=true" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "has_syntax_errors=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
