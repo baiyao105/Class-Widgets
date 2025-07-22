@@ -62,14 +62,15 @@ jobs:
               skip_ci=true
             fi
             if [[ "${{ github.event.action }}" == "synchronize" && "$skip_ci" == "false" ]]; then
-              commit_message=$(git log -1 --pretty=%B)
+              commit_sha="${{ github.event.pull_request.head.sha }}"
+              commit_message=$(git log -1 --pretty=%B "$commit_sha")
               if echo "$commit_message" | grep -i -q "skip[[:space:]]*ci"; then
                 skip_ci=true
               fi
             fi
           fi
           echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
-          echo "[DEBUG] commit-message: $commit_message"
+          echo "[DEBUG] commit-message: $commit_message ; sha: $commit_sha"
           echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
       - name: Set Build Info
