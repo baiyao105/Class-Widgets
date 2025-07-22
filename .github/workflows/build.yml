@@ -44,12 +44,36 @@ jobs:
     outputs:
       is_release: ${{ steps.build-info.outputs.is_release }}
       build_type: ${{ steps.build-info.outputs.build_type }}
+      skip_ci: ${{ steps.check-skip-ci.outputs.skip_ci }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Check Skip CI
+        id: check-skip-ci
+        shell: bash
+        run: |
+          skip_ci=false
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            pr_title="${{ github.event.pull_request.title }}"
+            if [[ "$pr_title" =~ [Ss][Kk][Ii][Pp][[:space:]][Cc][Ii] ]]; then
+              skip_ci=true
+            fi
+            if [[ "${{ github.event.action }}" == "synchronize" && "$skip_ci" == "false" ]]; then
+              commit_message=$(git log -1 --pretty=%B)
+              if [[ "$commit_message" =~ [Ss][Kk][Ii][Pp][[:space:]][Cc][Ii] ]]; then
+                skip_ci=true
+              fi
+            fi
+          fi
+          echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
+          echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
       - name: Set Build Info
         id: build-info
+        if: steps.check-skip-ci.outputs.skip_ci != 'true'
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
@@ -98,7 +122,7 @@ jobs:
 
   build:
     needs: [prepare]
-    if: needs.prepare.result == 'success'
+    if: needs.prepare.result == 'success' && needs.prepare.outputs.skip_ci != 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -328,7 +352,7 @@ jobs:
 
   sign:
     needs: [prepare, build]
-    if: needs.prepare.outputs.is_release == 'true' && needs.build.result == 'success'
+    if: needs.prepare.outputs.is_release == 'true' && needs.build.result == 'success' && needs.prepare.outputs.skip_ci != 'true'
     runs-on: windows-latest
     strategy:
       matrix:
@@ -389,7 +413,7 @@ jobs:
 
   package:
     needs: [prepare, build, sign]
-    if: (needs.build.result == 'success') && (needs.sign.result == 'success' || needs.sign.result == 'failure')
+    if: (needs.build.result == 'success') && (needs.sign.result == 'success' || needs.sign.result == 'failure') && needs.prepare.outputs.skip_ci != 'true'
     runs-on: ubuntu-latest
     outputs:
       package-count: ${{ steps.organize.outputs.package-count }}
