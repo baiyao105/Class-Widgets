@@ -63,11 +63,9 @@ jobs:
             fi
             if [[ "${{ github.event.action }}" == "synchronize" && "$skip_ci" == "false" ]]; then
               commit_message=$(git log -1 --pretty=%B)
-              if [[ "$commit_message" =~ [Ss][Kk][Ii][Pp][[:space:]][Cc][Ii] ]]; then
+              if echo "$commit_message" | grep -i -q "skip[[:space:]]*ci"; then
                 skip_ci=true
               fi
-            fi
-          fi
           echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
           echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
