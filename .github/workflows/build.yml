@@ -70,7 +70,9 @@ jobs:
             fi
           fi
           echo "skip_ci=$skip_ci" >> $GITHUB_OUTPUT
-          echo "[DEBUG] commit-message: $commit_message ; sha: $commit_sha"
+          echo "::group::Commit Message"
+          echo "[DEBUG] commit-message: "$commit_message" ; sha: $commit_sha ; skip-ci: $skip_ci"
+          echo "::endgroup::"
           echo "是否跳过 CI: $skip_ci" >> $GITHUB_STEP_SUMMARY
 
       - name: Set Build Info
