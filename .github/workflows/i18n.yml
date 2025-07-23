@@ -180,6 +180,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Update ref
+        shell: bash
+        run: |
+          git fetch origin
+          git rebase origin/${{ github.ref_name }}
+
       - name: Set up Qt tools
         uses: daaku/gh-action-apt-install@v4
         with:
