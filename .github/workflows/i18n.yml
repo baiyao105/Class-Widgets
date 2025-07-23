@@ -104,24 +104,16 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Cache Qt Tools
-        uses: actions/cache@v4
-        id: cache-qt-tools
-        with:
-          path: |
-            /var/cache/apt/archives
-          key: ${{ runner.os }}-i18n-qttools
-          restore-keys: |
-            ${{ runner.os }}-i18n-qttools
-            ${{ runner.os }}-i18n
-
-      - name: Set up Qt-Tools
-        if: steps.cache-qt-tools.outputs.cache-hit != 'true'
+      - name: Update ref
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
+          git fetch origin
+          git rebase origin/${{ github.ref_name }}
 
-
+      - name: Set up Qt tools
+        uses: daaku/gh-action-apt-install@v4
+        with:
+          packages: pyqt5-dev-tools qttools5-dev-tools
 
       - name: Update main .ts files
         if: needs.detect-changes.outputs.has_py_changes == 'true' || needs.detect-changes.outputs.should_update_all == 'true'
@@ -188,23 +180,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Cache Qt Tools
-        uses: actions/cache@v4
-        id: cache-qt-tools-compile
+      - name: Set up Qt tools
+        uses: daaku/gh-action-apt-install@v4
         with:
-          path: |
-            /var/cache/apt/archives
-          key: ${{ runner.os }}-i18n-qttools
-          restore-keys: |
-            ${{ runner.os }}-i18n-qttools-
-            ${{ runner.os }}-i18n-
-
-      - name: Set up Qt-Tools
-        if: steps.cache-qt-tools-compile.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
-
+          packages: pyqt5-dev-tools qttools5-dev-tools
 
       - name: Compile main .ts files
         shell: bash
@@ -238,7 +217,6 @@ jobs:
               fi
             fi
           done
-
 
       - name: Commit compiled files
         uses: stefanzweifel/git-auto-commit-action@v6
