@@ -10,11 +10,6 @@ on:
       - 'ui/**/i18n/**/*.ts'
   workflow_dispatch:
     inputs:
-      update_all_ts:
-        description: '更新全部.ts文件'
-        required: true
-        default: true
-        type: boolean
       compile_to_qm:
         description: '编译.ts为.qm文件'
         required: true
@@ -54,7 +49,6 @@ jobs:
           has_ts_changes="false"
           should_update_all="false"
           should_compile="false"
-
           if [[ "${{ github.event_name }}" == "push" ]]; then
             changed_files=$(git diff --name-only HEAD~1 HEAD)
             if echo "$changed_files" | grep -q '\.ui$'; then
@@ -73,9 +67,9 @@ jobs:
               should_compile="true"
             fi
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            should_update_all="${{ github.event.inputs.update_all_ts }}"
+            should_update_all="true"
             should_compile="${{ github.event.inputs.compile_to_qm }}"
-            echo "[DEBUG] 手动触发 - 是否更新全部: $should_update_all; 是否编译: $should_compile"
+            echo "[DEBUG] 手动触发 - 更新全部: $should_update_all; 是否编译: $should_compile"
           fi
           echo "has_ui_changes=$has_ui_changes" >> $GITHUB_OUTPUT
           echo "has_py_changes=$has_py_changes" >> $GITHUB_OUTPUT
@@ -125,11 +119,10 @@ jobs:
         if: steps.cache-qt-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pyqt5-dev-tools
-          
-      - name: Add Qt Tools to PATH
-        run: |
-          echo "$HOME/.cache/qt-tools" >> $GITHUB_PATH
+          sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
+
+      - name: Pull rebase from main
+        run: git pull --rebase origin main
 
       - name: Update main .ts files
         if: needs.detect-changes.outputs.has_py_changes == 'true' || needs.detect-changes.outputs.should_update_all == 'true'
@@ -166,9 +159,6 @@ jobs:
               fi
             fi
           done
-
-      - name: Pull rebase from main
-        run: git pull --rebase origin main
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v6
@@ -213,11 +203,10 @@ jobs:
         if: steps.cache-qt-tools-compile.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pyqt5-dev-tools
-          
-      - name: Add Qt Tools to PATH
-        run: |
-          echo "$HOME/.cache/qt-tools" >> $GITHUB_PATH
+          sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
+
+      - name: Pull rebase from ${{ github.ref_name }}
+        run: git pull --rebase origin ${{ github.ref_name }}
 
       - name: Compile main .ts files
         shell: bash
@@ -252,8 +241,8 @@ jobs:
             fi
           done
 
-      - name: Pull rebase from main
-        run: git pull --rebase origin main
+      - name: Pull rebase from ${{ github.ref_name }}
+        run: git pull --rebase origin ${{ github.ref_name }}
 
       - name: Commit compiled files
         uses: stefanzweifel/git-auto-commit-action@v6
@@ -268,7 +257,6 @@ jobs:
           file_pattern: 'i18n/*.qm ui/*/i18n/*.qm'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-
 
   summary:
     name: Update Summary
@@ -313,7 +301,7 @@ jobs:
             echo "- **提交**: ${{ github.sha }}"
             echo "- **执行时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
             if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "- **更新全部**: ${{ github.event.inputs.update_all_ts }}"
+              echo "- **更新全部**: true (默认)"
               echo "- **编译 QM**: ${{ github.event.inputs.compile_to_qm }}"
             fi
             echo ""
