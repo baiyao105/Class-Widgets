@@ -115,20 +115,17 @@ jobs:
         id: cache-qt-tools
         with:
           path: |
-            ~/.cache/qt-tools
-          key: ${{ runner.os }}-i18n-qttools-${{ hashFiles('/etc/apt/sources.list*') }}
+            /var/cache/apt/archives
+          key: ${{ runner.os }}-i18n-qttools
           restore-keys: |
-            ${{ runner.os }}-i18n-qttools-
-            ${{ runner.os }}-i18n-
+            ${{ runner.os }}-i18n-qttools
+            ${{ runner.os }}-i18n
 
       - name: Set up Qt-Tools
         if: steps.cache-qt-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y qttools5-dev-tools
-          mkdir -p ~/.cache/qt-tools
-          cp /usr/bin/lupdate ~/.cache/qt-tools/
-          cp /usr/bin/lrelease ~/.cache/qt-tools/
+          sudo apt-get install -y pyqt5-dev-tools
           
       - name: Add Qt Tools to PATH
         run: |
@@ -144,7 +141,7 @@ jobs:
             for ts_file in i18n/*.ts; do
               if [ -f "$ts_file" ]; then
                 echo "[DEBUG] 更新 $ts_file"
-                lupdate -extensions=py $py_files -ts "$ts_file"
+                pylupdate5 $py_files -ts "$ts_file"
               fi
             done
           fi
@@ -163,7 +160,7 @@ jobs:
                 mkdir -p "$i18n_dir"
                 ts_file="${i18n_dir}/zh_CN.ts"
                 echo "[DEBUG] 更新 $ts_file"
-                lupdate $ui_files -ts "$ts_file"
+                pylupdate5 $ui_files -ts "$ts_file"
               else
                 echo "[DEBUG] 主题 $theme_name 中未找到 UI 文件"
               fi
@@ -206,8 +203,8 @@ jobs:
         id: cache-qt-tools-compile
         with:
           path: |
-            ~/.cache/qt-tools
-          key: ${{ runner.os }}-i18n-qttools-${{ hashFiles('/etc/apt/sources.list*') }}
+            /var/cache/apt/archives
+          key: ${{ runner.os }}-i18n-qttools
           restore-keys: |
             ${{ runner.os }}-i18n-qttools-
             ${{ runner.os }}-i18n-
@@ -216,10 +213,7 @@ jobs:
         if: steps.cache-qt-tools-compile.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y qttools5-dev-tools
-          mkdir -p ~/.cache/qt-tools
-          cp /usr/bin/lupdate ~/.cache/qt-tools/
-          cp /usr/bin/lrelease ~/.cache/qt-tools/
+          sudo apt-get install -y pyqt5-dev-tools
           
       - name: Add Qt Tools to PATH
         run: |
