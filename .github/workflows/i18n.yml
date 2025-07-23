@@ -54,7 +54,7 @@ jobs:
           has_ts_changes="false"
           should_update_all="false"
           should_compile="false"
-          
+
           if [[ "${{ github.event_name }}" == "push" ]]; then
             changed_files=$(git diff --name-only HEAD~1 HEAD)
             if echo "$changed_files" | grep -q '\.ui$'; then
@@ -65,7 +65,6 @@ jobs:
               has_py_changes="true"
               echo "[DEBUG] .py Changes Detected"
             fi
-            
             if echo "$changed_files" | grep -q '\.ts$'; then
               has_ts_changes="true"
               echo "[DEBUG] .ts Changes Detected"
@@ -175,7 +174,7 @@ jobs:
             - 触发事件: ${{ github.event_name }}
             - 提交哈希: ${{ github.sha }}
             - 工作流运行: ${{ github.run_id }}
-            
+
             *由 GitHub Actions 自动生成
           file_pattern: 'i18n/*.ts ui/*/i18n/*.ts'
           commit_user_name: 'github-actions[bot]'
@@ -242,7 +241,7 @@ jobs:
                   fi
                 done
               else
-                echo "[DEBUG] 主题 $theme_name 没有翻译文件"  
+                echo "[DEBUG] 主题 $theme_name 没有翻译文件"
               fi
             fi
           done
