@@ -121,8 +121,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
 
-      - name: Pull rebase from main
-        run: git pull --rebase origin main
+
 
       - name: Update main .ts files
         if: needs.detect-changes.outputs.has_py_changes == 'true' || needs.detect-changes.outputs.should_update_all == 'true'
@@ -170,6 +169,7 @@ jobs:
             - 工作流运行: ${{ github.run_id }}
 
             *由 GitHub Actions 自动生成
+          skip_dirty_check: true
           file_pattern: 'i18n/*.ts ui/*/i18n/*.ts'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: '41898282+github-actions[bot]@users.noreply.github.com'
@@ -205,8 +205,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pyqt5-dev-tools qttools5-dev-tools
 
-      - name: Pull rebase from ${{ github.ref_name }}
-        run: git pull --rebase origin ${{ github.ref_name }}
 
       - name: Compile main .ts files
         shell: bash
@@ -241,8 +239,6 @@ jobs:
             fi
           done
 
-      - name: Pull rebase from ${{ github.ref_name }}
-        run: git pull --rebase origin ${{ github.ref_name }}
 
       - name: Commit compiled files
         uses: stefanzweifel/git-auto-commit-action@v6
@@ -254,6 +250,7 @@ jobs:
             - 工作流运行: ${{ github.run_id }}
 
             * 由 GitHub Actions 自动生成
+          skip_dirty_check: true
           file_pattern: 'i18n/*.qm ui/*/i18n/*.qm'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: '41898282+github-actions[bot]@users.noreply.github.com'
