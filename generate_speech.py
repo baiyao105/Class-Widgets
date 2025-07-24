@@ -8,7 +8,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import edge_tts
 import pyttsx3
@@ -318,13 +318,14 @@ class EdgeTTSProvider(TTSVoiceProvider):
 
             result: List[TTSVoice] = []
             for voice in voices:
+                voice_obj: Any = voice
                 tts_voice = TTSVoice(
-                    id=voice['ShortName'],
-                    name=voice['FriendlyName'],
-                    language=voice['Locale'][:2],
-                    gender=voice['Gender'],
+                    id=voice_obj['ShortName'],
+                    name=voice_obj['FriendlyName'],
+                    language=voice_obj['Locale'][:2],
+                    gender=voice_obj['Gender'],
                     engine=TTSEngine.EDGE,
-                    locale=voice['Locale']
+                    locale=voice_obj['Locale']
                 )
                 result.append(tts_voice)
 
@@ -345,13 +346,14 @@ class EdgeTTSProvider(TTSVoiceProvider):
 
                 result: List[TTSVoice] = []
                 for voice in voices:
+                    voice_obj: Any = voice
                     tts_voice = TTSVoice(
-                        id=voice['ShortName'],
-                        name=voice['FriendlyName'],
-                        language=voice['Locale'][:2],
-                        gender=voice['Gender'],
+                        id=voice_obj['ShortName'],
+                        name=voice_obj['FriendlyName'],
+                        language=voice_obj['Locale'][:2],
+                        gender=voice_obj['Gender'],
                         engine=TTSEngine.EDGE,
-                        locale=voice['Locale']
+                        locale=voice_obj['Locale']
                     )
                     result.append(tts_voice)
                 return result
@@ -435,10 +437,11 @@ class Pyttsx3Provider(TTSVoiceProvider):
 
             result: List[TTSVoice] = []
             for voice in voices:
-                language = 'zh' if any(keyword in voice.name.lower() for keyword in ['chinese', 'zh', '中文']) else 'en'
+                voice_obj: Any = voice
+                language = 'zh' if any(keyword in voice_obj.name.lower() for keyword in ['chinese', 'zh', '中文']) else 'en'
                 tts_voice = TTSVoice(
-                    id=voice.id,
-                    name=voice.name,
+                    id=voice_obj.id,
+                    name=voice_obj.name,
                     language=language,
                     gender='unknown',
                     engine=TTSEngine.PYTTSX3
@@ -975,7 +978,7 @@ async def get_tts_voices(engine_filter: Optional[str] = None, language_filter: O
             except ValueError:
                 return [], f"未知的TTS引擎: {engine_filter}"
         voices = manager.get_voices(engine_enum, language_filter)
-        voice_list = []
+        voice_list: List[Dict[str, str]] = []
         for voice in voices:
             voice_list.append({
                 'id': voice.id,
@@ -1055,7 +1058,7 @@ def list_pyttsx3_voices() -> List[Dict[str, str]]:
         manager = get_tts_service()._manager
         if TTSEngine.PYTTSX3 in manager.providers:
             voices = manager.providers[TTSEngine.PYTTSX3].get_voices()
-            voice_list = []
+            voice_list: List[Dict[str, str]] = []
             for voice in voices:
                 voice_list.append({
                     'id': voice.id,
@@ -1073,7 +1076,6 @@ def list_pyttsx3_voices() -> List[Dict[str, str]]:
         logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
         return []
 
-
 def on_audio_played(file_path: str) -> None:
     """音频播放完成后的回调函数"""
     try:
@@ -1083,7 +1085,6 @@ def on_audio_played(file_path: str) -> None:
     except Exception as e:
         logger.warning(f"删除TTS临时文件失败 {file_path}: {e}")
 
-
 def is_tts_playing() -> bool:
     """检查是否有TTS正在播放"""
     try:
@@ -1092,7 +1093,6 @@ def is_tts_playing() -> bool:
     except Exception as e:
         logger.warning(f"检查TTS播放状态失败: {e}")
         return False
-
 
 def stop_tts() -> bool:
     """停止TTS播放"""
