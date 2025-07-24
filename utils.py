@@ -78,6 +78,7 @@ def restart() -> None:
 def stop(status: int = 0) -> None:
     """
     退出程序
+    
     :param status: 退出状态码,0=正常退出,!=0表示异常退出
     """
     global update_timer, _stop_in_progress
@@ -92,11 +93,19 @@ def stop(status: int = 0) -> None:
             update_timer = None
         except Exception as e:
             logger.warning(f"停止全局更新定时器时出错: {e}")
+    import gc
+    import asyncio
+    gc.collect()
+    try:
+        asyncio.set_event_loop(None)
+    except Exception as e:
+        logger.warning(f"清理异步引用时出错: {e}")
     app = QApplication.instance()
     guard.release()
     if app:
         _reset_signal_handlers()
         app.quit()
+        app.processEvents()
 
     _terminate_child_processes()
     logger.debug(f"程序退出({status})")

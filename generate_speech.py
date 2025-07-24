@@ -724,11 +724,9 @@ class TTSService(QObject):
     def _handle_play_complete(self, file_path: str, on_complete: Optional[Callable[[str], None]]) -> None:
         """处理播放完成"""
         try:
-            import importlib
-            play_audio_module = importlib.import_module('play_audio')
-            play_audio_func = play_audio_module.play_audio
-            play_audio_func(file_path)
-            if on_complete:
+            from play_audio import play_audio
+            success = play_audio(file_path, tts_delete_after=True)
+            if success and on_complete:
                 on_complete(file_path)
         except Exception as e:
             logger.error(f"播放音频文件失败: {e}")
@@ -821,7 +819,7 @@ def play_tts_with_audio(text: str, voice_id: Optional[str] = None,
             _tts_playing = True
 
         from play_audio import play_audio
-        success = play_audio(file_path, tts_delete_after, volume)
+        success = play_audio(file_path, tts_delete_after=tts_delete_after, volume=volume)
         with _tts_lock:
             _tts_playing = False
 

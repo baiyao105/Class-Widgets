@@ -855,7 +855,7 @@ class TTSPreviewThread(QThread):
                 logger.warning(f"生成的音频文件可能无效，大小仅为 {file_size} 字节: {audio_file}")
                 TTSEngine.delete_audio_file(audio_file)
                 raise ValueError(f"生成的音频文件可能无效，大小仅为 {file_size} 字节")
-                
+
             play_audio(audio_file, tts_delete_after=True)
             self.previewFinished.emit(True)
         except Exception as e:
