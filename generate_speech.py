@@ -18,7 +18,6 @@ from PyQt5.QtCore import QObject, pyqtSignal, QCoreApplication
 _tts_playing = False
 _tts_lock = threading.RLock()
 
-
 class TTSEngine(Enum):
     """TTS 引擎"""
     EDGE = "edge"
@@ -229,7 +228,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
         super().__init__(TTSEngine.EDGE)
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="EdgeTTS")
         self._shutdown = False
-    
+
     def shutdown(self) -> None:
         """关闭提供器,清理资源"""
         if not self._shutdown:
@@ -238,7 +237,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
                 self._executor.shutdown(wait=True)
             except Exception as e:
                 logger.warning(f"关闭 EdgeTTS 提供器时出错: {e}")
-    
+
     def __del__(self):
         """析构函数"""
         self.shutdown()
@@ -247,7 +246,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
         """清理事件循环"""
         if not loop:
             return
-        
+
         def _delayed_cleanup():
             """延迟清理"""
             import time
@@ -343,7 +342,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 voices = loop.run_until_complete(edge_tts.list_voices())
-                
+
                 result = []
                 for voice in voices:
                     tts_voice = TTSVoice(
@@ -387,7 +386,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
                         raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "语音文件生成失败，文件不存在"))
                     if os.path.getsize(output_path) == 0:
                         raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "语音文件生成失败，文件为空"))
-                    
+
                     return result
                 except Exception as e:
                     error_msg = str(e)
