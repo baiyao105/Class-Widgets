@@ -617,8 +617,8 @@ class ErrorDialog(Dialog):  # 重大错误提示框
             stop()
         
         super().__init__(
-            self.tr('Class Widgets 崩溃报告'),
-            self.tr('抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。'
+            QCoreApplication.translate('ErrorDialog', 'Class Widgets 崩溃报告'),
+            QCoreApplication.translate('ErrorDialog', '抱歉！Class Widgets 发生了严重的错误从而无法正常运行。您可以保存下方的错误信息并向他人求助。'
             '若您认为这是程序的Bug，请点击“报告此问题”或联系开发者。'),
             parent
         )

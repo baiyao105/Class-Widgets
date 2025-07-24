@@ -87,6 +87,15 @@ def stop(status: int = 0) -> None:
     _stop_in_progress = True
 
     logger.debug('退出程序...')
+
+    try:
+        from generate_speech import get_tts_service
+        tts_service = get_tts_service()
+        if hasattr(tts_service, '_manager') and tts_service._manager:
+            tts_service._manager.stop()
+    except Exception as e:
+        logger.warning(f"清理TTS管理器时出错: {e}")
+    
     if 'update_timer' in globals() and update_timer:
         try:
             update_timer.stop()

@@ -55,7 +55,9 @@ class AudioManager:
                 return True
             except pygame.error:
                 try:
-                    pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=1024)
+                    pygame.mixer.init(
+                        frequency=22050, size=-16, channels=1, buffer=1024
+                    )
                     self.mixer_initialized = True
                     logger.info("Pygame mixer 兼容模式初始化成功")
                     return True
@@ -80,7 +82,10 @@ class AudioManager:
             else:
                 return False, f"音频文件写入超时或为空: {relative_path}"
         if file_size < 10:
-            return False, f"音频文件可能无效或不完整，大小仅为 {file_size} 字节: {relative_path}"
+            return False, (
+                f"音频文件可能无效或不完整，"
+                f"大小仅为 {file_size} 字节: {relative_path}"
+            )
         return True, relative_path
 
     def _get_or_load_sound(self, file_path: str) -> Optional[pygame.mixer.Sound]:
@@ -89,7 +94,8 @@ class AudioManager:
         if not is_cache_file:
             with self.cache_lock:
                 if file_path in self.sound_cache:
-                    logger.debug(f'使用缓存音频: {os.path.relpath(file_path, conf.base_directory)}')
+                    relative_path = os.path.relpath(file_path, conf.base_directory)
+                    logger.debug(f'使用缓存音频: {relative_path}')
                     return self.sound_cache[file_path]
         try:
             sound = pygame.mixer.Sound(file_path)
@@ -98,7 +104,10 @@ class AudioManager:
                     self.sound_cache[file_path] = sound
             return sound
         except pygame.error as e:
-            logger.error(f"加载音频文件失败: {os.path.relpath(file_path, conf.base_directory)} | 错误: {e}")
+            relative_path = os.path.relpath(file_path, conf.base_directory)
+            logger.error(
+                f"加载音频文件失败: {relative_path} | 错误: {e}"
+            )
             return None
 
     def _get_volume(self, volume: Optional[float]) -> float:
@@ -107,7 +116,10 @@ class AudioManager:
             return max(0.0, min(1.0, volume))
         return int(config_center.read_conf('Audio', 'volume')) / 100
 
-    def play_audio(self, file_path: str, volume: Optional[float] = None, blocking: bool = True) -> bool:
+    def play_audio(self,
+                   file_path: str,
+                   volume: Optional[float] = None,
+                   blocking: bool = True) -> bool:
         """播放音频文件
 
         Args:
@@ -141,19 +153,27 @@ class AudioManager:
 
             logger.debug(f'成功播放音频: {relative_path} (是否阻塞: {blocking})')
             return True
-        except Exception as e:
-            logger.error(f'音频播放失败: {relative_path} | 错误: {e}')
+        except (pygame.error, OSError) as e:
+            logger.error(
+                f'音频播放失败: {relative_path} | 错误: {e}'
+            )
             return False
 
     def is_playing(self) -> bool:
+        """检查是否有音频正在播放
+
+        Returns:
+            bool: 如果有音频正在播放返回True,反之返回False
+        """
         return pygame.mixer.get_busy() if self.mixer_initialized else False
 
-    def stop_all(self):
+    def stop_all(self) -> None:
         """停止播放的音频"""
         if self.mixer_initialized:
             pygame.mixer.stop()
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
+        """清空音频缓存"""
         with self.cache_lock:
             self.sound_cache.clear()
             logger.debug("音频缓存已清空")
@@ -165,8 +185,11 @@ class PlayAudio(QThread):
     play_back_signal = pyqtSignal(bool)
     play_finished_signal = pyqtSignal(str, bool)  # (文件路径, 是否成功)
 
-    def __init__(self, file_path: str, volume: Optional[float] = None,
-                 cleanup_callback=None, blocking: bool = True):
+    def __init__(self,
+                 file_path: str,
+                 volume: Optional[float] = None,
+                 cleanup_callback=None,
+                 blocking: bool = True):
         super().__init__()
         self.file_path = file_path
         self.volume = volume
@@ -185,15 +208,24 @@ class PlayAudio(QThread):
         self.play_back_signal.emit(success)
         self.play_finished_signal.emit(self.file_path, success)
 
-def _tts_cleanup_callback(file_path: str, success: bool):
-    """TTS清理回调"""
+def _tts_cleanup_callback(file_path: str, success: bool) -> None:
+    """TTS清理回调
+
+    Args:
+        file_path: 音频文件路径
+        success: 是否成功
+    """
     try:
         from generate_speech import on_audio_played
         on_audio_played(file_path)
     except ImportError:
         logger.warning("无法导入on_audio_played")
 
-def play_audio(file_path: str, tts_delete_after: bool = False, volume: Optional[float] = None) -> bool:
+def play_audio(
+    file_path: str,
+    tts_delete_after: bool = False,
+    volume: Optional[float] = None
+) -> bool:
     """播放音频文件"""
     success = audio_manager.play_audio(file_path, volume, blocking=True)
     if tts_delete_after and success:
@@ -201,31 +233,42 @@ def play_audio(file_path: str, tts_delete_after: bool = False, volume: Optional[
 
     return success
 
-def play_audio_async(file_path: str, volume: Optional[float] = None,
-                    cleanup_callback=None) -> bool:
-    """异步播放音频文件"""
-    success = audio_manager.play_audio(file_path, volume, blocking=False)
-    if cleanup_callback and success:
-        try:
-            cleanup_callback(file_path, success)
-        except Exception as e:
-            logger.warning(f"清理回调失败: {e}")
+def play_audio_async(
+    file_path: str,
+    volume: Optional[float] = None,
+    cleanup_callback=None
+) -> PlayAudio:
+    """异步播放音频文件
 
-    return success
+    Args:
+        file_path: 音频文件路径
+        volume: 音量 (0.0-1.0)
+        cleanup_callback: 播放完成后的清理回调函数
+
+    Returns:
+        PlayAudio: 音频播放线程对象
+    """
+    thread = PlayAudio(file_path, volume, cleanup_callback, blocking=False)
+    thread.start()
+    return thread
 
 def is_playing() -> bool:
-    """检查音频播放"""
+    """检查音频播放
+
+    Returns:
+        bool: 音频播放返回True,反之返回False
+    """
     return audio_manager.is_playing()
 
-def stop_audio():
+def stop_audio() -> None:
     """停止播放的音频"""
     audio_manager.stop_all()
 
-def clear_audio_cache():
+def clear_audio_cache() -> None:
     """清空音频缓存"""
     audio_manager.clear_cache()
 
-def reset_mixer():
+def reset_mixer() -> None:
     """重置mixer状态"""
     with audio_manager.mixer_lock:
         audio_manager.mixer_initialized = False
