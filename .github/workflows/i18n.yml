@@ -120,12 +120,19 @@ jobs:
         shell: bash
         run: |
           echo "[DEBUG] 更新主程序翻译文件..."
-          py_files=$(find . -name "*.py" -not -path "./build/*" -not -path "./dist/*" | tr '\n' ' ')
-          if [ -n "$py_files" ]; then
+          py_files=$(find . -maxdepth 1 -name "*.py" | tr '\n' ' ')
+          ui_files=$(find ./view -name "*.ui" 2>/dev/null | tr '\n' ' ' || echo "")
+          if [ -n "$py_files" ] || [ -n "$ui_files" ]; then
             for ts_file in i18n/*.ts; do
               if [ -f "$ts_file" ]; then
                 echo "[DEBUG] 更新 $ts_file"
-                pylupdate5 $py_files -ts "$ts_file"
+                if [ -n "$py_files" ] && [ -n "$ui_files" ]; then
+                  pylupdate5 -extensions py $py_files $ui_files -ts "$ts_file"
+                elif [ -n "$py_files" ]; then
+                  pylupdate5 -extensions py $py_files -ts "$ts_file"
+                elif [ -n "$ui_files" ]; then
+                  pylupdate5 $ui_files -ts "$ts_file"
+                fi
               fi
             done
           fi
@@ -142,9 +149,12 @@ jobs:
               if [ -n "$ui_files" ]; then
                 i18n_dir="${theme_dir}i18n"
                 mkdir -p "$i18n_dir"
-                ts_file="${i18n_dir}/zh_CN.ts"
-                echo "[DEBUG] 更新 $ts_file"
-                pylupdate5 $ui_files -ts "$ts_file"
+                for ts_file in "${i18n_dir}"/*.ts; do
+                  if [ -f "$ts_file" ]; then
+                    echo "[DEBUG] 更新 $ts_file"
+                    pylupdate5 $ui_files -ts "$ts_file"
+                  fi
+                done
               else
                 echo "[DEBUG] 主题 $theme_name 中未找到 UI 文件"
               fi
