@@ -127,9 +127,9 @@ jobs:
               if [ -f "$ts_file" ]; then
                 echo "[DEBUG] 更新 $ts_file"
                 if [ -n "$py_files" ] && [ -n "$ui_files" ]; then
-                  pylupdate5 -extensions py $py_files $ui_files -ts "$ts_file"
+                  pylupdate5 $py_files $ui_files -ts "$ts_file"
                 elif [ -n "$py_files" ]; then
-                  pylupdate5 -extensions py $py_files -ts "$ts_file"
+                  pylupdate5 $py_files -ts "$ts_file"
                 elif [ -n "$ui_files" ]; then
                   pylupdate5 $ui_files -ts "$ts_file"
                 fi
