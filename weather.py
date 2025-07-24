@@ -13,19 +13,19 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple, Type, Union
 from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
 from loguru import logger
 from functools import wraps
 
-from conf import base_directory
+from conf import base_directory  # type: ignore[attr-defined]
 from file import config_center
 
 def cache_result(expire_seconds: int = 300):
     """缓存装饰器 """
     # 她还是忘了不了她的缓存
     def decorator(func):
-        cache = {}
+        cache: Dict[str, Tuple[Any, float]] = {}
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -122,7 +122,7 @@ class WeatherDataCache:
     """天气数据缓存管理器"""
 
     def __init__(self, default_expire: int = 300):
-        self._cache = {}
+        self._cache: Dict[str, Tuple[Any, float]] = {}
         self.default_expire = default_expire
 
     def get(self, key: str) -> Optional[Any]:
@@ -196,7 +196,7 @@ class WeatherManager:
             'return_desc': api_params.get('return_desc', False)
         }
 
-    def _get_provider_class(self, api_name: str) -> type:
+    def _get_provider_class(self, api_name: str) -> Type[WeatherapiProvider]:
         """获得提供类"""
         if api_name == 'xiaomi_weather':
             provider_class_name = 'XiaomiWeatherProvider'
@@ -205,14 +205,15 @@ class WeatherManager:
         else:
             provider_class_name = f'{api_name.capitalize()}WeatherProvider'
         if provider_class_name in globals():
-            return globals()[provider_class_name]
+            return globals()[provider_class_name]  # type: ignore[no-any-return]
         else:
             # 通用(你认为永远是你认为的)
             return GenericWeatherProvider
 
     def get_current_api(self) -> str:
         """获取当前选择的天气api"""
-        return config_center.read_conf('Weather', 'api')
+        result = config_center.read_conf('Weather', 'api')
+        return str(result) if result is not None else ''
 
     def get_current_provider(self) -> Optional[WeatherapiProvider]:
         """获取当前天气api提供者"""
@@ -221,11 +222,13 @@ class WeatherManager:
 
     def get_api_list(self) -> List[str]:
         """获取可用的天气api列表"""
-        return self.api_config.get('weather_api_list', [])
+        result = self.api_config.get('weather_api_list', [])
+        return result if isinstance(result, list) else []
 
     def get_api_list_zh(self) -> List[str]:
         """获取天气api中文名称列表"""
-        return self.api_config.get('weather_api_list_zhCN', [])
+        result = self.api_config.get('weather_api_list_zhCN', [])
+        return result if isinstance(result, list) else []
 
     def on_api_changed(self, new_api: str):
         """清理缓存"""
@@ -434,7 +437,8 @@ class GenericWeatherProvider(WeatherapiProvider):
         """解析描述"""
         desc_path = self.parameters.get('description', '')
         if desc_path:
-            return self._extract_value_by_path(data, desc_path)
+            result = self._extract_value_by_path(data, desc_path)
+            return str(result) if result is not None else None
 
         icon_code = self.parse_weather_icon(data)
         if icon_code:
@@ -443,13 +447,13 @@ class GenericWeatherProvider(WeatherapiProvider):
 
         return None
 
-    def _extract_value_by_path(self, data: Dict[str, Any], path: str) -> Any:
+    def _extract_value_by_path(self, data: Dict[str, Any], path: str) -> Optional[Union[str, int, float, Dict[str, Any], List[Any]]]:
         """提取数据值"""
         if not self._is_valid_extraction_input(data, path):
             return None
 
         try:
-            value = data
+            value: Any = data
             for key in path.split('.'):
                 value = self._extract_single_key(value, key)
                 if value is None:
@@ -463,7 +467,7 @@ class GenericWeatherProvider(WeatherapiProvider):
         """验证输入有效性"""
         return bool(path and data)
 
-    def _extract_single_key(self, value: Any, key: str) -> Any:
+    def _extract_single_key(self, value: Any, key: str) -> Optional[Union[str, int, float, Dict[str, Any], List[Any]]]:
         """提取单键值"""
         if key == '0' and isinstance(value, list):
             return value[0] if len(value) > 0 else None
@@ -830,7 +834,7 @@ class WeatherDatabase:
             logger.error(f'搜索城市代码失败: {e}')
             return '101010100'
 
-    def _normalize_city_params(self, city_name: str, district_name: str = '') -> tuple:
+    def _normalize_city_params(self, city_name: str, district_name: str = '') -> Tuple[str, str]:
         """标准化参数"""
         if isinstance(city_name, (tuple, list)):
             city_name = str(city_name[0]) if city_name else ''
@@ -1321,7 +1325,7 @@ class WeatherDataProcessor:
             'source': 'xiaomi'
         }
 
-    def _extract_xiaomi_alert_info(self, alert: Dict[str, Any], title: str) -> tuple:
+    def _extract_xiaomi_alert_info(self, alert: Dict[str, Any], title: str) -> Tuple[str, str]:
         """提取小米天气预警类型,级别"""
         alert_type = alert.get('type', '')
         alert_level = alert.get('level', '')
@@ -1375,7 +1379,7 @@ class WeatherDataProcessor:
             'source': 'generic'
         }
 
-    def _extract_alert_info_from_title(self, title: str) -> tuple:
+    def _extract_alert_info_from_title(self, title: str) -> Tuple[Optional[str], Optional[str]]:
         """从预警标题中提取预警类型和级别"""
         pattern = r'发布(\w+)(蓝|黄|橙|红)色预警'
         match = re.search(pattern, title)
@@ -1563,7 +1567,7 @@ def get_weather_stylesheet(code: str) -> str:
     return weather_processor.get_weather_stylesheet(code)
 
 
-def get_weather_data(key: str = 'temp', weather_data: Dict[str, Any] = None) -> Optional[str]:
+def get_weather_data(key: str = 'temp', weather_data: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """获取天气数据"""
     return weather_processor.extract_weather_data(key, weather_data)
 
