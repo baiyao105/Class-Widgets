@@ -1952,8 +1952,7 @@ https://classwidgets.rinlit.cn/docs-user/</translation>
         <source>Edge TTS 需要联网才能正常发声哦~
 请确保网络连接,不然会说不出话来(&gt;﹏&lt;)
 * 可能会有一定的延迟,耐心等待一下~</source>
-        <translation>SettingsMenu
-Edge TTS需要連結互聯網才能發出聲音喔～
+        <translation>Edge TTS需要連結互聯網才能發出聲音喔～
 Edge TTS 需要連接互聯網才能正常發聲喔～
 請確保網絡已連接，否則將無法發聲 (&gt;﹏&lt;)
 ＊可能會有少許延遲，請耐心等候一下～</translation>
@@ -1989,8 +1988,7 @@ Edge TTS 需要連接互聯網才能正常發聲喔～
         <location filename="../menu.py" line="1792"/>
         <source>加载TTS语音时发生错误:
 {error_message}</source>
-        <translation>SettingsMenu
-載入 TTS 語音時發生錯誤：
+        <translation>載入 TTS 語音時發生錯誤：
 {error_message}</translation>
     </message>
     <message>
@@ -2022,7 +2020,7 @@ Edge TTS 需要連接互聯網才能正常發聲喔～
         <location filename="../menu.py" line="2208"/>
         <location filename="../menu.py" line="2209"/>
         <source>跟随系统</source>
-        <translation type="unfinished">跟從系統</translation>
+        <translation>跟從系統</translation>
     </message>
     <message>
         <location filename="../menu.py" line="2223"/>
@@ -2779,8 +2777,7 @@ Json 設定檔 (*.json)</translation>
     <message>
         <location filename="../menu.py" line="3249"/>
         <source>新版本速递：{new_version}</source>
-        <translation>SettingsMenu
-新版本：{new_version}</translation>
+        <translation>新版本：{new_version}</translation>
     </message>
     <message>
         <source>menu</source>
@@ -3449,47 +3446,47 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
     <message>
         <location filename="../file.py" line="304"/>
         <source>{section}.{key}</source>
-        <translation type="unfinished"></translation>
+        <translation>这个不需要翻译！</translation>
     </message>
     <message>
         <location filename="../file.py" line="454"/>
         <source>General.schedule</source>
-        <translation type="unfinished">新課程時間表 - 1</translation>
+        <translation>新課程時間表 - 1</translation>
     </message>
     <message>
         <location filename="../file.py" line="455"/>
         <source>TTS.language</source>
-        <translation type="unfinished"></translation>
+        <translation>zh-CN</translation>
     </message>
     <message>
         <location filename="../file.py" line="456"/>
         <source>TTS.attend_class</source>
-        <translation type="unfinished">依家開始{lesson_name}課</translation>
+        <translation>依家開始{lesson_name}課</translation>
     </message>
     <message>
         <location filename="../file.py" line="457"/>
         <source>TTS.finish_class</source>
-        <translation type="unfinished">活動結束，下一堂課: {lesson_name}</translation>
+        <translation>活動結束，下一堂課: {lesson_name}</translation>
     </message>
     <message>
         <location filename="../file.py" line="458"/>
         <source>TTS.prepare_class</source>
-        <translation type="unfinished">活動即將開始，下一堂課: {lesson_name}</translation>
+        <translation>活動即將開始，下一堂課: {lesson_name}</translation>
     </message>
     <message>
         <location filename="../file.py" line="459"/>
         <source>TTS.after_school</source>
-        <translation type="unfinished">所有活動已結束</translation>
+        <translation>所有活動已結束</translation>
     </message>
     <message>
         <location filename="../file.py" line="460"/>
         <source>Weather.api</source>
-        <translation type="unfinished"></translation>
+        <translation>xiaomi_weather</translation>
     </message>
     <message>
         <location filename="../file.py" line="461"/>
         <source>Plugin.mirror</source>
-        <translation type="unfinished"></translation>
+        <translation>original</translation>
     </message>
 </context>
 <context>
