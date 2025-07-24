@@ -110,6 +110,11 @@ jobs:
           git fetch origin
           git rebase origin/${{ github.ref_name }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
         with:
@@ -203,6 +208,11 @@ jobs:
         run: |
           git fetch origin
           git rebase origin/${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
