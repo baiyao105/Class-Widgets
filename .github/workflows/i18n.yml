@@ -145,14 +145,15 @@ jobs:
             if [ -d "$theme_dir" ]; then
               theme_name=$(basename "$theme_dir")
               echo "[DEBUG] 处理主题: $theme_name"
-              ui_files=$(find "$theme_dir" -name "*.ui" | tr '\n' ' ')
+              ui_files=$(find "$theme_dir" -name "*.ui" -type f | tr '\n' ' ')
               if [ -n "$ui_files" ]; then
                 i18n_dir="${theme_dir}i18n"
                 mkdir -p "$i18n_dir"
+                echo "[DEBUG] 找到 UI 文件: $ui_files"
                 for ts_file in "${i18n_dir}"/*.ts; do
                   if [ -f "$ts_file" ]; then
                     echo "[DEBUG] 更新 $ts_file"
-                    pylupdate5 $ui_files -ts "$ts_file"
+                    lupdate $ui_files -ts "$ts_file"
                   fi
                 done
               else
