@@ -113,7 +113,7 @@ jobs:
       - name: Set up Qt tools
         uses: daaku/gh-action-apt-install@v4
         with:
-          packages: pyqt5-dev-tools qttools5-dev-tools
+          packages: pyside6-tools qttools5-dev-tools
 
       - name: Update main .ts files
         if: needs.detect-changes.outputs.has_py_changes == 'true' || needs.detect-changes.outputs.should_update_all == 'true'
