@@ -8,7 +8,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import edge_tts
 import pyttsx3
@@ -221,6 +221,10 @@ class TTSVoiceProvider:
         """合成语音(同步)"""
         raise NotImplementedError
 
+    def shutdown(self) -> None:
+        """关闭提供器,清理资源(默认)"""
+        pass
+
 
 class EdgeTTSProvider(TTSVoiceProvider):
     """Edge TTS 提供器"""
@@ -312,7 +316,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
             future = self._executor.submit(_run_async)
             voices = future.result(timeout=10.0)
 
-            result = []
+            result: List[TTSVoice] = []
             for voice in voices:
                 tts_voice = TTSVoice(
                     id=voice['ShortName'],
@@ -339,7 +343,7 @@ class EdgeTTSProvider(TTSVoiceProvider):
                 asyncio.set_event_loop(loop)
                 voices = loop.run_until_complete(edge_tts.list_voices())
 
-                result = []
+                result: List[TTSVoice] = []
                 for voice in voices:
                     tts_voice = TTSVoice(
                         id=voice['ShortName'],
@@ -425,11 +429,11 @@ class Pyttsx3Provider(TTSVoiceProvider):
 
         try:
             with self._engine_lock:
-                engine = pyttsx3.init()
-                voices = engine.getProperty('voices')
+                engine: Any = pyttsx3.init()
+                voices: Any = engine.getProperty('voices')
                 engine.stop()
 
-            result = []
+            result: List[TTSVoice] = []
             for voice in voices:
                 language = 'zh' if any(keyword in voice.name.lower() for keyword in ['chinese', 'zh', '中文']) else 'en'
                 tts_voice = TTSVoice(
@@ -454,7 +458,7 @@ class Pyttsx3Provider(TTSVoiceProvider):
 
         try:
             with self._engine_lock:
-                engine = pyttsx3.init()
+                engine: Any = pyttsx3.init()
                 engine.setProperty('voice', voice_id)
                 engine.setProperty('rate', int(200 * speed))
                 temp_path = output_path + '.tmp'
