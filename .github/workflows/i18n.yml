@@ -153,7 +153,7 @@ jobs:
                 for ts_file in "${i18n_dir}"/*.ts; do
                   if [ -f "$ts_file" ]; then
                     echo "[DEBUG] 更新 $ts_file"
-                    lupdate $ui_files -ts "$ts_file"
+                    pylupdate5 $ui_files -ts "$ts_file"
                   fi
                 done
               else
