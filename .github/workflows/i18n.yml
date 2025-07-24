@@ -110,10 +110,14 @@ jobs:
           git fetch origin
           git rebase origin/${{ github.ref_name }}
 
-      - name: Set up Qt tools
-        uses: daaku/gh-action-apt-install@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
-          packages: pyside6-tools qttools5-dev-tools
+          enable-cache: true
+          cache-dependency-glob: ""
+
+      - name: Install PySide6 tools
+        run: uv pip install --system pyside6-tools
 
       - name: Update main .ts files
         if: needs.detect-changes.outputs.has_py_changes == 'true' || needs.detect-changes.outputs.should_update_all == 'true'
@@ -200,10 +204,14 @@ jobs:
           git fetch origin
           git rebase origin/${{ github.ref_name }}
 
-      - name: Set up Qt tools
-        uses: daaku/gh-action-apt-install@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
-          packages: pyside6-tools qttools5-dev-tools
+          enable-cache: true
+          cache-dependency-glob: ""
+
+      - name: Install PySide6 tools
+        run: uv pip install --system pyside6-tools
 
       - name: Compile main .ts files
         shell: bash
@@ -212,7 +220,7 @@ jobs:
             if [ -f "$ts_file" ]; then
               qm_file="${ts_file%.ts}.qm"
               echo "[DEBUG] 编译: $(basename "$ts_file") -> $(basename "$qm_file")"
-              lrelease "$ts_file" -qm "$qm_file"
+              pyside6-lrelease "$ts_file" -qm "$qm_file"
             fi
           done
 
@@ -229,7 +237,7 @@ jobs:
                   if [ -f "$ts_file" ]; then
                     qm_file="${ts_file%.ts}.qm"
                     echo "[DEBUG] 编译: $(basename "$ts_file") -> $(basename "$qm_file")"
-                    lrelease "$ts_file" -qm "$qm_file"
+                    pyside6-lrelease "$ts_file" -qm "$qm_file"
                   fi
                 done
               else
