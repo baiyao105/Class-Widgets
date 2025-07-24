@@ -127,11 +127,14 @@ jobs:
               if [ -f "$ts_file" ]; then
                 echo "[DEBUG] 更新 $ts_file"
                 if [ -n "$py_files" ] && [ -n "$ui_files" ]; then
-                  pylupdate5 $py_files $ui_files -ts "$ts_file"
+                  pyside6-lupdate $py_files $ui_files -ts "$ts_file"
+                  echo "[DEBUG] 已更新 $ts_file on .py&.ui"
                 elif [ -n "$py_files" ]; then
-                  pylupdate5 $py_files -ts "$ts_file"
+                  pyside6-lupdate $py_files -ts "$ts_file"
+                  echo "[DEBUG] 已更新 $ts_file on .py"
                 elif [ -n "$ui_files" ]; then
-                  pylupdate5 $ui_files -ts "$ts_file"
+                  pyside6-lupdate $ui_files -ts "$ts_file"
+                  echo "[DEBUG] 已更新 $ts_file on .ui"
                 fi
               fi
             done
@@ -153,7 +156,7 @@ jobs:
                 for ts_file in "${i18n_dir}"/*.ts; do
                   if [ -f "$ts_file" ]; then
                     echo "[DEBUG] 更新 $ts_file"
-                    pylupdate5 $ui_files -ts "$ts_file"
+                    pyside6-lupdate $ui_files -ts "$ts_file"
                   fi
                 done
               else
@@ -200,7 +203,7 @@ jobs:
       - name: Set up Qt tools
         uses: daaku/gh-action-apt-install@v4
         with:
-          packages: pyqt5-dev-tools qttools5-dev-tools
+          packages: pyside6-tools qttools5-dev-tools
 
       - name: Compile main .ts files
         shell: bash
