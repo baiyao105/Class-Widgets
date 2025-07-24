@@ -206,9 +206,8 @@ class WeatherManager:
             provider_class_name = f'{api_name.capitalize()}WeatherProvider'
         if provider_class_name in globals():
             return globals()[provider_class_name]  # type: ignore[no-any-return]
-        else:
-            # 通用(你认为永远是你认为的)
-            return GenericWeatherProvider
+        # 通用(你认为永远是你认为的)
+        return GenericWeatherProvider
 
     def get_current_api(self) -> str:
         """获取当前选择的天气api"""
@@ -1440,7 +1439,7 @@ class WeatherDataProcessor:
             current_api=current_api,
             parameter_path=parameter_path
         )
-        
+
         if current_api == 'amap_weather':
             return self._extract_amap_value(context)
         elif current_api == 'qq_weather':
