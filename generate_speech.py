@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import os
 import platform
@@ -242,15 +243,13 @@ class EdgeTTSProvider(TTSVoiceProvider):
         """析构函数"""
         self.shutdown()
 
-    def _safe_cleanup_loop(self, loop):
+    def _safe_cleanup_loop(self, loop: Optional[asyncio.AbstractEventLoop]):
         """清理事件循环"""
         if not loop:
             return
 
         def _delayed_cleanup():
             """延迟清理"""
-            import time
-            import asyncio
             time.sleep(0.1)
             try:
                 if not loop.is_closed():
@@ -268,13 +267,11 @@ class EdgeTTSProvider(TTSVoiceProvider):
             except Exception as e:
                 logger.warning(f"清理事件循环引用时出错: {e}")
         try:
-            import threading
             cleanup_thread = threading.Thread(target=_delayed_cleanup, daemon=True)
             cleanup_thread.start()
         except Exception as e:
             logger.warning(f"启动清理线程失败: {e}")
             try:
-                import asyncio
                 if not loop.is_closed():
                     pending = asyncio.all_tasks(loop)
                     if pending:
@@ -283,7 +280,6 @@ class EdgeTTSProvider(TTSVoiceProvider):
             except Exception:
                 pass
             try:
-                import asyncio
                 asyncio.set_event_loop(None)
             except Exception:
                 pass
