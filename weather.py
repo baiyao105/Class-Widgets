@@ -1266,12 +1266,8 @@ class WeatherDataProcessor:
         if not exclude_keywords:
             return False
         title = alert.get('title', '').lower()
-        description = alert.get('description', '').lower()
-        display_text = alert.get('display_text', '').lower()
-        alert_type = alert.get('type', '').lower()
-        search_text = f"{title} {description} {display_text} {alert_type}"
         for keyword in exclude_keywords:
-            if keyword.lower() in search_text:
+            if keyword.lower() in title:
                 logger.debug(f"预警被排除:'{keyword}' 标题: '{alert.get('title', '未知预警')}'")
                 return True
 
