@@ -930,6 +930,8 @@ class WidgetsManager:
             logger.info(f'显示小组件：{widget.path, widget.windowTitle()}')
 
     def adjust_ui(self) -> None:  # 更新小组件UI
+        if self.state == 0:
+            return
         for widget in self.widgets:
             # 调整窗口尺寸
             width = self.get_widget_width(widget.path)

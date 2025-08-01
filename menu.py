@@ -2137,12 +2137,11 @@ class SettingsMenu(FluentWindow):
         window_status_combo.addItems(list_.window_status)
         window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top', '0')))
         if os.name != 'nt':
-            model = window_status_combo.model()
-            if model.rowCount() > 3:
-                item = model.item(3)  # 置于次级底部
-                if item:
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
-                    item.setText(item.text() + self.tr(' (仅Windows)'))
+            if window_status_combo.count() > 3:
+                window_status_combo.setItemEnabled(3, False)
+                original_text = window_status_combo.itemText(3)
+                if ' (仅Windows)' not in original_text:
+                    window_status_combo.setItemText(3, original_text + self.tr(' (仅Windows)'))
 
         def on_window_status_changed():
             """刷新窗口状态"""
@@ -4658,6 +4657,11 @@ def sp_get_class_num():  # 获取当前周课程数（未完成）
 
 
 if __name__ == '__main__':
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    
     app = QApplication(sys.argv)
     settings = SettingsMenu()
     settings.show()
