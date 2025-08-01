@@ -1377,9 +1377,9 @@ class FloatingWidget(QWidget):  # 浮窗
 
         # 根据平台和设置应用窗口标志
         if sys.platform == 'darwin':
-            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.X11BypassWindowManagerHint
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Widget | Qt.BypassWindowManagerHint
         else:
-            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.X11BypassWindowManagerHint
+            flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool | Qt.BypassWindowManagerHint
 
         self.setWindowFlags(flags)
 
@@ -1400,12 +1400,12 @@ class FloatingWidget(QWidget):  # 浮窗
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                 Qt.WindowType.Widget |  # macOS 失焦时仍然显示
-                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
                                 Qt.WindowType.Tool |
-                                Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                                Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
                                 )
 
         backgnd = self.findChild(QFrame, 'backgnd')
