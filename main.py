@@ -1084,7 +1084,8 @@ class WidgetsManager:
 class openProgressDialog(QWidget):
     def __init__(self, action_title='打开 记事本', action='notepad'):
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
         time = int(config_center.read_conf('Plugin', 'aguto_delay'))
         self.action = action
 
@@ -1131,7 +1132,7 @@ class openProgressDialog(QWidget):
     def init_ui(self) -> None:
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
-            Qt.X11BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+            Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -1200,7 +1201,8 @@ class openProgressDialog(QWidget):
 class FloatingWidget(QWidget):  # 浮窗
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
         self.animation_rect = None
         self.animation = None
         self.m_Position = None
@@ -1686,7 +1688,8 @@ class FloatingWidget(QWidget):  # 浮窗
 class DesktopWidget(QWidget):  # 主要小组件
     def __init__(self, parent: WidgetsManager = WidgetsManager, path: str = 'widget-time.ui', enable_tray: bool = False, cnt: int = 0, position: Optional[Tuple[int, int]] = None, widget_cnt: Optional[int] = None) -> None:
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.Tool)
+        self.setWindowFlags(self.windowFlags() |
+        Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
 
         self.cnt = cnt
         self.widget_cnt = widget_cnt
@@ -1881,93 +1884,110 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self._is_topmost_callback_added = False
             except (ValueError, AttributeError):
                 pass
+
         was_visible = self.isVisible()
         current_geometry = self.geometry() if was_visible else None
         current_opacity = self.windowOpacity() if was_visible else 1.0
         pin_on_top = config_center.read_conf('General', 'pin_on_top', '0')
         enable_click = config_center.read_conf('General', 'enable_click', '1')
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, enable_click == '0')
+        self.state_animation_group = QParallelAnimationGroup(self)
+        if was_visible:
+            self.fade_out_animation = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_out_animation.setDuration(200)  # 淡出
+            self.fade_out_animation.setStartValue(current_opacity)
+            self.fade_out_animation.setEndValue(0.0)
+            self.fade_out_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.state_animation_group.addAnimation(self.fade_out_animation)
 
-        if pin_on_top == '1':  # 置顶
-            new_flags = (
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
-                Qt.WindowType.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint | Qt.Tool
-            )
-        elif pin_on_top == '2':  # 置底
-            new_flags = (
-                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
-                Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
-            )
-        elif pin_on_top == '3':  # 置于次级底部
-            new_flags = (
-                Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
-            )
-        else:
-            new_flags = Qt.WindowType.FramelessWindowHint | Qt.Tool
-        self.setWindowFlags(new_flags)
-        # logger.debug("穿透属性:", self.testAttribute(Qt.WA_TransparentForMouseEvents))
-
-        if pin_on_top == '2':  # 置底
-            self.update()
-            self.show()
-            parent = self.parent()
-            if hasattr(parent, 'get_widget_pos'):
-                pos = parent.get_widget_pos(self.path, None)
-                if pos:
-                    self.move(pos[0], pos[1])
-            if self.width() == 0 or self.height() == 0:
-                self.resize(self.w, self.h)
-        else:
-            self.update()
-            self.show()
-            if current_geometry and current_geometry.isValid():
-                self.setGeometry(current_geometry)
+        def apply_state_changes():
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, enable_click == '0')
+            if pin_on_top == '1':  # 置顶
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.BypassWindowManagerHint | Qt.Tool
+                )
+            elif pin_on_top == '2':  # 置底
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
+                )
+            elif pin_on_top == '3':  # 置于次级底部
+                new_flags = (
+                    Qt.WindowType.FramelessWindowHint |
+                    Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool
+                )
             else:
+                new_flags = Qt.WindowType.FramelessWindowHint | Qt.Tool
+            self.setWindowFlags(new_flags)
+
+            if pin_on_top == '2':  # 置底
+                self.show()
                 parent = self.parent()
                 if hasattr(parent, 'get_widget_pos'):
                     pos = parent.get_widget_pos(self.path, None)
                     if pos:
                         self.move(pos[0], pos[1])
-            self.setWindowOpacity(current_opacity)
-            self.raise_()
-
-        if pin_on_top == '1':  # 置顶
-            if os.name == 'nt':
-                if not self._is_topmost_callback_added:
-                    try:
-                        if hasattr(utils, 'update_timer') and utils.update_timer:
-                            utils.update_timer.add_callback(self._ensure_topmost, 0.5)
-                            self._is_topmost_callback_added = True
-                            self._ensure_topmost()
-                        else:
-                            logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
-                    except Exception as e:
-                        logger.error(f"添加置顶回调时出错: {e}")
-
-        elif pin_on_top == '2':  # 置底
-            self.lower()
-
-        elif pin_on_top == '3':  # 置于次级底部
-            if os.name == 'nt':
-                def set_window_pos_secondary():
-                    try:
-                        if self.isVisible() and self.width() > 0 and self.height() > 0:
-                            hwnd = self.winId().__int__()
-                            SWP_NOSIZE = 0x0001
-                            SWP_NOMOVE = 0x0002
-                            SWP_NOACTIVATE = 0x0010
-                            SWP_SHOWWINDOW = 0x0040
-                            HWND_NOTOPMOST = 2
-                            ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
-                            self.lower()
-                    except Exception as e:
-                        logger.error(f"设置窗口次级置底时出错: {e}")
                 if self.width() == 0 or self.height() == 0:
                     self.resize(self.w, self.h)
-                set_window_pos_secondary()
             else:
+                self.show()
+                if current_geometry and current_geometry.isValid():
+                    self.setGeometry(current_geometry)
+                else:
+                    parent = self.parent()
+                    if hasattr(parent, 'get_widget_pos'):
+                        pos = parent.get_widget_pos(self.path, None)
+                        if pos:
+                            self.move(pos[0], pos[1])
+                self.raise_()
+            self.fade_in_animation = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_in_animation.setDuration(250)  # 淡入
+            self.fade_in_animation.setStartValue(0.0)
+            self.fade_in_animation.setEndValue(current_opacity)
+            self.fade_in_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.fade_in_animation.start()
+
+            if pin_on_top == '1':  # 置顶
+                if os.name == 'nt':
+                    if not self._is_topmost_callback_added:
+                        try:
+                            if hasattr(utils, 'update_timer') and utils.update_timer:
+                                utils.update_timer.add_callback(self._ensure_topmost, 0.5)
+                                self._is_topmost_callback_added = True
+                                self._ensure_topmost()
+                            else:
+                                logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
+                        except Exception as e:
+                            logger.error(f"添加置顶回调时出错: {e}")
+            
+            elif pin_on_top == '2':  # 置底
                 self.lower()
+            
+            elif pin_on_top == '3':  # 置于次级底部
+                if os.name == 'nt':
+                    def set_window_pos_secondary():
+                        try:
+                            if self.isVisible() and self.width() > 0 and self.height() > 0:
+                                hwnd = self.winId().__int__()
+                                SWP_NOSIZE = 0x0001
+                                SWP_NOMOVE = 0x0002
+                                SWP_NOACTIVATE = 0x0010
+                                SWP_SHOWWINDOW = 0x0040
+                                HWND_NOTOPMOST = 2
+                                ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+                                self.lower()
+                        except Exception as e:
+                            logger.error(f"设置窗口次级置底时出错: {e}")
+                    if self.width() == 0 or self.height() == 0:
+                        self.resize(self.w, self.h)
+                    set_window_pos_secondary()
+                else:
+                    self.lower()
+        if was_visible:
+            self.state_animation_group.finished.connect(apply_state_changes)
+            self.state_animation_group.start()
+        else:
+            apply_state_changes()
 
     def _ensure_topmost(self) -> None:
         # 突然忘记写移除了,不写了,应该没事(
