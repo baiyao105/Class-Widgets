@@ -1388,7 +1388,7 @@ class FloatingWidget(QWidget):  # 浮窗
             if not self._is_topmost_callback_added:
                 try:
                     if hasattr(utils, 'update_timer') and utils.update_timer:
-                        utils.update_timer.add_callback(self._ensure_topmost)
+                        utils.update_timer.add_callback(self._ensure_topmost, 0.5)
                         self._is_topmost_callback_added = True
                         self._ensure_topmost() # 立即执行一次确保初始置顶
                     else:
@@ -1920,6 +1920,8 @@ class DesktopWidget(QWidget):  # 主要小组件
                 new_flags = Qt.WindowType.FramelessWindowHint | Qt.Tool
             self.setWindowFlags(new_flags)
 
+            QApplication.processEvents()
+            self.update()
             if pin_on_top == '2':  # 置底
                 self.show()
                 parent = self.parent()
@@ -3057,9 +3059,17 @@ if __name__ == '__main__':
     get_current_lesson_name()
     get_next_lessons()
 
-    # 如果在全屏或最大化模式下启动，首先折叠主组件后显示浮动窗口动画。
-    if check_windows_maximize() or check_fullscreen():
-        mgr.decide_to_hide()  # 折叠动画,其实这里可用`mgr.full_hide_windows()`但是播放动画似乎更好()
+    hide_mode = config_center.read_conf('General', 'hide')
+    should_hide = False
+    if hide_mode == '1':  # 上课自动隐藏
+        should_hide = current_state == 1  # 判断是否为上课状态
+    elif hide_mode == '2':  # 全屏自动隐藏
+        should_hide = check_windows_maximize() or check_fullscreen()  # 检查是否全屏
+    elif hide_mode == '3':  # 灵活隐藏
+        should_hide = current_state == 1
+
+    if should_hide:
+        mgr.decide_to_hide()
 
     if current_state == 1:
         setThemeColor(f"#{config_center.read_conf('Color', 'attend_class')}")
