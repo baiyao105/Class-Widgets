@@ -1,9 +1,3 @@
-"""
-weather.py
-
-天气数据相关接口封装
-"""
-
 import json
 import sqlite3
 import datetime
@@ -18,8 +12,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
 from loguru import logger
 from functools import wraps
 
-from conf import base_directory  # type: ignore[attr-defined]
-from file import config_center
+from file import config_center, base_directory
 
 def cache_result(expire_seconds: int = 300):
     """缓存装饰器 """
@@ -1253,10 +1246,16 @@ class WeatherDataProcessor:
     def _get_alert_exclude_keywords(self) -> List[str]:
         try:
             exclude_str = config_center.read_conf('Weather', 'alert_exclude', '')
-            if not exclude_str.strip():
+            if not exclude_str or not exclude_str.strip():
                 return []
-            keywords = [keyword.strip() for keyword in exclude_str.split(',') if keyword.strip()]
-            return keywords
+            keywords = [keyword.strip() for keyword in re.split(r'\s+', exclude_str.strip()) if keyword.strip()]
+            unique_keywords = []
+            seen = set()
+            for keyword in keywords:
+                if keyword not in seen:
+                    unique_keywords.append(keyword)
+                    seen.add(keyword)
+            return unique_keywords
         except Exception as e:
             logger.error(f"获得排除关键词失败: {e}")
             return []

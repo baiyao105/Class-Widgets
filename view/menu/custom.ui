@@ -1217,7 +1217,7 @@
               <item>
                <widget class="CaptionLabel" name="CaptionLabel_15">
                 <property name="text">
-                 <string>包含该字符串内容的预警(若可用)将不会被显示</string>
+                 <string>包含该字符串内容的预警将不会被显示\n多个内容使用空格分隔</string>
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>

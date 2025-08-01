@@ -2076,7 +2076,7 @@ class SettingsMenu(FluentWindow):
 
         alert_exclude = self.findChild(LineEdit, 'alert_exclude') # 预警排除
         alert_exclude.setText(config_center.read_conf('Weather', 'alert_exclude', ''))
-        alert_exclude.setPlaceholderText(self.tr('雷雨大风 , 海上大风...'))
+        alert_exclude.setPlaceholderText(self.tr('大风 雷电 地质...'))
         alert_exclude.textChanged.connect(lambda: config_center.write_conf('Weather', 'alert_exclude', alert_exclude.text()))
 
     def setup_about_interface(self):
