@@ -2145,7 +2145,9 @@ class SettingsMenu(FluentWindow):
                 flyout = Flyout.create(
                     icon=fIcon.INFO,
                     title=self.tr('提示'),
-                    content=self.tr('窗口会置于次底部, 但仍然比普通置顶要高一点点~'),
+                    content=self.tr(
+                        '窗口会置于次底部, 但仍然比普通置顶要高一点点~'
+                        ),
                     target=window_status_combo,
                     parent=self,
                     isClosable=True
@@ -2209,7 +2211,15 @@ class SettingsMenu(FluentWindow):
             flyout = Flyout.create(
                 icon=fIcon.INFO,
                 title=self.tr('提示'),
-                content=self.tr('窗口实体状态\n会认真挡住前面的点击哦~\n\n*请重启应用以完全生效') if checked else self.tr('鼠标穿透启用\n窗口不挡你啦,可以点穿它~\n\n*请重启应用以完全生效'),
+                content = self.tr(
+                    "窗口实体状态\n"
+                    "会认真挡住前面的点击哦~\n\n"
+                    "*请重启应用以完全生效"
+                ) if checked else self.tr(
+                    "鼠标穿透启用\n"
+                    "窗口不挡你啦,可以点穿它~\n\n"
+                    "*请重启应用以完全生效"
+                ),
                 target=switch_enable_click,
                 parent=self,
                 isClosable=True
