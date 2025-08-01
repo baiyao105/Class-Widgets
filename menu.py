@@ -2129,11 +2129,30 @@ class SettingsMenu(FluentWindow):
 
         window_status_combo = self.adInterface.findChild(ComboBox, 'window_status_combo')
         window_status_combo.addItems(list_.window_status)
-        window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top')))
+        window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top', '0')))
+        if os.name != 'nt':
+            model = window_status_combo.model()
+            if model.rowCount() > 3:
+                item = model.item(3)  # 置于次级底部
+                if item:
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+                    item.setText(item.text() + self.tr(' (仅Windows)'))
 
         def on_window_status_changed():
-            """状态改变时回调"""
-            config_center.write_conf('General', 'pin_on_top', str(window_status_combo.currentIndex()))
+            """刷新窗口状态"""
+            current_index = window_status_combo.currentIndex()
+            if os.name == 'nt' and current_index == 3:
+                flyout = Flyout.create(
+                    icon=fIcon.INFO,
+                    title=self.tr('提示'),
+                    content=self.tr('窗口会置于次底部, 但仍然比普通置顶要高一点点~'),
+                    target=window_status_combo,
+                    parent=self,
+                    isClosable=True
+                )
+                flyout.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                flyout.show()
+            config_center.write_conf('General', 'pin_on_top', str(current_index))
             if hasattr(utils, 'main_mgr') and utils.main_mgr is not None:
                 utils.main_mgr.reapply_window_states()
         
@@ -2184,8 +2203,23 @@ class SettingsMenu(FluentWindow):
 
         switch_enable_click = self.adInterface.findChild(SwitchButton, 'switch_enable_click')
         switch_enable_click.setChecked(int(config_center.read_conf('General', 'enable_click')))
-        switch_enable_click.checkedChanged.connect(lambda checked: switch_checked('General', 'enable_click', checked))
-        # 允许点击
+
+        def on_enable_click_changed(checked):
+            switch_checked('General', 'enable_click', checked)
+            flyout = Flyout.create(
+                icon=fIcon.INFO,
+                title=self.tr('提示'),
+                content=self.tr('窗口实体状态\n会认真挡住前面的点击哦~\n\n*请重启应用以完全生效') if checked else self.tr('鼠标穿透启用\n窗口不挡你啦,可以点穿它~\n\n*请重启应用以完全生效'),
+                target=switch_enable_click,
+                parent=self,
+                isClosable=True
+            )
+            flyout.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            flyout.show()
+            if hasattr(utils, 'main_mgr') and utils.main_mgr is not None:
+                utils.main_mgr.reapply_window_states()
+        switch_enable_click.checkedChanged.connect(on_enable_click_changed)
+        # 允许点击/鼠标穿透
 
         switch_enable_alt_schedule = self.adInterface.findChild(SwitchButton, 'switch_enable_alt_schedule')
         switch_enable_alt_schedule.setChecked(int(config_center.read_conf('General', 'enable_alt_schedule')))
