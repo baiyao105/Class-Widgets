@@ -1242,11 +1242,39 @@ class WeatherDataProcessor:
     def _process_all_alerts(self, all_alerts: List[Dict[str, Any]], provider) -> List[Dict[str, Any]]:
         """处理预警数据"""
         unified_alerts = []
+        exclude_keywords = self._get_alert_exclude_keywords()
+
         for alert in all_alerts:
             unified_alert = self._normalize_alert_data(alert, provider)
-            if unified_alert:
+            if unified_alert and not self._should_exclude_alert(unified_alert, exclude_keywords):
                 unified_alerts.append(unified_alert)
         return unified_alerts
+
+    def _get_alert_exclude_keywords(self) -> List[str]:
+        try:
+            exclude_str = config_center.read_conf('Weather', 'alert_exclude', '')
+            if not exclude_str.strip():
+                return []
+            keywords = [keyword.strip() for keyword in exclude_str.split(',') if keyword.strip()]
+            return keywords
+        except Exception as e:
+            logger.error(f"获得排除关键词失败: {e}")
+            return []
+
+    def _should_exclude_alert(self, alert: Dict[str, Any], exclude_keywords: List[str]) -> bool:
+        if not exclude_keywords:
+            return False
+        title = alert.get('title', '').lower()
+        description = alert.get('description', '').lower()
+        display_text = alert.get('display_text', '').lower()
+        alert_type = alert.get('type', '').lower()
+        search_text = f"{title} {description} {display_text} {alert_type}"
+        for keyword in exclude_keywords:
+            if keyword.lower() in search_text:
+                logger.debug(f"预警被排除:'{keyword}' 标题: '{alert.get('title', '未知预警')}'")
+                return True
+
+        return False
 
     def _build_unified_alert_result(self, unified_alerts: List[Dict[str, Any]]) -> Dict[str, Any]:
         """构建预警模板"""
