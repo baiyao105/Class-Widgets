@@ -2123,9 +2123,15 @@ class SettingsMenu(FluentWindow):
 
         margin_spin = self.adInterface.findChild(SpinBox, 'margin_spin')
         margin_spin.setValue(int(config_center.read_conf('General', 'margin')))
-        margin_spin.valueChanged.connect(
-            lambda: config_center.write_conf('General', 'margin', str(margin_spin.value()))
-        )  # 保存边距设定
+        def on_margin_changed():
+            config_center.write_conf('General', 'margin', str(margin_spin.value()))
+            try:
+                import main
+                if hasattr(main, 'mgr') and main.mgr:
+                    main.mgr.adjust_ui()
+            except Exception as e:
+                logger.error(f"更新小组件位置时出错: {e}")
+        margin_spin.valueChanged.connect(on_margin_changed)
 
         window_status_combo = self.adInterface.findChild(ComboBox, 'window_status_combo')
         window_status_combo.addItems(list_.window_status)

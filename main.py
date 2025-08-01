@@ -934,11 +934,12 @@ class WidgetsManager:
             # 调整窗口尺寸
             width = self.get_widget_width(widget.path)
             height = self.get_widgets_height()
-            pos_x = self.get_widget_pos(widget.path, widget.widget_cnt)[0]
+            pos = self.get_widget_pos(widget.path, widget.widget_cnt)
+            pos_x, pos_y = pos[0], pos[1]
             op = int(config_center.read_conf('General', 'opacity')) / 100
 
             if widget.animation is None:
-                widget.widget_transition(pos_x, width, height, op)
+                widget.widget_transition(pos_x, width, height, op, pos_y)
 
     def get_widget_pos(self, path: str, cnt: Optional[int] = None) -> List[int]:  # 获取小组件位置
         num = self.widgets_list.index(path) if cnt is None else cnt
@@ -1926,6 +1927,8 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.show()
                 parent = self.parent()
                 if hasattr(parent, 'get_widget_pos'):
+                    if hasattr(parent, 'get_start_pos'):
+                        parent.get_start_pos()
                     pos = parent.get_widget_pos(self.path, None)
                     if pos:
                         self.move(pos[0], pos[1])
@@ -1938,6 +1941,8 @@ class DesktopWidget(QWidget):  # 主要小组件
                 else:
                     parent = self.parent()
                     if hasattr(parent, 'get_widget_pos'):
+                        if hasattr(parent, 'get_start_pos'):
+                            parent.get_start_pos()
                         pos = parent.get_widget_pos(self.path, None)
                         if pos:
                             self.move(pos[0], pos[1])
@@ -2733,8 +2738,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(525)  # 持续时间
         # 获取当前窗口的宽度和高度，确保动画过程中保持一致
+        margin = max(0, int(config_center.read_conf('General', 'margin')))
         self.animation.setEndValue(
-        QRect(self.x(), int(config_center.read_conf('General', 'margin')), self.width(), self.height()))
+        QRect(self.x(), margin, self.width(), self.height()))
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)  # 设置动画效果
         self.animation.finished.connect(self.clear_animation)
 
@@ -2743,11 +2749,13 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         self.animation.start()
 
-    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1) -> None:  # 窗口形变
+    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1, pos_y: int = None) -> None:  # 窗口形变
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(525)  # 持续时间
         self.animation.setStartValue(QRect(self.x(), self.y(), self.width(), self.height()))
-        self.animation.setEndValue(QRect(pos_x, self.y(), width, height))
+        if pos_y is None:
+            pos_y = max(0, int(config_center.read_conf('General', 'margin')))
+        self.animation.setEndValue(QRect(pos_x, pos_y, width, height))
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)  # 设置动画效果
         self.animation.start()
 
