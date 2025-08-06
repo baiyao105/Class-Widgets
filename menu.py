@@ -1189,17 +1189,24 @@ class SettingsMenu(FluentWindow):
             self.visibility_distance_value = self.wtInterface.findChild(StrongBodyLabel, 'visibility_value')  # 能见度值
             self.pressure_hpa_value = self.wtInterface.findChild(StrongBodyLabel, 'pressure_value_2')  # 气压值
             self.refresh_button = self.wtInterface.findChild(ToolButton, 'ToolButton') # 刷新按钮
+            select_weather_api = self.wtInterface.findChild(ComboBox, 'select_weather_api') # 天气api选择器
+            api_key_edit = self.wtInterface.findChild(LineEdit, 'api_key_edit') # api_key输入框
+            self.alerts_title_label = self.wtInterface.findChild(SubtitleLabel, 'alerts_title_label')  # 预警标题
+            self.weather_alerts_section = self.wtInterface.findChild(QVBoxLayout, 'weather_alerts_section')  # 预警区域
+            alerts_container_widget = self.wtInterface.findChild(QWidget, 'alerts_container_widget')  # 预警容器widget
+            self.weather_temperat_unit = self.wtInterface.findChild(ComboBox, 'weather_temperat_unit')  # 温度单位选择器
+            self.weather_refresh_picker = self.wtInterface.findChild(SpinBox, 'weather_refresh_picker')  # 刷新时间选择器
+            alert_exclude = self.wtInterface.findChild(LineEdit, 'alert_exclude')
+
             if self.refresh_button:
                 self.refresh_button.setIcon(fIcon.SYNC)
                 self.refresh_button.clicked.connect(self._on_refresh_clicked)
-            self.weather_refresh_picker = self.wtInterface.findChild(SpinBox, 'weather_refresh_picker')  # 天气刷新时间选择器
             if self.weather_refresh_picker:
                 self.weather_refresh_picker.setRange(5, 120)  # 5分钟到120分钟
                 refresh_interval = int(config_center.read_conf('Weather', 'refresh_interval'))
                 self.weather_refresh_picker.setValue(refresh_interval)  # 从配置读取
                 self.weather_refresh_picker.setSuffix(' 分钟')
                 self.weather_refresh_picker.valueChanged.connect(self._on_refresh_interval_changed)
-            self.weather_temperat_unit = self.wtInterface.findChild(ComboBox, 'weather_temperat_unit')  # 温度单位选择器
             if self.weather_temperat_unit:
                 self.weather_temperat_unit.addItems(list_.temperature_units)
                 current_unit = config_center.read_conf('Weather', 'temperature_unit')
@@ -1208,8 +1215,6 @@ class SettingsMenu(FluentWindow):
                 else:
                     self.weather_temperat_unit.setCurrentIndex(0)  # 摄氏度
                 self.weather_temperat_unit.currentIndexChanged.connect(self._on_temperature_unit_changed)
-            self.weather_alerts_section = self.wtInterface.findChild(QVBoxLayout, 'weather_alerts_section')  # 预警区域
-            alerts_container_widget = self.wtInterface.findChild(QWidget, 'alerts_container_widget')  # 预警容器widget
             if alerts_container_widget:
                 self.alerts_container_layout = FlowLayout(alerts_container_widget, needAni=True)
                 self.alerts_container_layout.setContentsMargins(10, 10, 10, 10)
@@ -1218,8 +1223,22 @@ class SettingsMenu(FluentWindow):
                 # logger.debug(f"FlowLayout创建成功: {self.alerts_container_layout}")
             else:
                 self.alerts_container_layout = None
-            self.alerts_title_label = self.wtInterface.findChild(SubtitleLabel, 'alerts_title_label')  # 预警标题
             self.alert_cards: list[QWidget] = []  # 预警卡片列表
+            if select_weather_api:
+                select_weather_api.addItems(wd.weather_manager.api_config['weather_api_list_zhCN'])
+                select_weather_api.setCurrentIndex(wd.weather_manager.api_config['weather_api_list'].index(
+                    config_center.read_conf('Weather', 'api')
+                ))
+                select_weather_api.currentIndexChanged.connect(
+                    lambda: self._on_weather_api_changed(select_weather_api)
+                )
+            if api_key_edit:
+                api_key_edit.setText(config_center.read_conf('Weather', 'api_key', ''))
+                api_key_edit.textChanged.connect(lambda: config_center.write_conf('Weather', 'api_key', api_key_edit.text()))
+            if alert_exclude:
+                alert_exclude.setText(config_center.read_conf('Weather', 'alert_exclude', ''))
+                alert_exclude.setPlaceholderText(self.tr('大风 雷电 地质...'))
+            alert_exclude.textChanged.connect(lambda: config_center.write_conf('Weather', 'alert_exclude', alert_exclude.text()))
 
             # 初始化天气管理器
             self.weather_manager = wd.WeatherManager()
@@ -1581,7 +1600,7 @@ class SettingsMenu(FluentWindow):
                 else:
                     error_text = str(error_info.get('message', '获取天气数据失败'))
             else:
-                error_text = "获取天气数据失败"
+                error_text = "获取天气数据失败" # 不存在但向后保底
             if hasattr(self, 'current_temperature') and self.current_temperature:
                 self.current_temperature.setText("-- °C")
             if hasattr(self, 'weather_description') and self.weather_description:
@@ -1591,6 +1610,17 @@ class SettingsMenu(FluentWindow):
             self._hide_weather_alerts_section()
         except Exception as e:
             logger.error(f"显示错误信息失败: {e}")
+
+    def _on_weather_api_changed(self, select_weather_api):
+        """API切换处理"""
+        try:
+            new_api = wd.weather_manager.api_config['weather_api_list'][select_weather_api.currentIndex()]
+            config_center.write_conf('Weather', 'api', new_api)
+            config_center.write_conf('Weather', 'city', '0')
+            if hasattr(wd, 'on_weather_api_changed'):
+                wd.on_weather_api_changed(new_api)
+        except Exception as e:
+            logger.error(f'切换天气API时发生错误: {e}')
 
     def load_plugin_cards(self):
         """加载插件卡片"""
@@ -2650,28 +2680,6 @@ class SettingsMenu(FluentWindow):
         switch_enable_display_full_next_lessons.setChecked(int(config_center.read_conf('General', 'enable_display_full_next_lessons')))
         switch_enable_display_full_next_lessons.checkedChanged.connect(
             lambda checked: switch_checked('General', 'enable_display_full_next_lessons', checked))
-
-        select_weather_api = self.wtInterface.findChild(ComboBox, 'select_weather_api')
-        if select_weather_api:
-            select_weather_api.addItems(wd.weather_manager.api_config['weather_api_list_zhCN'])
-            select_weather_api.setCurrentIndex(wd.weather_manager.api_config['weather_api_list'].index(
-                config_center.read_conf('Weather', 'api')
-            ))
-            select_weather_api.currentIndexChanged.connect(
-                lambda:( config_center.write_conf('Weather', 'api',
-                                                 wd.weather_manager.api_config['weather_api_list'][
-                                                     select_weather_api.currentIndex()]), 
-                              config_center.write_conf('Weather', 'city', '0'))
-            )
-        api_key_edit = self.wtInterface.findChild(LineEdit, 'api_key_edit')
-        if api_key_edit:
-            api_key_edit.setText(config_center.read_conf('Weather', 'api_key', ''))
-            api_key_edit.textChanged.connect(lambda: config_center.write_conf('Weather', 'api_key', api_key_edit.text()))
-        alert_exclude = self.wtInterface.findChild(LineEdit, 'alert_exclude')
-        if alert_exclude:
-            alert_exclude.setText(config_center.read_conf('Weather', 'alert_exclude', ''))
-            alert_exclude.setPlaceholderText(self.tr('大风 雷电 地质...'))
-            alert_exclude.textChanged.connect(lambda: config_center.write_conf('Weather', 'alert_exclude', alert_exclude.text()))
 
     def setup_about_interface(self):
         ab_scroll = self.findChild(SmoothScrollArea, 'ab_scroll')  # 触摸屏适配

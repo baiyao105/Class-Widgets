@@ -69,6 +69,8 @@ def cache_result(expire_seconds: int = 300):
             result = func(*args, **kwargs)
             cache[cache_key] = (result, current_time)
             return result
+
+        wrapper.clear_cache = lambda: cache.clear()
         return wrapper
     return decorator
 
@@ -146,7 +148,7 @@ class WeatherapiProvider(ABC):
     def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 5) -> Dict[str, Any]:
         """获取预报数据的统一方法"""
         pass
-    
+
     @abstractmethod
     def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
         """解析预报数据的统一方法"""
@@ -282,6 +284,8 @@ class WeatherManager:
         self.cache.clear()
         self.current_weather_data = None
         self.current_alert_data = None
+        if hasattr(self.fetch_weather_data, 'clear_cache'):
+            self.fetch_weather_data.clear_cache()
 
     def clear_processor_cache(self, processor):
         """清理数据处理器缓存"""
@@ -417,6 +421,9 @@ class WeatherManager:
         provider = self.get_current_provider()
         if not provider:
             return None
+        if 'error' in self.current_weather_data.get('now', {}):
+            logger.warning(f'当前数据存在错误,跳过解析: {self.current_weather_data["now"]["error"]}')
+            return None
         try:
             if data_type == 'temperature':
                 return provider.parse_temperature(self.current_weather_data)
@@ -447,10 +454,10 @@ class WeatherManager:
         except Exception as e:
             logger.error(f'解析天气数据失败 ({data_type}): {e}')
             return None
-        
+
     def fetch_forecast(self, forecast_type: str, days: int = 5) -> List[Dict[str, Any]]:
         """统一获取天气预报数据
-        
+
         Args:
             forecast_type: 预报类型 ('hourly' 或 'daily')
             days: 仅对 daily 类型有效，预报天数
@@ -459,30 +466,30 @@ class WeatherManager:
         if not provider:
             logger.error(f'未找到天气提供源: {self.get_current_api()}')
             return []
-        
+
         try:
             location_key = self._get_location_key()
             api_key = config_center.read_conf('Weather', 'api_key')
-            
+
             # 获取原始数据
             raw_data = provider.fetch_forecast_data(location_key, api_key, forecast_type, days)
-            
+
             # 解析数据
             parsed_data = provider.parse_forecast_data(raw_data, forecast_type)
-            
+
             return parsed_data
         except Exception as e:
             logger.error(f'获取 {forecast_type} 预报失败: {e}')
             return []
-        
+
     def fetch_hourly_forecast(self) -> List[Dict[str, Any]]:
         """获取逐小时天气预报"""
         return self.fetch_forecast('hourly')
-    
+
     def fetch_daily_forecast(self, days: int = 5) -> List[Dict[str, Any]]:
         """获取多天天气预报"""
         return self.fetch_forecast('daily', days)
-        
+
     def get_precipitation_info(self) -> Dict[str, Any]:
         """获取降水信息"""
         provider = self.get_current_provider()
@@ -497,19 +504,19 @@ class WeatherManager:
                 'same_precipitation': True,
                 'temp_change': 0
             }
-        
+
         try:
             # 使用统一接口获取预报数据
             hourly_data = self.fetch_hourly_forecast()
             daily_data = self.fetch_daily_forecast(5)
-            
+
             # 当前降水状态
             precipitation_now = False
             if self.current_weather_data and 'now' in self.current_weather_data:
                 current_icon = provider.parse_weather_icon(self.current_weather_data['now'])
                 if current_icon:
                     precipitation_now = provider._is_precipitation(str(current_icon))
-            
+
             # 降水信息初始化
             precipitation_time = []
             tomorrow_precipitation = False
@@ -517,14 +524,12 @@ class WeatherManager:
             first_hour_precip = False
             same_precipitation = True
             temp_change = 0
-            
+
             # 处理逐小时预报数据
             if hourly_data:
-                # 确保是列表类型
                 if not isinstance(hourly_data, list):
                     logger.warning(f"逐小时预报数据不是列表类型: {type(hourly_data)}")
                     hourly_data = []
-                
                 if len(hourly_data) > 0:
                     first_hour = hourly_data[0]
                     # 获取第一个小时的降水状态
@@ -532,9 +537,8 @@ class WeatherManager:
                         first_hour_precip = first_hour['precipitation']
                     elif 'weather_code' in first_hour:
                         first_hour_precip = provider._is_precipitation(str(first_hour['weather_code']))
-                    
+
                     same_precipitation = (precipitation_now == first_hour_precip)
-                    
                     # 降水时间分组
                     current_precip = None
                     count = 0
@@ -544,7 +548,6 @@ class WeatherManager:
                             is_precip = hour['precipitation']
                         elif 'weather_code' in hour:
                             is_precip = provider._is_precipitation(str(hour['weather_code']))
-                        
                         if current_precip is None:
                             current_precip = is_precip
                             count = 1
@@ -554,18 +557,15 @@ class WeatherManager:
                             precipitation_time.append(count)
                             current_precip = is_precip
                             count = 1
-                    
-                    # 添加最后一组
                     if count > 0:
                         precipitation_time.append(count)
-            
+
             # 处理多天预报数据
             if daily_data:
-                # 确保是列表类型
                 if not isinstance(daily_data, list):
                     logger.warning(f"多天预报数据不是列表类型: {type(daily_data)}")
                     daily_data = []
-                
+
                 if len(daily_data) > 1:
                     tomorrow = daily_data[1]
                     # 获取明日降水状态
@@ -573,7 +573,6 @@ class WeatherManager:
                         tomorrow_precipitation = tomorrow['precipitation_day']
                     elif 'weather_day' in tomorrow:
                         tomorrow_precipitation = provider._is_precipitation(str(tomorrow['weather_day']))
-                    
                     # 降水持续天数
                     for day in daily_data:
                         if 'precipitation_day' in day:
@@ -586,7 +585,7 @@ class WeatherManager:
                                 precipitation_day += 1
                             else:
                                 break
-                    
+
                     # 计算最高气温变化
                     #                                  ! 小米天气api 的 temp_low 才是最高气温 以后可能需要单独处理 !
                     today = daily_data[0]
@@ -625,7 +624,7 @@ class WeatherManager:
         provider = self.get_current_provider()
         if not provider:
             return []
-        
+
         try:
             precip_info = self.get_precipitation_info()
             reminders = []
@@ -641,7 +640,7 @@ class WeatherManager:
                             reminders.append({
                                 'type': 'precipitation_hours',
                                 'title': QCoreApplication.translate(
-                                    "WeatherReminder", 
+                                    "WeatherReminder",
                                     "降水将持续 {} 小时"
                                 ).format(duration),
                                 'icon': 'rain'
@@ -650,7 +649,7 @@ class WeatherManager:
                             reminders.append({
                                 'type': 'precipitation_continue',
                                 'title': QCoreApplication.translate(
-                                    "WeatherReminder", 
+                                    "WeatherReminder",
                                     "降水将持续很久"
                                 ),
                                 'icon': 'rain'
@@ -661,7 +660,7 @@ class WeatherManager:
                             reminders.append({
                                 'type': 'precipitation_soon',
                                 'title': QCoreApplication.translate(
-                                    "WeatherReminder", 
+                                    "WeatherReminder",
                                     "{} 小时后有降水"
                                 ).format(hours),
                                 'icon': 'rain'
@@ -672,7 +671,7 @@ class WeatherManager:
                             reminders.append({
                                 'type': 'tomorrow_precipitation',
                                 'title': QCoreApplication.translate(
-                                    "WeatherReminder", 
+                                    "WeatherReminder",
                                     "明日有降水"
                                 ),
                                 'icon': 'rain'
@@ -682,7 +681,7 @@ class WeatherManager:
                         reminders.append({
                             'type': 'precipitation_stop_soon',
                             'title': QCoreApplication.translate(
-                                "WeatherReminder", 
+                                "WeatherReminder",
                                 "雨快要停了"
                             ),
                             'icon': 'no_rain'
@@ -691,18 +690,18 @@ class WeatherManager:
                         reminders.append({
                             'type': 'precipitation_start_soon',
                             'title': QCoreApplication.translate(
-                                "WeatherReminder", 
+                                "WeatherReminder",
                                 "快要下雨了"
                             ),
                             'icon': 'rain'
                         })
 
-            # 气温提醒      
+            # 气温提醒
             if precip_info['temp_change'] >= 8:
                 reminders.append({
                     'type': 'temperature_rise',
                     'title': QCoreApplication.translate(
-                        "WeatherReminder", 
+                        "WeatherReminder",
                         "明日气温陡升"
                     ),
                     'icon': 'high_temp'
@@ -711,7 +710,7 @@ class WeatherManager:
                 reminders.append({
                     'type': 'temperature_drop',
                     'title': QCoreApplication.translate(
-                        "WeatherReminder", 
+                        "WeatherReminder",
                         "明日气温骤降"
                     ),
                     'icon': 'low_temp'
@@ -833,35 +832,35 @@ class GenericWeatherProvider(WeatherapiProvider):
             return value.get(key)
         else:
             return None
-        
+
     def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 5) -> Dict[str, Any]:
         """获取预报数据的统一方法"""
         config_key = f"{forecast_type}_forecast"
         forecast_config = self.config.get(config_key, {})
-        
+
         if not forecast_config:
             logger.warning(f"{self.api_name} 未配置 {forecast_type} 预报")
             return {}
-            
+
         try:
             from network_thread import proxies
             url_template = forecast_config.get('url', '')
             if not url_template:
                 return {}
-                
+
             # 替换模板中的变量
             url = url_template.format(
-                location_key=location_key, 
+                location_key=location_key,
                 key=api_key,
                 days=days
             )
-            
+
             # 对于坐标类型的API
             if self.config.get('method') == 'coordinates':
                 if ',' in location_key:
                     lon, lat = location_key.split(',')
                     url = url.format(lon=lon, lat=lat)
-            
+
             logger.debug(f"获取 {forecast_type} 预报数据: {url}")
             response = requests.get(url, proxies=proxies, timeout=10)
             response.raise_for_status()
@@ -869,34 +868,34 @@ class GenericWeatherProvider(WeatherapiProvider):
         except Exception as e:
             logger.error(f"获取 {forecast_type} 预报失败: {e}")
             return {}
-    
+
     def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
         """解析预报数据的统一方法"""
         config_key = f"{forecast_type}_forecast"
         forecast_config = self.config.get(config_key, {})
-        
+
         if not forecast_config:
             return []
-            
+
         data_path = forecast_config.get('data_path', '')
         if not data_path:
             return []
-            
+
         # 提取原始预报数据
         forecast_data = self._extract_value_by_path(raw_data, data_path)
         if not forecast_data:
             return []
-            
+
         # 确保数据是列表类型
         if not isinstance(forecast_data, list):
             forecast_data = [forecast_data]
-            
+
         # 创建基本预报条目
         forecast_items = []
         for i, item in enumerate(forecast_data):
             if not isinstance(item, dict):
                 continue
-                
+
             forecast_item = {}
             # 映射字段
             for field, path_template in forecast_config.get('fields', {}).items():
@@ -905,12 +904,12 @@ class GenericWeatherProvider(WeatherapiProvider):
                 value = self._extract_value_by_path(item, path)
                 if value is not None:
                     forecast_item[field] = value
-                    
+
             if forecast_item:
                 forecast_items.append(forecast_item)
-                
+
         return forecast_items
-    
+
     def fetch_hourly_forecast(self, location_key: str, api_key: str) -> List[Dict[str, Any]]:
         """获取逐小时天气预报数据（兼容接口）"""
         try:
@@ -919,7 +918,7 @@ class GenericWeatherProvider(WeatherapiProvider):
         except Exception as e:
             logger.error(f"获取逐小时预报失败: {e}")
             return []
-    
+
     def fetch_daily_forecast(self, location_key: str, api_key: str, days: int = 5) -> List[Dict[str, Any]]:
         """获取多天天气预报数据（兼容接口）"""
         try:
@@ -1225,23 +1224,23 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
         weather_desc = weather_processor.get_weather_by_code(weather_code)
         # 检查天气描述中是否包含降水关键词
         return any(keyword in weather_desc for keyword in ["雨", "雪", "雹"])
-    
+
     def parse_hourly_forecast(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """解析逐小时天气预报数据，添加降水判断"""
         result = []
         precipitation_time = []  # 存储降水时间分组
         current_precip = None    # 当前降水状态
         count = 0                # 当前分组计数
-        
+
         try:
             temps = data.get("temperature", {}).get("value", [])
             weather_codes = data.get("weather", {}).get("value", [])
-            
+
             # 构建每小时数据
             for i in range(min(len(temps), len(weather_codes))):
                 weather_code = str(weather_codes[i])
                 is_precip = self._is_precipitation(weather_code)
-                
+
                 hour_data = {
                     "temperature": temps[i],
                     "weather_code": weather_code,
@@ -1249,7 +1248,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                     "hour": i  # 相对于当前时间的小时偏移
                 }
                 result.append(hour_data)
-                
+
                 # 降水状态分组统计
                 if current_precip is None:
                     current_precip = is_precip
@@ -1260,39 +1259,39 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                     precipitation_time.append(count)
                     current_precip = is_precip
                     count = 1
-            
+
             # 添加最后一组
             if count > 0:
                 precipitation_time.append(count)
-                
+
             # 添加降水分组统计结果
             result.append({"precipitation_time": precipitation_time})
-            
+
         except Exception as e:
             logger.error(f"解析小米逐小时预报失败: {e}")
-        
+
         return result
-    
+
     def parse_daily_forecast(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """解析多天天气预报数据，添加降水日统计"""
         result = []
         precipitation_days = []  # 存储降水日标记
         tomorrow_precipitation = False  # 明日白天是否降水
         precipitation_day = 0  # 连续降水日天数
-        
+
         try:
             temp_ranges = data.get("temperature", {}).get("value", [])
             weather_values = data.get("weather", {}).get("value", [])
-            
+
             for i in range(min(len(temp_ranges), len(weather_values))):
                 weather_day = str(weather_values[i]["from"]) if "from" in weather_values[i] else ""
                 weather_night = str(weather_values[i]["to"]) if "to" in weather_values[i] else ""
-                
+
                 # 判断是否为降水日
                 day_precip = self._is_precipitation(weather_day) if weather_day else False
                 night_precip = self._is_precipitation(weather_night) if weather_night else False
                 is_precip_day = day_precip or night_precip
-                
+
                 day_data = {
                     "day": i,  # 日期偏移
                     "temp_high": temp_ranges[i]["to"] if "to" in temp_ranges[i] else "",
@@ -1304,11 +1303,11 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 }
                 result.append(day_data)
                 precipitation_days.append(is_precip_day)
-                
+
                 # 检查明日是否是白天降水日
                 if i == 1:
                     tomorrow_precipitation = day_precip
-            
+
             # 计算连续降水日天数
             if tomorrow_precipitation:
                 # 从明日开始计算连续降水日
@@ -1317,16 +1316,16 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                         precipitation_day += 1
                     else:
                         break
-                
+
                 # 添加统计结果
                 result.append({
                     "tomorrow_precipitation": tomorrow_precipitation,
                     "precipitation_day": precipitation_day
                 })
-        
+
         except Exception as e:
             logger.error(f"解析小米多天预报失败: {e}")
-        
+
         return result
 
     def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 5) -> Dict[str, Any]:
@@ -1336,7 +1335,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             full_data = self.fetch_current_weather(location_key, api_key)
             if not full_data:
                 return {}
-                
+
             if forecast_type == 'hourly':
                 hourly_forecast = full_data.get("forecastHourly", {})
                 return hourly_forecast
@@ -1353,7 +1352,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
         except Exception as e:
             logger.error(f"获取小米天气{forecast_type}预报失败: {e}")
             return {}
-    
+
     def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
         """小米天气特殊解析"""
         if forecast_type == 'hourly':
@@ -1507,7 +1506,7 @@ class QWeatherProvider(GenericWeatherProvider):
     def supports_alerts(self) -> bool:
         """和风天气支持预警功能"""
         return True
-    
+
     def _is_precipitation(self, weather_code: str) -> bool:
         """判断天气是否为降水类型（和风天气）"""
         if weather_code.isdigit():
@@ -2794,43 +2793,43 @@ if __name__ == '__main__':
         if hourly_forecast:
             print("逐小时天气预报 (近12小时):")
             precipitation_time = None
-            
+
             for hour in hourly_forecast:
                 if "precipitation_time" in hour:
                     precipitation_time = hour["precipitation_time"]
                     continue
-                    
+
                 weather_desc = get_weather_by_code(str(hour["weather_code"]))
                 precip_status = "有降水" if hour["precipitation"] else "无降水"
                 print(f"{hour['hour']}小时后: {hour['temperature']}°C, {weather_desc} ({precip_status})")
-            
+
             if precipitation_time:
                 print(f"降水时间分组: {precipitation_time}")
         else:
             print("无逐小时预报数据")
-        
+
         # 测试5天预报
         daily_forecast = get_daily_forecast(5)
         if daily_forecast:
             print("\n5 天天气预报:")
             tomorrow_precip = False
             precip_days = 0
-            
+
             for day in daily_forecast:
                 if "tomorrow_precipitation" in day:
                     tomorrow_precip = day["tomorrow_precipitation"]
                     precip_days = day["precipitation_day"]
                     continue
-                    
+
                 day_weather = get_weather_by_code(str(day["weather_day"]))
                 night_weather = get_weather_by_code(str(day["weather_night"]))
                 precip_status = "降水日" if day["precipitation_day"] else "非降水日"
                 day_precip_status = "白天有降水" if day["day_precipitation"] else "白天无降水"
-                
+
                 print(f"第 {day['day']+1} 天: {day['temp_high']} - {day['temp_low']}°C")
                 print(f"  白天: {day_weather}, 夜间: {night_weather}")
                 print(f"  状态: {precip_status}, {day_precip_status}")
-            
+
         else:
             print("无 5 天预报数据")
 

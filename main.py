@@ -37,7 +37,7 @@ import utils
 import menu
 import weather as db
 from conf import base_directory, load_theme_config
-from extra_menu import ExtraMenu, open_settings
+from extra_menu import ExtraMenu, open_settings, settings
 from generate_speech import generate_speech_sync, list_pyttsx3_voices
 from menu import open_plaza, I18nManager
 from weather import WeatherReportThread as weatherReportThread
@@ -2877,9 +2877,7 @@ class DesktopWidget(QWidget):  # 主要小组件
                 else:
                     self.weather_alert_text.hide()
                     self.alert_icon.hide()
-                
-                # 同时更新设置界面中的天气信息
-                from extra_menu import settings
+
                 if settings and hasattr(settings, '_on_weather_data_ready'):
                     settings._on_weather_data_ready(original_weather_data)
 
@@ -2938,7 +2936,6 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.weather_timer.setInterval(new_interval)
                 self.weather_timer.start()
                 # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
-                from extra_menu import settings
                 if settings and hasattr(settings, 'weather_refresh_picker'):
                     if settings.weather_refresh_picker:
                         settings.weather_refresh_picker.setValue(minutes)
