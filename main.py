@@ -2673,7 +2673,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.current_alert_index = 0
         current_alert = self.current_alerts[self.current_alert_index]
 
-        alert_title = self._simplify_alert_text(current_alert.get('title'))
+        alert_title = db.simplify_alert_text(current_alert.get('title'))
         if len(alert_title) > 6:
             alert_text = alert_title  # 极端情况去除预警二字
         else:
@@ -2702,30 +2702,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.weather_alert_text.setAlignment(Qt.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
         if hasattr(self, 'alert_icon'):
-            icon_path = self._get_alert_icon_by_severity(severity)
+            icon_path = db.get_alert_icon_by_severity(severity)
             if icon_path:
                 self.alert_icon.setIcon(QIcon(icon_path))
-    
-    def _simplify_alert_text(self, text: str) -> str:
-        """简化预警文本"""
-        if not text:
-            return self.tr('预警')
-        match = re.search(r'(发布|升级为)(\w+)(蓝色|黄色|橙色|红色)预警', text)
-        if match:
-            return self.tr("{data}").format(data=match.group(2))  # 简化至仅剩预警类别，如“暴雨” “雷暴大风”
-        return '未知预警'
-
-    def _get_alert_icon_by_severity(self, severity: Union[str, int]) -> str:
-        """根据预警等级获取对应图标"""
-        severity_color_map = {
-            '1': 'blue',
-            '2': 'yellow', 
-            '3': 'orange',
-            '4': 'red'
-        }
-        severity_str = str(severity) if severity else '2'
-        color = severity_color_map.get(severity_str, 'yellow')
-        return get_alert_image(color)
 
     def _reset_weather_alert_state(self) -> None:
         """重置天气预警、提醒显示状态"""

@@ -2675,11 +2675,11 @@ def get_alert_icon_by_severity(severity: Union[str, int]) -> str:
         }
         severity_str = str(severity).lower() if severity else '2'
         color = severity_color_map.get(severity_str, 'yellow')
-        icon_path = os.path.join(base_directory, 'img', 'weather', 'alert', f'{color}.png')
-        return icon_path if os.path.exists(icon_path) else os.path.join(base_directory, 'img', 'weather', 'alert', 'blue.png')
+        icon_path = os.path.join(base_directory, 'img', 'weather', 'alerts', f'{color}.png')
+        return icon_path if os.path.exists(icon_path) else os.path.join(base_directory, 'img', 'weather', 'alerts', 'blue.png')
     except Exception as e:
         logger.error(f"获取预警图标失败: {e}")
-        return os.path.join(base_directory, 'img', 'weather', 'alert', 'blue.png')
+        return os.path.join(base_directory, 'img', 'weather', 'alerts', 'blue.png')
 
 
 def simplify_alert_text(text: str) -> str:
