@@ -16,6 +16,40 @@ from PyQt5.QtCore import QThread, pyqtSignal, QEventLoop
 from file import config_center, base_directory
 
 
+class WeatherFetchThread(QThread):
+    """(异步)天气数据获取"""
+    weather_data_ready = pyqtSignal(dict)
+    weather_error = pyqtSignal(str)
+
+    def __init__(self, weather_manager):
+        super().__init__()
+        self.weather_manager = weather_manager
+        self._is_running = False
+
+    def run(self):
+        try:
+            self._is_running = True
+            weather_data = self.weather_manager.fetch_weather_data()
+            if self._is_running:
+                if 'error' in weather_data.get('now', {}):
+                    self.weather_error.emit(weather_data['now']['error'])
+                else:
+                    self.weather_data_ready.emit(weather_data)
+        except Exception as e:
+            if self._is_running:
+                error_msg = f"异步获取天气数据失败: {e}"
+                logger.error(error_msg)
+                self.weather_error.emit(error_msg)
+        finally:
+            self._is_running = False
+
+    def stop(self):
+        """停止线程"""
+        self._is_running = False
+        if self.isRunning():
+            self.quit()
+            self.wait(3000)
+
 def cache_result(expire_seconds: int = 300):
     """缓存装饰器 """
     # 她还是忘了不了她的缓存
@@ -29,7 +63,7 @@ def cache_result(expire_seconds: int = 300):
             if cache_key in cache:
                 result, timestamp = cache[cache_key]
                 if current_time - timestamp < expire_seconds:
-                    #logger.debug(f"使用缓存结果: {func.__name__}")
+                    # logger.debug(f"使用缓存结果: {func.__name__}")
                     return result
             result = func(*args, **kwargs)
             cache[cache_key] = (result, current_time)
@@ -92,6 +126,11 @@ class WeatherapiProvider(ABC):
     @abstractmethod
     def parse_weather_description(self, data: Dict[str, Any]) -> Optional[str]:
         """解析天气描述"""
+        pass
+
+    @abstractmethod
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析更新时间"""
         pass
 
     def supports_alerts(self) -> bool:
@@ -319,7 +358,7 @@ class WeatherManager:
         except Exception as e:
             logger.error(f'自动获取位置失败: {e}')
             return '101010100'
-        
+
     def _get_coordinates_location(self) -> str:
         """获取坐标位置"""
         try:
@@ -374,6 +413,23 @@ class WeatherManager:
                 return provider.parse_weather_icon(self.current_weather_data)
             elif data_type == 'description':
                 return provider.parse_weather_description(self.current_weather_data)
+            elif data_type == 'feels_like':
+                if hasattr(provider, 'parse_feels_like'):
+                    return provider.parse_feels_like(self.current_weather_data)
+                return None
+            elif data_type == 'wind_direction':
+                if hasattr(provider, 'parse_wind_direction'):
+                    return provider.parse_wind_direction(self.current_weather_data)
+                return None
+            elif data_type == 'aqi':
+                if hasattr(provider, 'parse_aqi'):
+                    return provider.parse_aqi(self.current_weather_data)
+                return None
+            elif data_type in ('co', 'no2', 'o3', 'pm10', 'pm25', 'so2'):
+                if hasattr(provider, 'parse_aqi_data'):
+                    aqi_data = provider.parse_aqi_data(self.current_weather_data)
+                    return aqi_data.get(data_type)
+                return None
             else:
                 logger.warning(f'未知的数据类型: {data_type}')
                 return None
@@ -493,6 +549,28 @@ class GenericWeatherProvider(WeatherapiProvider):
         else:
             return None
 
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析更新时间（通用实现）"""
+        try:
+            # 尝试从配置的路径获取更新时间
+            update_time_path = self.parameters.get('updateTime', '')
+            if update_time_path:
+                value = self._extract_value_by_path(data, update_time_path)
+                if value:
+                    return str(value)
+
+            # 尝试常见的更新时间字段
+            common_fields = ['updateTime', 'update_time', 'lastUpdate', 'last_update', 'time']
+            for field in common_fields:
+                value = data.get(field)
+                if value:
+                    return str(value)
+
+            return None
+        except Exception as e:
+            logger.error(f"解析更新时间失败({self.api_name}): {e}")
+            return None
+
 
 class XiaomiWeatherProvider(GenericWeatherProvider):
     """小米天气api获得"""
@@ -500,16 +578,16 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
     def parse_temperature(self, data: Dict[str, Any]) -> Optional[str]:
         """解析小米天气温度"""
         try:
-            # 结构: current.temperature.value
+            # 结构: now.current.temperature.value
             current = data.get("current", {})
             temperature = current.get('temperature', {})
-            temp_unit = temperature.get('unit')
+            temp_unit = temperature.get('unit', '℃')
             temp_value = temperature.get('value')
 
-            if temp_value is not None:
+            if temp_value is not None and str(temp_value).strip():
                 return f"{temp_value}{temp_unit}"
             else:
-                logger.error(f"小米天气api温度数据为空")
+                logger.error(f"小米天气api温度数据为空: {temp_value}")
                 return None
         except Exception as e:
             logger.error(f"解析小米天气温度失败: {e}")
@@ -518,10 +596,11 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
     def parse_weather_icon(self, data: Dict[str, Any]) -> Optional[str]:
         """解析图标代码"""
         try:
+            # 结构: now.current.weather
             current = data.get("current", {})
             code = current.get('weather')
-            if code is None:
-                logger.error("天气码为空")
+            if code is None or str(code).strip() == '':
+                logger.error(f"天气码为空: {code}")
                 return None
             return str(code)
         except Exception as e:
@@ -537,6 +616,143 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             return None
         except Exception as e:
             logger.error(f"解析小米天气描述失败: {e}")
+            return None
+
+    def parse_wind_speed(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气风速"""
+        try:
+            # 结构: now.current.wind.speed
+            current = data.get("current", {})
+            wind = current.get('wind', {})
+            speed = wind.get('speed', {})
+            speed_value = speed.get('value')
+            speed_unit = speed.get('unit', 'km/h')
+            if speed_value is not None and str(speed_value).strip():
+                return f"{speed_value} {speed_unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析风速失败(小米天气): {e}")
+            return None
+
+    def parse_humidity(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气湿度"""
+        try:
+            # 结构: now.current.humidity
+            current = data.get("current", {})
+            humidity = current.get('humidity', {})
+            humidity_value = humidity.get('value')
+            if humidity_value is not None and str(humidity_value).strip():
+                return f"{humidity_value} %"
+            return None
+        except Exception as e:
+            logger.error(f"解析湿度失败(小米天气): {e}")
+            return None
+
+    def parse_visibility(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气能见度"""
+        try:
+            # 结构: now.current.visibility
+            current = data.get("current", {})
+            visibility = current.get('visibility', {})
+            visibility_value = visibility.get('value')
+            visibility_unit = visibility.get('unit', 'km')
+            if visibility_value is not None and str(visibility_value).strip():
+                return f"{visibility_value} {visibility_unit}"
+            else:
+                logger.warning(f"小米天气能见度数据为空或无效: '{visibility_value}'")
+                return "-- km"
+        except Exception as e:
+            logger.error(f"解析能见度失败(小米天气): {e}")
+            return None
+
+    def parse_pressure(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气气压"""
+        try:
+            # 结构: now.current.pressure
+            current = data.get("current", {})
+            pressure = current.get('pressure', {})
+            pressure_value = pressure.get('value')
+            pressure_unit = pressure.get('unit', 'hPa')
+            if pressure_value is not None and str(pressure_value).strip():
+                return f"{pressure_value} {pressure_unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析气压失败(小米天气): {e}")
+            return None
+
+    def parse_feels_like(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气体感温度"""
+        try:
+            # 结构: now.current.feelsLike
+            current = data.get("current", {})
+            feels_like = current.get('feelsLike', {})
+            feels_like_value = feels_like.get('value')
+            feels_like_unit = feels_like.get('unit', '℃')
+            if feels_like_value is not None and str(feels_like_value).strip():
+                return f"{feels_like_value}{feels_like_unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析体感温度失败(小米天气): {e}")
+            return None
+
+    def parse_wind_direction(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气风向"""
+        try:
+            # 结构: now.current.wind.direction
+            current = data.get("current", {})
+            wind = current.get('wind', {})
+            direction = wind.get('direction', {})
+            direction_value = direction.get('value')
+            direction_unit = direction.get('unit', '°')
+            if direction_value is not None and str(direction_value).strip():
+                # 将角度转换为方向描述
+                direction_desc = self._convert_wind_direction(float(direction_value))
+                return f"{direction_desc}"
+            return None
+        except Exception as e:
+            logger.error(f"解析风向失败(小米天气): {e}")
+            return None
+
+    def _convert_wind_direction(self, degree: float) -> str:
+        """将风向角度转换为方向描述"""
+        directions = [
+            "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+        ]
+        index = int((degree + 11.25) / 22.5) % 16
+        return directions[index]
+
+    def parse_aqi_data(self, data: Dict[str, Any]) -> Dict[str, Optional[str]]:
+        """解析小米天气空气质量数据"""
+        try:
+            # 结构: aqi字段内
+            aqi_data = data.get('aqi', {})
+            result = {
+                'aqi': aqi_data.get('aqi'),
+                'co': aqi_data.get('co'),
+                'no2': aqi_data.get('no2'),
+                'o3': aqi_data.get('o3'),
+                'pm10': aqi_data.get('pm10'),
+                'pm25': aqi_data.get('pm25'),
+                'so2': aqi_data.get('so2'),
+                'suggest': aqi_data.get('suggest'),
+                'src': aqi_data.get('src')
+            }
+            return result
+        except Exception as e:
+            logger.error(f"解析空气质量数据失败(小米天气): {e}")
+            return {}
+
+    def parse_aqi(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气AQI指数"""
+        try:
+            aqi_data = data.get('aqi', {})
+            aqi_value = aqi_data.get('aqi')
+            if aqi_value is not None and str(aqi_value).strip():
+                return str(aqi_value)
+            return None
+        except Exception as e:
+            logger.error(f"解析AQI失败(小米天气): {e}")
             return None
 
     def fetch_weather_alerts(self, location_key: str, api_key: str) -> Optional[Dict[str, Any]]:
@@ -585,6 +801,27 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             'description': alert_item.get('detail', '')
         }
 
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析小米天气更新时间"""
+        try:
+            # 小米天气API的更新时间可能在不同位置
+            update_time = data.get('updateTime')
+            if update_time:
+                return str(update_time)
+            # 尝试从current字段获取
+            current = data.get('current', {})
+            update_time = current.get('updateTime')
+            if update_time:
+                return str(update_time)
+            # 尝试从其他可能的字段获取
+            update_time = data.get('lastUpdate') or data.get('time')
+            if update_time:
+                return str(update_time)
+            return None
+        except Exception as e:
+            logger.error(f"解析小米天气更新时间失败: {e}")
+            return None
+
 
 
 class QWeatherProvider(GenericWeatherProvider):
@@ -631,6 +868,25 @@ class QWeatherProvider(GenericWeatherProvider):
             return icon_code if icon_code else None
         except Exception as e:
             logger.error(f"解析和风天气描述失败: {e}")
+            return None
+
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析天气数据更新时间(和风天气)"""
+        try:
+            # 和风天气api结构: updateTime
+            update_time = data.get('updateTime')
+            if update_time:
+                return str(update_time)
+
+            # 如果顶层没有，尝试从now中获取
+            now = data.get('now', {})
+            update_time = now.get('updateTime')
+            if update_time:
+                return str(update_time)
+
+            return None
+        except Exception as e:
+            logger.error(f"解析和风天气更新时间失败: {e}")
             return None
 
     def fetch_weather_alerts(self, location_key: str, api_key: str) -> Optional[Dict[str, Any]]:
@@ -760,6 +1016,31 @@ class AmapWeatherProvider(GenericWeatherProvider):
             logger.error(f"解析高德天气描述失败: {e}")
             return None
 
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析高德天气更新时间"""
+        try:
+            # 高德天气API的更新时间可能在不同位置
+            update_time = data.get('updateTime')
+            if update_time:
+                return str(update_time)
+
+            # 尝试从lives字段获取
+            lives = data.get('lives', [])
+            if lives and len(lives) > 0:
+                update_time = lives[0].get('reporttime') or lives[0].get('updateTime')
+                if update_time:
+                    return str(update_time)
+
+            # 尝试从其他可能的字段获取
+            update_time = data.get('reporttime') or data.get('lastUpdate')
+            if update_time:
+                return str(update_time)
+
+            return None
+        except Exception as e:
+            logger.error(f"解析高德天气更新时间失败: {e}")
+            return None
+
 
 class QQWeatherProvider(GenericWeatherProvider):
     """腾讯天气api提供者"""
@@ -806,7 +1087,33 @@ class QQWeatherProvider(GenericWeatherProvider):
         except Exception as e:
             logger.error(f"解析腾讯天气描述失败: {e}")
             return None
-        
+
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析腾讯天气更新时间"""
+        try:
+            # 腾讯天气API的更新时间可能在不同位置
+            update_time = data.get('updateTime')
+            if update_time:
+                return str(update_time)
+
+            # 尝试从result字段获取
+            result = data.get('result', {})
+            update_time = result.get('updateTime') or result.get('update_time')
+            if update_time:
+                return str(update_time)
+
+            # 尝试从realtime字段获取
+            realtime = result.get('realtime', [])
+            if realtime and len(realtime) > 0:
+                update_time = realtime[0].get('updateTime') or realtime[0].get('update_time')
+                if update_time:
+                    return str(update_time)
+
+            return None
+        except Exception as e:
+            logger.error(f"解析腾讯天气更新时间失败: {e}")
+            return None
+
 
 class OpenMeteoProvider(GenericWeatherProvider):
     @retry_on_failure(max_retries=2, delay=0.5)
@@ -846,7 +1153,7 @@ class OpenMeteoProvider(GenericWeatherProvider):
         except Exception as e:
             logger.error(f"解析 Open-Meteo 温度失败: {e}")
             return None
-    
+
     def parse_weather_icon(self, data: Dict[str, Any]) -> Optional[str]:
         """解析天气图标代码(Open-Meteo)"""
         try:
@@ -858,13 +1165,32 @@ class OpenMeteoProvider(GenericWeatherProvider):
         except Exception as e:
             logger.error(f"解析 Open-Meteo 天气图标失败: {e}")
             return None
-    
+
     def parse_weather_description(self, data: Dict[str, Any]) -> Optional[str]:
         """解析天气描述(Open-Meteo)"""
         try:
             return self.parse_weather_icon(data)
         except Exception as e:
             logger.error(f"解析 Open-Meteo 描述失败: {e}")
+            return None
+
+    def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析Open-Meteo更新时间"""
+        try:
+            # Open-Meteo API的更新时间通常在current字段中
+            current = data.get('current', {})
+            update_time = current.get('time')
+            if update_time:
+                return str(update_time)
+
+            # 尝试从顶层获取
+            update_time = data.get('time') or data.get('updateTime')
+            if update_time:
+                return str(update_time)
+
+            return None
+        except Exception as e:
+            logger.error(f"解析Open-Meteo更新时间失败: {e}")
             return None
 
 
@@ -1000,6 +1326,39 @@ class WeatherDataProcessor:
         """清理指定api的缓存"""
         if api_name in self._status_cache:
             del self._status_cache[api_name]
+
+    def _convert_temperature_unit(self, temp_str: str) -> str:
+        """根据配置转换温度单位"""
+        if not temp_str:
+            return temp_str
+        try:
+            target_unit = config_center.read_conf('Weather', 'temperature_unit', 'celsius')
+            match = re.match(r'([+-]?\d+(?:\.\d+)?)\s*([°℃℉CF]?)', temp_str.strip())
+            if not match:
+                return temp_str
+            temp_value = float(match.group(1))
+            current_unit = match.group(2).lower() if match.group(2) else ''
+            is_celsius = current_unit in ['', '℃', '°c', 'c'] or '℃' in temp_str
+            is_fahrenheit = current_unit in ['℉', '°f', 'f'] or '℉' in temp_str
+            if not is_celsius and not is_fahrenheit:
+                is_celsius = True
+            if target_unit == 'fahrenheit':
+                if is_celsius:
+                    # 摄氏度->华氏度: F = C * 9/5 + 32
+                    converted_temp = temp_value * 9/5 + 32
+                    return f"{converted_temp:.1f}℉"
+                else:
+                    return f"{temp_value:.1f}℉"
+            else:  # celsius
+                if is_fahrenheit:
+                    # 华氏度->摄氏度: C = (F - 32) * 5/9
+                    converted_temp = (temp_value - 32) * 5/9
+                    return f"{converted_temp:.1f}℃"
+                else:
+                    return f"{temp_value:.1f}℃"
+        except Exception as e:
+            logger.error(f"温度单位转换失败: {e}")
+            return temp_str
 
     def _load_weather_status(self, api_name: Optional[str] = None) -> Dict[str, Any]:
         """加载天气状态配置"""
@@ -1141,7 +1500,11 @@ class WeatherDataProcessor:
 
         try:
             if key == 'temp':
-                return provider.parse_temperature(weather_data)
+                temp_result = provider.parse_temperature(weather_data)
+                # 应用温度单位转换
+                if temp_result:
+                    return self._convert_temperature_unit(temp_result)
+                return temp_result
             elif key == 'icon':
                 icon_code = provider.parse_weather_icon(weather_data)
                 if provider.config.get('return_desc', False) and icon_code:
@@ -1149,6 +1512,48 @@ class WeatherDataProcessor:
                 return icon_code
             elif key in ('alert', 'alert_title', 'alert_desc'):
                 return self._extract_alert_data(key, weather_data)
+            elif key == 'wind_speed':
+                if hasattr(provider, 'parse_wind_speed'):
+                    return provider.parse_wind_speed(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'humidity':
+                if hasattr(provider, 'parse_humidity'):
+                    return provider.parse_humidity(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'visibility':
+                if hasattr(provider, 'parse_visibility'):
+                    return provider.parse_visibility(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'pressure':
+                if hasattr(provider, 'parse_pressure'):
+                    return provider.parse_pressure(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'feels_like':
+                if hasattr(provider, 'parse_feels_like'):
+                    feels_like_result = provider.parse_feels_like(weather_data)
+                    # 应用温度单位转换
+                    if feels_like_result:
+                        return self._convert_temperature_unit(feels_like_result)
+                    return feels_like_result
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'wind_direction':
+                if hasattr(provider, 'parse_wind_direction'):
+                    return provider.parse_wind_direction(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'aqi':
+                if hasattr(provider, 'parse_aqi'):
+                    return provider.parse_aqi(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key in ('co', 'no2', 'o3', 'pm10', 'pm25', 'so2'):
+                if hasattr(provider, 'parse_aqi_data'):
+                    aqi_data = provider.parse_aqi_data(weather_data)
+                    return aqi_data.get(key)
+                return self._legacy_extract_weather_data(key, weather_data)
+            elif key == 'updateTime':
+                # 提取天气数据的更新时间
+                if hasattr(provider, 'parse_update_time'):
+                    return provider.parse_update_time(weather_data)
+                return self._legacy_extract_weather_data(key, weather_data)
             else:
                 # 回退到旧方法
                 return self._legacy_extract_weather_data(key, weather_data)
@@ -1702,6 +2107,42 @@ def get_alert_image(alert_type: str) -> str:
     return weather_processor.get_alert_image_path(alert_type)
 
 
+def get_alert_icon_by_severity(severity: Union[str, int]) -> str:
+    """根据预警等级获取对应图标路径"""
+    try:
+        severity_color_map = {
+            '1': 'blue',
+            '2': 'yellow',
+            '3': 'orange',
+            '4': 'red',
+            'minor': 'blue',
+            'moderate': 'yellow',
+            'severe': 'orange',
+            'extreme': 'red'
+        }
+        severity_str = str(severity).lower() if severity else '2'
+        color = severity_color_map.get(severity_str, 'yellow')
+        icon_path = os.path.join(base_directory, 'img', 'weather', 'alert', f'{color}.png')
+        return icon_path if os.path.exists(icon_path) else os.path.join(base_directory, 'img', 'weather', 'alert', 'blue.png')
+    except Exception as e:
+        logger.error(f"获取预警图标失败: {e}")
+        return os.path.join(base_directory, 'img', 'weather', 'alert', 'blue.png')
+
+
+def simplify_alert_text(text: str) -> str:
+    """简化预警文本"""
+    if not text:
+        return '预警'
+    try:
+        match = re.search(r'(发布|升级为)(\w+)(蓝色|黄色|橙色|红色)预警', text)
+        if match:
+            return match.group(2)  # 简化至仅剩预警类别，如"暴雨" "雷暴大风"
+        return text.replace('预警', '').strip() or '未知预警'
+    except Exception as e:
+        logger.error(f"简化预警文本失败: {e}")
+        return '未知预警'
+
+
 def is_supported_alert() -> bool:
     """检查是否支持预警"""
     return weather_processor.is_alert_supported()
@@ -1724,34 +2165,89 @@ def get_weather_alert_url() -> Optional[str]:
 
 if __name__ == '__main__':
     try:
-        print("=== 测试 ===")
+        print("=== 天气系统测试 ===")
+
+        # 测试城市搜索功能
+        print("\n1. 测试城市搜索功能")
         cities = search_by_name('北京')
         print(f"搜索'北京'的结果: {cities[:5]}")
         code = search_code_by_name('北京', '')
         print(f"北京的城市代码: {code}")
         city_name = search_by_num(code)
         print(f"代码{code}对应的城市: {city_name}")
+
+        # 测试天气数据获取
+        print("\n2. 测试天气数据获取")
+        current_api = weather_manager.get_current_api()
+        print(f"当前使用的天气API: {current_api}")
+
         weather_data = weather_manager.fetch_weather_data()
         if weather_data:
             print(f"获取到的天气数据结构: {type(weather_data)}")
-            print(f"天气数据键: {list(weather_data.keys()) if isinstance(weather_data, dict) else 'Not a dict'}")
+            print(f"天气数据顶级键: {list(weather_data.keys()) if isinstance(weather_data, dict) else 'Not a dict'}")
 
-            if 'now' in weather_data:
-                now_data = weather_data['now']
-                print(f"当前天气数据: {now_data}")
-                temp = weather_processor.extract_weather_data('temp', now_data)
-                icon = weather_processor.extract_weather_data('icon', now_data)
-                print(f"解析的温度: {temp}")
-                print(f"解析的天气图标: {icon}")
-            else:
-                print("天气数据中没有'now'字段")
+            # 详细分析数据结构
+            if isinstance(weather_data, dict):
+                for key, value in weather_data.items():
+                    if isinstance(value, dict):
+                        print(f"  {key}: {type(value)} - 键: {list(value.keys())}")
+                        # 如果是小米天气，特别检查now字段中的current
+                        if key == 'now' and current_api == 'xiaomi':
+                            current_data = value.get('current', {})
+                            if current_data:
+                                print(f"    小米天气now.current详细结构:")
+                                for sub_key, sub_value in current_data.items():
+                                    if isinstance(sub_value, dict):
+                                        print(f"      {sub_key}: {type(sub_value)} - 键: {list(sub_value.keys())}")
+                                        # 特别检查temperature字段
+                                        if sub_key == 'temperature':
+                                            print(f"        temperature详细: {sub_value}")
+                                    else:
+                                        print(f"      {sub_key}: {type(sub_value)} = {sub_value}")
+                            else:
+                                print(f"    小米天气now中没有current字段")
+                    else:
+                        print(f"  {key}: {type(value)} = {value}")
+
+            # 测试数据解析
+            print("\n3. 测试数据解析")
+            provider = weather_manager.get_current_provider()
+            if provider:
+                print(f"当前Provider: {type(provider).__name__}")
+
+                # 根据API类型选择测试数据
+                test_data = weather_data
+                if 'now' in weather_data:
+                    test_data = weather_data['now']
+                    print("使用'now'字段进行测试")
+                elif 'current' in weather_data:
+                    test_data = weather_data['current']
+                    print("使用'current'字段进行测试")
+                else:
+                    print("使用完整数据进行测试")
+                try:
+                    temp = provider.parse_temperature(weather_data)
+                    print(f"Provider解析的温度: {temp}")
+                except Exception as e:
+                    print(f"Provider温度解析失败: {e}")
+                try:
+                    icon = provider.parse_weather_icon(weather_data)
+                    print(f"Provider解析的天气图标: {icon}")
+                except Exception as e:
+                    print(f"Provider图标解析失败: {e}")
+                temp_processor = weather_processor.extract_weather_data('temp', weather_data)
+                icon_processor = weather_processor.extract_weather_data('icon', weather_data)
+                print(f"Processor解析的温度: {temp_processor}")
+                print(f"Processor解析的天气图标: {icon_processor}")
+
         else:
             print("未获取到天气数据")
+
+        print("\n天气描述")
         weather_desc = get_weather_by_code('0')
-        print(f"\n天气代码0对应的描述: {weather_desc}")
+        print(f"天气代码0对应的描述: {weather_desc}")
         icon_path = get_weather_icon_by_code('0')
         print(f"天气代码0对应的图标: {icon_path}")
-
 
     except Exception as e:
         print(f"测试出错: {e}")

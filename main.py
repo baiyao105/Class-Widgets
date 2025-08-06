@@ -1804,7 +1804,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.showing_temperature = True  # 跟踪状态(预警/气温)
 
             self.weather_timer = QTimer(self)
-            self.weather_timer.setInterval(30 * 60 * 1000)  # 30分钟更新一次
+            refresh_interval = int(config_center.read_conf('Weather', 'refresh_interval'))
+            self.weather_timer.setInterval(refresh_interval * 60 * 1000)  # 从配置读取间隔
             self.weather_timer.timeout.connect(self.get_weather_data)
             self.weather_timer.start()
             self.get_weather_data()
@@ -2103,7 +2104,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.tray_menu.addActions([
             Action(fIcon.SHOPPING_CART, self.tr('插件广场'), triggered=open_plaza),
             Action(fIcon.DEVELOPER_TOOLS, self.tr('额外选项'), triggered=self.open_extra_menu),
-            Action(fIcon.SETTING, self.tr('设置'), triggered=open_settings)
+            Action(fIcon.SETTING, self.tr('设置'), triggered=lambda: open_settings(self))
         ])
         self.tray_menu.addSeparator()
         self.tray_menu.addAction(Action(fIcon.SYNC, self.tr('重新启动'), triggered=restart))
@@ -2566,6 +2567,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                 else:
                     self.weather_alert_text.hide()
                     self.alert_icon.hide()
+                
+                # 同时更新设置界面中的天气信息
+                from extra_menu import settings
+                if settings and hasattr(settings, '_on_weather_data_ready'):
+                    settings._on_weather_data_ready(original_weather_data)
 
                 temp_data = db.get_weather_data('temp', weather_data)
                 if temp_data and temp_data.lower() != 'none':
@@ -2612,14 +2618,31 @@ class DesktopWidget(QWidget):  # 主要小组件
                         self.backgnd.setStyleSheet(update_stylesheet)
             except Exception as e:
                 logger.error(f'天气图标设置失败：{e}')
+    
+    def update_weather_timer_interval(self, minutes: int) -> None:
+        """更新天气定时器间隔"""
+        try:
+            if hasattr(self, 'weather_timer') and self.weather_timer:
+                self.weather_timer.stop()
+                new_interval = minutes * 60 * 1000
+                self.weather_timer.setInterval(new_interval)
+                self.weather_timer.start()
+                # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
+                from extra_menu import settings
+                if settings and hasattr(settings, 'weather_refresh_picker'):
+                    if settings.weather_refresh_picker:
+                        settings.weather_refresh_picker.setValue(minutes)
+        except Exception as e:
+            logger.error(f'更新天气定时器间隔失败: {e}')
 
     def open_extra_menu(self) -> None:
         global ex_menu
         if ex_menu is None or not ex_menu.isVisible():
             ex_menu = ExtraMenu()
+            ex_menu.main_window = self
             ex_menu.show()
             ex_menu.destroyed.connect(self.cleanup_extra_menu)
-            logger.info('打开“额外选项”')
+            logger.info('打开"额外选项"')
         else:
             ex_menu.raise_()
             ex_menu.activateWindow()

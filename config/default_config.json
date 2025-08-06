@@ -45,6 +45,8 @@
     "city": "0",
     "api": "xiaomi_weather",
     "api_key": "",
+    "refresh_interval": "15",
+    "temperature_unit": "°C",
     "alert_exclude": ""
   },
   "Color": {
