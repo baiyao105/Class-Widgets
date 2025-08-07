@@ -1562,7 +1562,20 @@ class SettingsMenu(FluentWindow):
                         alert_icon.setPixmap(scaled_pixmap)
             if alerts_label:
                 alert_text = wd.simplify_alert_text(alert_data.get('type', self.tr('未知')))
-                alerts_label.setText(alert_text + self.tr('预警'))
+                full_text = alert_text + self.tr('预警')
+                alerts_label.setText(full_text)
+                text_length = len(full_text)
+                if text_length <= 4:
+                    font_size = 17  # 默认字体大小
+                elif text_length <= 6:
+                    font_size = 15
+                elif text_length <= 8:
+                    font_size = 13
+                else:
+                    font_size = 11
+                font = alerts_label.font()
+                font.setPointSize(font_size)
+                alerts_label.setFont(font)
             card_widget.mousePressEvent = lambda event, data=alert_data: self._show_alert_detail(data)
             card_widget.setCursor(Qt.PointingHandCursor)  # 悬停光标
             # logger.debug(f"alerts_container_layout: hasattr={hasattr(self, 'alerts_container_layout')}, value={getattr(self, 'alerts_container_layout', None)}")
@@ -1703,8 +1716,10 @@ class SettingsMenu(FluentWindow):
             new_api = wd.weather_manager.api_config['weather_api_list'][select_weather_api.currentIndex()]
             config_center.write_conf('Weather', 'api', new_api)
             config_center.write_conf('Weather', 'city', '0')
+            self._hide_weather_alerts_section()
             if hasattr(wd, 'on_weather_api_changed'):
                 wd.on_weather_api_changed(new_api)
+            self._on_refresh_clicked()
         except Exception as e:
             logger.error(f'切换天气API时发生错误: {e}')
 
@@ -3864,16 +3879,19 @@ class SettingsMenu(FluentWindow):
         method = wd.weather_manager.get_current_provider().config["method"]
         search_city_dialog = selectCity(self, method=method)
         if search_city_dialog.exec():
+            city_changed = False
             if method == 'location_key':
                 selected_city = search_city_dialog.city_list.selectedItems()
                 if selected_city:
                     config_center.write_conf('Weather', 'city', wd.search_code_by_name((selected_city[0].text(),'')))
+                    city_changed = True
             else:
                 lon = search_city_dialog.longitude_edit.text()
                 lat = search_city_dialog.latitude_edit.text()
                 if lon and lat:
                     try:
                         config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
+                        city_changed = True
                     except ValueError:
                         Flyout.create(
                             icon=InfoBarIcon.ERROR,
@@ -3884,6 +3902,9 @@ class SettingsMenu(FluentWindow):
                             isClosable=True,
                             aniType=FlyoutAnimationType.PULL_UP
                         )
+            if city_changed:
+                self._hide_weather_alerts_section()
+                self._on_refresh_clicked()
 
     def show_license(self):
         license_dialog = licenseDialog(self)
