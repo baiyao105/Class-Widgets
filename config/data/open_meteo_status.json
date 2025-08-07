@@ -7,12 +7,12 @@
         },
         {
             "code": 1,
-            "wea": "Mostly clear",
+            "wea": "Mostly Clear",
             "original_code": 1
         },
         {
             "code": 2,
-            "wea": "Partly cloudy",
+            "wea": "Partly Cloudy",
             "original_code": 1
         },
         {
@@ -27,7 +27,7 @@
         },
         {
             "code": 48,
-            "wea": "Rime fog",
+            "wea": "Rime Fog",
             "original_code": 18
         },
         {
@@ -47,12 +47,12 @@
         },
         {
             "code": 56,
-            "wea": "Frz drizzle L",
+            "wea": "Frz Drizzle L",
             "original_code": 19
         },
         {
             "code": 57,
-            "wea": "Frz drizzle H",
+            "wea": "Frz Drizzle H",
             "original_code": 19
         },
         {
@@ -72,12 +72,12 @@
         },
         {
             "code": 66,
-            "wea": "Frz rain L",
+            "wea": "Frz Rain L",
             "original_code": 19
         },
         {
             "code": 67,
-            "wea": "Frz rain H",
+            "wea": "Frz Rain H",
             "original_code": 19
         },
         {
@@ -97,32 +97,32 @@
         },
         {
             "code": 77,
-            "wea": "Snow grains",
+            "wea": "Snow Grains",
             "original_code": 16
         },
         {
             "code": 80,
-            "wea": "Rain shwr L",
+            "wea": "Rain Shwr L",
             "original_code": 9
         },
         {
             "code": 81,
-            "wea": "Rain shwr M",
+            "wea": "Rain Shwr M",
             "original_code": 10
         },
         {
             "code": 82,
-            "wea": "Rain shwr V",
+            "wea": "Rain Shwr V",
             "original_code": 11
         },
         {
             "code": 85,
-            "wea": "Snow shwr L",
+            "wea": "Snow Shwr L",
             "original_code": 15
         },
         {
             "code": 86,
-            "wea": "Snow shwr H",
+            "wea": "Snow Shwr H",
             "original_code": 17
         },
         {
