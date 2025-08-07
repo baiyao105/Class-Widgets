@@ -3879,11 +3879,8 @@ class SettingsMenu(FluentWindow):
         current_api = wd.weather_manager.get_current_api()
         provider = wd.weather_manager.get_current_provider()
         method = provider.config.get("method", "location_key")
-        
-        # 和风天气支持混合模式（城市ID和经纬度）
+
         if current_api == 'qweather':
-            # 显示选择对话框让用户选择输入方式
-            from qfluentwidgets import MessageBox
             choice_dialog = MessageBox(
                 title=self.tr('选择位置输入方式'),
                 content=self.tr('和风天气支持城市ID和经纬度两种方式，请选择您偏好的输入方式：'),
@@ -3891,17 +3888,12 @@ class SettingsMenu(FluentWindow):
             )
             choice_dialog.yesButton.setText(self.tr('城市搜索'))
             choice_dialog.cancelButton.setText(self.tr('经纬度输入'))
-            
             if choice_dialog.exec():
-                # 用户选择城市搜索
                 search_city_dialog = selectCity(self, method='location_key')
             else:
-                # 用户选择经纬度输入
                 search_city_dialog = selectCity(self, method='coordinates')
         else:
-            # 其他API按原有逻辑
             search_city_dialog = selectCity(self, method=method)
-            
         if search_city_dialog.exec():
             city_changed = False
             if search_city_dialog.method == 'location_key':
