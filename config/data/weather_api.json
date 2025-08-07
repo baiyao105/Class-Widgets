@@ -62,7 +62,60 @@
       },
       "database": "xiaomi_weather.db",
       "return_desc": false,
-      "method": "location_key"
+      "method": "location_key",
+      "hourly_forecast": {
+        "url": "https://devapi.qweather.com/v7/weather/24h?location={location_key}&key={key}",
+        "data_path": "hourly",
+        "fields": {
+          "fxTime": "fxTime",
+          "temp": "temp",
+          "icon": "icon",
+          "text": "text",
+          "wind360": "wind360",
+          "windDir": "windDir",
+          "windScale": "windScale",
+          "windSpeed": "windSpeed",
+          "humidity": "humidity",
+          "pop": "pop",
+          "precip": "precip",
+          "pressure": "pressure",
+          "cloud": "cloud",
+          "dew": "dew"
+        }
+      },
+      "daily_forecast": {
+        "url": "https://devapi.qweather.com/v7/weather/7d?location={location_key}&key={key}",
+        "data_path": "daily",
+        "fields": {
+          "fxDate": "fxDate",
+          "sunrise": "sunrise",
+          "sunset": "sunset",
+          "moonrise": "moonrise",
+          "moonset": "moonset",
+          "moonPhase": "moonPhase",
+          "moonPhaseIcon": "moonPhaseIcon",
+          "tempMax": "tempMax",
+          "tempMin": "tempMin",
+          "iconDay": "iconDay",
+          "textDay": "textDay",
+          "iconNight": "iconNight",
+          "textNight": "textNight",
+          "wind360Day": "wind360Day",
+          "windDirDay": "windDirDay",
+          "windScaleDay": "windScaleDay",
+          "windSpeedDay": "windSpeedDay",
+          "wind360Night": "wind360Night",
+          "windDirNight": "windDirNight",
+          "windScaleNight": "windScaleNight",
+          "windSpeedNight": "windSpeedNight",
+          "humidity": "humidity",
+          "precip": "precip",
+          "pressure": "pressure",
+          "vis": "vis",
+          "cloud": "cloud",
+          "uvIndex": "uvIndex"
+        }
+      }
     },
     "amap_weather": {
       "temp": "temperature",

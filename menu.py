@@ -1458,7 +1458,7 @@ class SettingsMenu(FluentWindow):
             if self.humidity_percentage_value and humidity and humidity.lower() != 'none':
                 self.humidity_percentage_value.setText(f"{humidity}")
             elif self.humidity_percentage_value:
-                self.humidity_percentage_value.setText("--%")
+                self.humidity_percentage_value.setText("-- %")
             # 能见度
             visibility = wd.get_weather_data('visibility', weather_data)
             if self.visibility_distance_value and visibility and visibility.lower() != 'none':
@@ -1471,12 +1471,12 @@ class SettingsMenu(FluentWindow):
                 self.pressure_hpa_value.setText(f"{pressure}")
             elif self.pressure_hpa_value:
                 self.pressure_hpa_value.setText("-- hPa")
-            aqi = wd.get_weather_data('aqi', weather_data)
+            # aqi = wd.get_weather_data('aqi', weather_data)
             # if aqi and aqi.lower() != 'none':
             #     logger.info(f"空气质量指数(AQI): {aqi}")
-            air_quality_params = ['co', 'no2', 'o3', 'pm10', 'pm25', 'so2']
-            for param in air_quality_params:
-                value = wd.get_weather_data(param, weather_data)
+            # air_quality_params = ['co', 'no2', 'o3', 'pm10', 'pm25', 'so2']
+            # for param in air_quality_params:
+            #     value = wd.get_weather_data(param, weather_data)
                 # if value and value.lower() != 'none':
                 #     logger.info(f"{param.upper()}: {value}")
         except Exception as e:
@@ -3876,21 +3876,50 @@ class SettingsMenu(FluentWindow):
         config_center.write_conf('Audio', 'volume', str(slider_volume.value()))
 
     def show_search_city(self):
-        method = wd.weather_manager.get_current_provider().config["method"]
-        search_city_dialog = selectCity(self, method=method)
+        current_api = wd.weather_manager.get_current_api()
+        provider = wd.weather_manager.get_current_provider()
+        method = provider.config.get("method", "location_key")
+        
+        # 和风天气支持混合模式（城市ID和经纬度）
+        if current_api == 'qweather':
+            # 显示选择对话框让用户选择输入方式
+            from qfluentwidgets import MessageBox
+            choice_dialog = MessageBox(
+                title=self.tr('选择位置输入方式'),
+                content=self.tr('和风天气支持城市ID和经纬度两种方式，请选择您偏好的输入方式：'),
+                parent=self
+            )
+            choice_dialog.yesButton.setText(self.tr('城市搜索'))
+            choice_dialog.cancelButton.setText(self.tr('经纬度输入'))
+            
+            if choice_dialog.exec():
+                # 用户选择城市搜索
+                search_city_dialog = selectCity(self, method='location_key')
+            else:
+                # 用户选择经纬度输入
+                search_city_dialog = selectCity(self, method='coordinates')
+        else:
+            # 其他API按原有逻辑
+            search_city_dialog = selectCity(self, method=method)
+            
         if search_city_dialog.exec():
             city_changed = False
-            if method == 'location_key':
+            if search_city_dialog.method == 'location_key':
                 selected_city = search_city_dialog.city_list.selectedItems()
                 if selected_city:
                     config_center.write_conf('Weather', 'city', wd.search_code_by_name((selected_city[0].text(),'')))
                     city_changed = True
-            else:
+            else:  # coordinates method
                 lon = search_city_dialog.longitude_edit.text()
                 lat = search_city_dialog.latitude_edit.text()
                 if lon and lat:
                     try:
-                        config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
+                        # 和风天气使用 lat,lon 格式
+                        if current_api == 'qweather':
+                            config_center.write_conf('Weather', 'city', f"{float(lat)},{float(lon)}")
+                        else:
+                            # 其他API使用 lon,lat 格式
+                            config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
                         city_changed = True
                     except ValueError:
                         Flyout.create(
