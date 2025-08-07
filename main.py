@@ -2257,6 +2257,50 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_thread = weatherReportThread()
             self.weather_thread.weather_signal.connect(self.update_weather_data)
             self.weather_thread.start()
+    
+    def _on_reminders_ready(self, reminders: list) -> None:
+        """处理异步获取的天气提醒数据"""
+        try:
+            self.current_reminders = reminders
+            self.current_reminder_index = 0
+            
+            if self.current_reminders:
+                # logger.debug(f'异步获取到 {len(self.current_reminders)} 个天气提醒')
+                for i, reminder in enumerate(self.current_reminders):
+                    logger.debug(f'提醒 {i+1}: {reminder.get("title", "未知")}')
+            self._update_weather_alert_display()
+        except Exception as e:
+            logger.error(f'处理天气提醒数据失败: {e}')
+
+    def _on_alerts_ready(self, alerts: list) -> None:
+        """处理异步获取的天气预警数据"""
+        try:
+            self.current_alerts = alerts
+            self.current_alert_index = 0
+            if self.current_alerts:
+                logger.debug(f'获取到 {len(self.current_alerts)} 个天气预警')
+                for i, alert in enumerate(self.current_alerts):
+                    logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
+            self._update_weather_alert_display()
+        except Exception as e:
+            logger.error(f'处理天气预警数据失败: {e}')
+    
+    def _update_weather_alert_display(self) -> None:
+        """更新天气预警和提醒的UI显示"""
+        try:
+            if self.current_alerts or self.current_reminders:
+                self.weather_alert_text.setFixedWidth(80)
+                self.weather_alert_text.setFixedHeight(40)
+                self._display_current_alert()
+                if not hasattr(self, 'weather_alert_timer') or not self.weather_alert_timer:
+                    self.weather_alert_timer = QTimer(self)
+                    self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
+                self.weather_alert_timer.start(6000)  # 6秒切换间隔
+            else:
+                self.weather_alert_text.hide()
+                self.alert_icon.hide()
+        except Exception as e:
+            logger.error(f'更新天气预警显示失败: {e}')
 
     def detect_weather_code_changed(self) -> None:
         current_code = config_center.read_conf('Weather')
@@ -2797,41 +2841,24 @@ class DesktopWidget(QWidget):  # 主要小组件
             try:
                 # 更新数据
                 weather_manager.current_weather_data = original_weather_data
-
-                # 获取预警数据
-                unified_alert_data = get_unified_weather_alerts(original_weather_data)
-                all_alerts = unified_alert_data.get('all_alerts', [])
-                
-                # 过滤相同预警
-                seen_titles = set()
-                unique_alerts = []
-                for alert in all_alerts:
-                    title = alert.get("title", "")
-                    if title not in seen_titles:
-                        seen_titles.add(title)
-                        unique_alerts.append(alert)
-                
-                self.current_alerts = unique_alerts
-                self.current_alert_index = 0
-
-                if self.current_alerts:
-                    logger.debug(f'获取到 {len(self.current_alerts)} 个天气预警')
-                    for i, alert in enumerate(self.current_alerts):
-                        logger.debug(f'预警 {i+1}: {alert.get("title", "未知")}')
-
-                # 获取天气提醒信息
-                self.current_reminders = weather_manager.get_weather_reminders()
-                self.current_reminder_index = 0
-
-                if self.current_reminders:
-                    logger.debug(f'获取到 {len(self.current_reminders)} 个天气提醒')
-                    for i, reminder in enumerate(self.current_reminders):
-                        logger.debug(f'提醒 {i+1}: {reminder.get("title", "未知")}')
-
-            except Exception as e:
-                logger.warning(f'获取预警和提醒数据失败：{e}')
+                # 初始化预警和提醒数据
                 self.current_alerts = []
                 self.current_alert_index = 0
+                self.current_reminders = []
+                self.current_reminder_index = 0
+                if not hasattr(self, 'reminder_thread') or not self.reminder_thread.isRunning():
+                    from weather import WeatherReminderThread
+                    self.reminder_thread = WeatherReminderThread(weather_manager, original_weather_data)
+                    self.reminder_thread.reminders_ready.connect(self._on_reminders_ready)
+                    self.reminder_thread.alerts_ready.connect(self._on_alerts_ready)
+                    self.reminder_thread.start()
+
+            except Exception as e:
+                logger.warning(f'初始化预警和提醒数据失败：{e}')
+                self.current_alerts = []
+                self.current_alert_index = 0
+                self.current_reminders = []
+                self.current_reminder_index = 0
 
             weather_name = db.get_weather_by_code(db.get_weather_data('icon', weather_data))
             temp_data = db.get_weather_data('temp', weather_data)
@@ -2845,18 +2872,6 @@ class DesktopWidget(QWidget):  # 主要小组件
                     QPixmap(db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data)))
                 )
                 self.alert_icon.hide()
-                if self.current_alerts or self.current_reminders:
-                    self.weather_alert_text.setFixedWidth(80)
-                    self.weather_alert_text.setFixedHeight(40)
-                    self._display_current_alert()
-                    if not hasattr(self, 'weather_alert_timer') or not self.weather_alert_timer:
-                        self.weather_alert_timer = QTimer(self)
-                        self.weather_alert_timer.timeout.connect(self.toggle_weather_alert)
-                    self.weather_alert_timer.start(6000)  # 6秒切换间隔
-                else:
-                    self.weather_alert_text.hide()
-                    self.alert_icon.hide()
-
                 if settings and hasattr(settings, '_on_weather_data_ready'):
                     settings._on_weather_data_ready(original_weather_data)
 

@@ -51,6 +51,55 @@ class WeatherFetchThread(QThread):
             self.quit()
             self.wait(3000)
 
+
+class WeatherReminderThread(QThread):
+    """异步天气提醒数据获取"""
+    reminders_ready = pyqtSignal(list)
+    alerts_ready = pyqtSignal(list)
+
+    def __init__(self, weather_manager, weather_data):
+        super().__init__()
+        self.weather_manager = weather_manager
+        self.weather_data = weather_data
+        self._is_running = False
+
+    def run(self):
+        try:
+            self._is_running = True
+            if self._is_running:
+                reminders = self.weather_manager.get_weather_reminders()
+                if self._is_running:
+                    self.reminders_ready.emit(reminders)
+            if self._is_running:
+                from weather import get_unified_weather_alerts
+                unified_alert_data = get_unified_weather_alerts(self.weather_data)
+                all_alerts = unified_alert_data.get('all_alerts', [])
+                seen_titles = set()
+                unique_alerts = []
+                for alert in all_alerts:
+                    title = alert.get("title", "")
+                    if title not in seen_titles:
+                        seen_titles.add(title)
+                        unique_alerts.append(alert)
+
+                if self._is_running:
+                    self.alerts_ready.emit(unique_alerts)
+
+        except Exception as e:
+            if self._is_running:
+                logger.error(f"异步获取天气提醒和预警失败: {e}")
+                self.reminders_ready.emit([])
+                self.alerts_ready.emit([])
+        finally:
+            self._is_running = False
+
+    def stop(self):
+        """停止线程"""
+        self._is_running = False
+        if self.isRunning():
+            self.quit()
+            self.wait(3000)
+
 def cache_result(expire_seconds: int = 300):
     """缓存装饰器 """
     # 她还是忘了不了她的缓存
@@ -627,6 +676,7 @@ class WeatherManager:
                 'temp_change': 0
             }
 
+    @cache_result(expire_seconds=600)  # 缓存10分钟，减少重复请求
     def get_weather_reminders(self) -> List[Dict[str, Any]]:
         """获取天气提醒信息"""
         provider = self.get_current_provider()
@@ -634,56 +684,62 @@ class WeatherManager:
             return []
 
         try:
-            precip_info = self.get_precipitation_info()
-            reminders = []
+            import signal
 
-            # 降水提醒
-            hourly_forecast = self.fetch_hourly_forecast()
-            if hourly_forecast and len(hourly_forecast) > 0:
-                same_precipitation = precip_info['same_precipitation']
-                if same_precipitation:  # 当前降水和第一个小时的降水状态相同
-                    if precip_info['precipitation']:  # 当前正在降水，降水持续
-                        if precip_info['precipitation_time'] and precip_info['precipitation_time'][0] <= 2:
-                            duration = precip_info['precipitation_time'][0]
-                            reminders.append({
-                                'type': 'precipitation_hours',
-                                'title': QCoreApplication.translate(
-                                    "WeatherReminder",
-                                    "降水将持续 {} 小时"
-                                ).format(duration),
-                                'icon': 'rain'
-                            })
-                        else:
-                            reminders.append({
-                                'type': 'precipitation_continue',
-                                'title': QCoreApplication.translate(
-                                    "WeatherReminder",
-                                    "降水将持续很久"
-                                ),
-                                'icon': 'rain'
-                            })
-                    else:  # 当前没有降水，很久后才有降水
-                        if precip_info['precipitation_time'] and precip_info['precipitation_time'][0] <= 3:
-                            hours = precip_info['precipitation_time'][0]
-                            reminders.append({
-                                'type': 'precipitation_soon',
-                                'title': QCoreApplication.translate(
-                                    "WeatherReminder",
-                                    "{} 小时后有降水"
-                                ).format(hours),
-                                'icon': 'rain'
-                            })
-                        # 明日降水提醒
-                        elif precip_info['tomorrow_precipitation']:
-                            days = precip_info['precipitation_day']  # 先留着吧
-                            reminders.append({
-                                'type': 'tomorrow_precipitation',
-                                'title': QCoreApplication.translate(
-                                    "WeatherReminder",
-                                    "明日有降水"
-                                ),
-                                'icon': 'rain'
-                            })
+            def timeout_handler(signum, frame):
+                raise TimeoutError("获取天气提醒超时")
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(15)
+
+            try:
+                precip_info = self.get_precipitation_info()
+                reminders = []
+                hourly_forecast = self.fetch_hourly_forecast()
+                if hourly_forecast and len(hourly_forecast) > 0:
+                    same_precipitation = precip_info['same_precipitation']
+                    if same_precipitation:  # 当前降水和第一个小时的降水状态相同
+                        if precip_info['precipitation']:  # 当前正在降水，降水持续
+                            if precip_info['precipitation_time'] and precip_info['precipitation_time'][0] <= 2:
+                                duration = precip_info['precipitation_time'][0]
+                                reminders.append({
+                                    'type': 'precipitation_hours',
+                                    'title': QCoreApplication.translate(
+                                        "WeatherReminder",
+                                        "降水将持续 {} 小时"
+                                    ).format(duration),
+                                    'icon': 'rain'
+                                })
+                            else:
+                                reminders.append({
+                                    'type': 'precipitation_continue',
+                                    'title': QCoreApplication.translate(
+                                        "WeatherReminder",
+                                        "降水将持续很久"
+                                    ),
+                                    'icon': 'rain'
+                                })
+                        else:  # 当前没有降水，很久后才有降水
+                            if precip_info['precipitation_time'] and precip_info['precipitation_time'][0] <= 3:
+                                hours = precip_info['precipitation_time'][0]
+                                reminders.append({
+                                    'type': 'precipitation_soon',
+                                    'title': QCoreApplication.translate(
+                                        "WeatherReminder",
+                                        "{} 小时后有降水"
+                                    ).format(hours),
+                                    'icon': 'rain'
+                                })
+                            # 明日降水提醒
+                            elif precip_info['tomorrow_precipitation']:
+                                days = precip_info['precipitation_day']  # 先留着吧
+                                reminders.append({
+                                    'type': 'tomorrow_precipitation',
+                                    'title': QCoreApplication.translate(
+                                        "WeatherReminder",
+                                        "明日有降水"
+                                    ),
+                                    'icon': 'rain'
+                                })
                 else:
                     if precip_info['precipitation']:
                         reminders.append({
@@ -704,27 +760,29 @@ class WeatherManager:
                             'icon': 'rain'
                         })
 
-            # 气温提醒
-            if precip_info['temp_change'] >= 8:
-                reminders.append({
-                    'type': 'temperature_rise',
-                    'title': QCoreApplication.translate(
-                        "WeatherReminder",
-                        "明日气温陡升"
-                    ),
-                    'icon': 'high_temp'
-                })
-            elif precip_info['temp_change'] <= -8:
-                reminders.append({
-                    'type': 'temperature_drop',
-                    'title': QCoreApplication.translate(
-                        "WeatherReminder",
-                        "明日气温骤降"
-                    ),
-                    'icon': 'low_temp'
-                })
+                # 气温提醒
+                if precip_info['temp_change'] >= 8:
+                    reminders.append({
+                        'type': 'temperature_rise',
+                        'title': QCoreApplication.translate(
+                            "WeatherReminder",
+                            "明日气温陡升"
+                        ),
+                        'icon': 'high_temp'
+                    })
+                elif precip_info['temp_change'] <= -8:
+                    reminders.append({
+                        'type': 'temperature_drop',
+                        'title': QCoreApplication.translate(
+                            "WeatherReminder",
+                            "明日气温骤降"
+                        ),
+                        'icon': 'low_temp'
+                    })
 
-            return reminders
+                return reminders
+            finally:
+                signal.alarm(0)  # 取消超时
         except Exception as e:
             logger.error(f'获取天气提醒失败: {e}')
             return []
@@ -855,21 +913,17 @@ class GenericWeatherProvider(WeatherapiProvider):
             url_template = forecast_config.get('url', '')
             if not url_template:
                 return {}
-
-            # 替换模板中的变量
             url = url_template.format(
                 location_key=location_key,
                 key=api_key,
                 days=days
             )
-
-            # 对于坐标类型的API
             if self.config.get('method') == 'coordinates':
                 if ',' in location_key:
                     lon, lat = location_key.split(',')
                     url = url.format(lon=lon, lat=lat)
 
-            logger.debug(f"获取 {forecast_type} 预报数据: {url}")
+            # logger.debug(f"获取 {forecast_type} 预报数据: {url}")
             response = requests.get(url, proxies=proxies, timeout=10)
             response.raise_for_status()
             return response.json()
@@ -945,8 +999,6 @@ class GenericWeatherProvider(WeatherapiProvider):
                 value = self._extract_value_by_path(data, update_time_path)
                 if value:
                     return str(value)
-
-            # 尝试常见的更新时间字段
             common_fields = ['updateTime', 'update_time', 'lastUpdate', 'last_update', 'time']
             for field in common_fields:
                 value = data.get(field)
@@ -1519,19 +1571,29 @@ class QWeatherProvider(GenericWeatherProvider):
             now = data.get('now', {})
             wind_dir = now.get('windDir')
             wind_360 = now.get('wind360')
-            if wind_dir:
-                return wind_dir
             if wind_360 is not None:
                 try:
                     degree = float(wind_360)
-                    return self._convert_wind_direction(degree)
+                    direction_desc = self._convert_wind_direction(degree)
+                    return f"{direction_desc}"
                 except (ValueError, TypeError):
                     pass
+            if wind_dir:
+                return wind_dir
 
             return None
         except Exception as e:
             logger.error(f"解析和风天气风向失败: {e}")
             return None
+
+    def _convert_wind_direction(self, degree: float) -> str:
+        """将风向角度转换为方向描述(和风天气)"""
+        directions = [
+            "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+        ]
+        index = int((degree + 11.25) / 22.5) % 16
+        return directions[index]
 
     def parse_wind_speed(self, data: Dict[str, Any]) -> Optional[str]:
         """解析风速数据(和风天气)"""
@@ -1992,14 +2054,24 @@ class OpenMeteoProvider(GenericWeatherProvider):
 
         try:
             from network_thread import proxies
-            url = self.base_url.format(lon=lon,lat=lat)
-            #logger.debug(f'{self.api_name} 请求URL: {url}')
+            weather_url = self.base_url.format(lon=lon, lat=lat)
             headers = {
-                'User-Agent': 'ClassWidgets/1.1.7.2 (contact: IsHPDuwu@outlook.com)'
+                'User-Agent': 'ClassWidgets'
             }
-            response = requests.get(url, proxies=proxies, timeout=10, headers=headers)
-            response.raise_for_status()
-            return response.json()
+            weather_response = requests.get(weather_url, proxies=proxies, timeout=10, headers=headers)
+            weather_response.raise_for_status()
+            weather_data = weather_response.json()
+            try:
+                air_quality_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&current=carbon_monoxide,nitrogen_dioxide,ozone,pm10,pm2_5,sulphur_dioxide&timezone=auto"
+                air_response = requests.get(air_quality_url, proxies=proxies, timeout=10, headers=headers)
+                air_response.raise_for_status()
+                air_data = air_response.json()
+                weather_data['air_quality'] = air_data
+            except Exception as e:
+                logger.warning(f'获取空气质量数据失败: {e}')
+                weather_data['air_quality'] = None
+
+            return weather_data
         except Exception as e:
             logger.error(f'{self.api_name} 获取天气数据失败: {e}')
             raise
@@ -2064,6 +2136,259 @@ class OpenMeteoProvider(GenericWeatherProvider):
             code = int(weather_code)
             return (51 <= code <= 67) or (71 <= code <= 77) or (80 <= code <= 86) or (95 <= code <= 99)
         return False
+
+    def parse_feels_like(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析体感温度(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            feels_like = current.get('apparent_temperature')
+            current_units = data.get('current_units', {})
+            unit = current_units.get('apparent_temperature', '°C')
+            if feels_like is not None:
+                return f"{feels_like}{unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 体感温度失败: {e}")
+            return None
+
+    def parse_humidity(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析湿度(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            humidity = current.get('relative_humidity_2m')
+            if humidity is not None:
+                return f"{humidity}%"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 湿度失败: {e}")
+            return None
+
+    def parse_wind_speed(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析风速(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            wind_speed = current.get('wind_speed_10m')
+            current_units = data.get('current_units', {})
+            unit = current_units.get('wind_speed_10m', 'km/h')
+            if wind_speed is not None:
+                return f"{wind_speed} {unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 风速失败: {e}")
+            return None
+
+    def parse_wind_direction(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析风向(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            wind_direction = current.get('wind_direction_10m')
+            if wind_direction is not None:
+                # 将角度转换为方向描述，使用与小米天气相同的格式
+                direction_desc = self._convert_wind_direction(float(wind_direction))
+                return f"{direction_desc}"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 风向失败: {e}")
+            return None
+
+    def _convert_wind_direction(self, degree: float) -> str:
+        """将风向角度转换为方向描述(Open-Meteo)"""
+        directions = [
+            "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+        ]
+        index = int((degree + 11.25) / 22.5) % 16
+        return directions[index]
+
+    def parse_pressure(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析气压(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            pressure = current.get('surface_pressure')
+            current_units = data.get('current_units', {})
+            unit = current_units.get('surface_pressure', 'hPa')
+            if pressure is not None:
+                return f"{pressure} {unit}"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 气压失败: {e}")
+            return None
+
+    def parse_visibility(self, data: Dict[str, Any]) -> Optional[str]:
+        """解析能见度(Open-Meteo)"""
+        try:
+            current = data.get('current', {})
+            visibility = current.get('visibility')
+            if visibility is not None:
+                # 转换为公里
+                visibility_km = visibility / 1000
+                return f"{visibility_km:.1f} km"
+            return None
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 能见度失败: {e}")
+            return None
+
+    def parse_aqi_data(self, data: Dict[str, Any]) -> Dict[str, Optional[str]]:
+        """解析空气质量数据(Open-Meteo)"""
+        aqi_data = {
+            'co': None,
+            'no2': None,
+            'o3': None,
+            'pm10': None,
+            'pm25': None,
+            'so2': None
+        }
+        try:
+            air_quality = data.get('air_quality')
+            if not air_quality:
+                return aqi_data
+            current = air_quality.get('current', {})
+            current_units = air_quality.get('current_units', {})
+            # 一氧化碳 (CO)
+            if 'carbon_monoxide' in current:
+                co_value = current['carbon_monoxide']
+                co_unit = current_units.get('carbon_monoxide', 'μg/m³')
+                if co_value is not None:
+                    aqi_data['co'] = f"{co_value} {co_unit}"
+            # 二氧化氮 (NO2)
+            if 'nitrogen_dioxide' in current:
+                no2_value = current['nitrogen_dioxide']
+                no2_unit = current_units.get('nitrogen_dioxide', 'μg/m³')
+                if no2_value is not None:
+                    aqi_data['no2'] = f"{no2_value} {no2_unit}"
+            # 臭氧 (O3)
+            if 'ozone' in current:
+                o3_value = current['ozone']
+                o3_unit = current_units.get('ozone', 'μg/m³')
+                if o3_value is not None:
+                    aqi_data['o3'] = f"{o3_value} {o3_unit}"
+            # PM10
+            if 'pm10' in current:
+                pm10_value = current['pm10']
+                pm10_unit = current_units.get('pm10', 'μg/m³')
+                if pm10_value is not None:
+                    aqi_data['pm10'] = f"{pm10_value} {pm10_unit}"
+            # PM2.5
+            if 'pm2_5' in current:
+                pm25_value = current['pm2_5']
+                pm25_unit = current_units.get('pm2_5', 'μg/m³')
+                if pm25_value is not None:
+                    aqi_data['pm25'] = f"{pm25_value} {pm25_unit}"
+            # 二氧化硫 (SO2)
+            if 'sulphur_dioxide' in current:
+                so2_value = current['sulphur_dioxide']
+                so2_unit = current_units.get('sulphur_dioxide', 'μg/m³')
+                if so2_value is not None:
+                    aqi_data['so2'] = f"{so2_value} {so2_unit}"
+        except Exception as e:
+            logger.error(f"解析 Open-Meteo 空气质量数据失败: {e}")
+
+        return aqi_data
+
+    def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 7) -> Dict[str, Any]:
+        """获取预报数据(Open-Meteo)"""
+        if not location_key:
+            raise ValueError(f'{self.api_name}: location_key 参数不能为空')
+
+        try:
+            lon, lat = location_key.split(',')
+        except:
+            raise ValueError(f'{self.api_name}: location_key 不为逗号分隔的经纬度模式')
+
+        try:
+            from network_thread import proxies
+            # Open-Meteo的预报数据已经在主API中包含了
+            url = self.base_url.format(lon=lon, lat=lat)
+            headers = {
+                'User-Agent': 'ClassWidgets/1.1.7.2 (contact: IsHPDuwu@outlook.com)'
+            }
+            response = requests.get(url, proxies=proxies, timeout=10, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f'{self.api_name} 获取预报数据失败: {e}')
+            raise
+
+    def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
+        """解析预报数据(Open-Meteo)"""
+        try:
+            if forecast_type == 'hourly':
+                return self._parse_hourly_forecast(raw_data)
+            elif forecast_type == 'daily':
+                return self._parse_daily_forecast(raw_data)
+            else:
+                logger.error(f'不支持的预报类型: {forecast_type}')
+                return []
+        except Exception as e:
+            logger.error(f'解析 Open-Meteo {forecast_type} 预报数据失败: {e}')
+            return []
+
+    def _parse_hourly_forecast(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """解析逐小时预报数据(Open-Meteo)"""
+        try:
+            hourly = data.get('hourly', {})
+            if not hourly:
+                return []
+
+            times = hourly.get('time', [])
+            temperatures = hourly.get('temperature_2m', [])
+            weather_codes = hourly.get('weather_code', [])
+            apparent_temps = hourly.get('apparent_temperature', [])
+            humidity = hourly.get('relative_humidity_2m', [])
+            wind_speeds = hourly.get('wind_speed_10m', [])
+            wind_directions = hourly.get('wind_direction_10m', [])
+            pressures = hourly.get('surface_pressure', [])
+            visibility = hourly.get('visibility', [])
+
+            hourly_units = data.get('hourly_units', {})
+
+            forecast_list = []
+            for i in range(min(len(times), 24)):  # 限制为24小时
+                hour_data = {
+                    'time': times[i] if i < len(times) else None,
+                    'temperature': f"{temperatures[i]}{hourly_units.get('temperature_2m', '°C')}" if i < len(temperatures) and temperatures[i] is not None else None,
+                    'weather_code': str(weather_codes[i]) if i < len(weather_codes) and weather_codes[i] is not None else None,
+                    'apparent_temperature': f"{apparent_temps[i]}{hourly_units.get('apparent_temperature', '°C')}" if i < len(apparent_temps) and apparent_temps[i] is not None else None,
+                    'humidity': f"{humidity[i]}%" if i < len(humidity) and humidity[i] is not None else None,
+                    'wind_speed': f"{wind_speeds[i]} {hourly_units.get('wind_speed_10m', 'km/h')}" if i < len(wind_speeds) and wind_speeds[i] is not None else None,
+                    'wind_direction': f"{wind_directions[i]}°" if i < len(wind_directions) and wind_directions[i] is not None else None,
+                    'pressure': f"{pressures[i]} {hourly_units.get('surface_pressure', 'hPa')}" if i < len(pressures) and pressures[i] is not None else None,
+                    'visibility': f"{visibility[i]/1000:.1f} km" if i < len(visibility) and visibility[i] is not None else None,
+                    'precipitation': "0.0"  # Open-Meteo在基础API中不直接提供降水量
+                }
+                forecast_list.append(hour_data)
+            # logger.info(f'Open-Meteo成功解析 {len(forecast_list)} 小时预报数据')
+            return forecast_list
+        except Exception as e:
+            logger.error(f'解析 Open-Meteo 逐小时预报失败: {e}')
+            return []
+
+    def _parse_daily_forecast(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """解析每日预报数据(Open-Meteo)"""
+        try:
+            daily = data.get('daily', {})
+            if not daily:
+                return []
+
+            times = daily.get('time', [])
+            temp_max = daily.get('temperature_2m_max', [])
+            temp_min = daily.get('temperature_2m_min', [])
+            weather_codes = daily.get('weather_code', [])
+            daily_units = data.get('daily_units', {})
+            forecast_list = []
+            for i in range(min(len(times), 7)):  # 限制为7天
+                day_data = {
+                    'date': times[i] if i < len(times) else None,
+                    'temp_max': f"{temp_max[i]}{daily_units.get('temperature_2m_max', '°C')}" if i < len(temp_max) and temp_max[i] is not None else None,
+                    'temp_min': f"{temp_min[i]}{daily_units.get('temperature_2m_min', '°C')}" if i < len(temp_min) and temp_min[i] is not None else None,
+                    'weather_code': str(weather_codes[i]) if i < len(weather_codes) and weather_codes[i] is not None else None,
+                }
+                forecast_list.append(day_data)
+            # logger.info(f'Open-Meteo成功解析 {len(forecast_list)} 天预报数据')
+            return forecast_list
+        except Exception as e:
+            logger.error(f'解析 Open-Meteo 每日预报失败: {e}')
+            return []
 
 
 class WeatherDatabase:
@@ -2898,19 +3223,32 @@ class WeatherReportThread(QThread):
     def __init__(self):
         super().__init__()
         self.weather_manager = WeatherManager()
+        self._is_running = False
 
     def run(self):
         """线程运行方法"""
         try:
+            self._is_running = True
             weather_data = self.weather_manager.fetch_weather_data()
-            if weather_data:
-                self.weather_signal.emit(weather_data)
-            else:
-                logger.error('获取天气数据返回None')
-                self.weather_signal.emit({'error': {'info': {'value': '错误', 'unit': ''}}})
+            if self._is_running:
+                if weather_data:
+                    self.weather_signal.emit(weather_data)
+                else:
+                    logger.error('获取天气数据返回None')
+                    self.weather_signal.emit({'error': {'info': {'value': '错误', 'unit': ''}}})
         except Exception as e:
-            logger.error(f'触发天气信息失败: {e}')
-            self.weather_signal.emit({'error': {'info': {'value': '错误', 'unit': ''}}})
+            if self._is_running:
+                logger.error(f'触发天气信息失败: {e}')
+                self.weather_signal.emit({'error': {'info': {'value': '错误', 'unit': ''}}})
+        finally:
+            self._is_running = False
+
+    def stop(self):
+        """停止线程"""
+        self._is_running = False
+        if self.isRunning():
+            self.quit()
+            self.wait(3000)
 
 
 weather_manager = WeatherManager()
