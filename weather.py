@@ -684,12 +684,13 @@ class WeatherManager:
             return []
 
         try:
-            import signal
-
-            def timeout_handler(signum, frame):
-                raise TimeoutError("获取天气提醒超时")
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(15)
+            import threading
+            timeout_occurred = threading.Event()
+            def timeout_handler():
+                timeout_occurred.set()
+            # 15秒超时
+            timer = threading.Timer(15.0, timeout_handler)
+            timer.start()
 
             try:
                 precip_info = self.get_precipitation_info()
@@ -782,7 +783,7 @@ class WeatherManager:
 
                 return reminders
             finally:
-                signal.alarm(0)  # 取消超时
+                timer.cancel()  # 取消超时定时器
         except Exception as e:
             logger.error(f'获取天气提醒失败: {e}')
             return []
@@ -1435,13 +1436,19 @@ class QWeatherProvider(GenericWeatherProvider):
             from network_thread import proxies
             if ',' in location_key:
                 lat, lon = location_key.split(',')
-                url = self.base_url.format(location_key=f"{lat},{lon}", key=api_key)
+                # 和风天气坐标格式：经度,纬度（经度在前纬度在后），只支持小数点后两位
+                lat = f"{float(lat):.2f}"
+                lon = f"{float(lon):.2f}"
+                # Note：和风天气API要求经度在前，纬度在后
+                url = self.base_url.format(location_key=f"{lon},{lat}", key=api_key)
             else:
                 url = self.base_url.format(location_key=location_key, key=api_key)
-            # logger.debug(f'{self.api_name} 请求URL: {url}')
+            # logger.debug(f'{self.api_name} 请求URL: {url.replace(api_key, "***" if api_key else "(空)")}')
             response = requests.get(url, proxies=proxies, timeout=10)
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            # logger.debug(f'{self.api_name} API响应: {result}')
+            return result
         except Exception as e:
             logger.error(f'{self.api_name} 获取天气数据失败: {e}')
             raise
@@ -1620,7 +1627,11 @@ class QWeatherProvider(GenericWeatherProvider):
             from network_thread import proxies
             if ',' in location_key:
                 lat, lon = location_key.split(',')
-                air_url = f"https://devapi.qweather.com/v7/air/now?location={lat},{lon}&key={api_key}"
+                # 和风天气坐标格式：经度,纬度（经度在前纬度在后），只支持小数点后两位
+                lat = f"{float(lat):.2f}"
+                lon = f"{float(lon):.2f}"
+                # Note：和风天气API要求经度在前，纬度在后
+                air_url = f"https://devapi.qweather.com/v7/air/now?location={lon},{lat}&key={api_key}"
             else:
                 air_url = f"https://devapi.qweather.com/v7/air/now?location={location_key}&key={api_key}"
 
@@ -1694,8 +1705,14 @@ class QWeatherProvider(GenericWeatherProvider):
 
         try:
             from network_thread import proxies
-            # 和风天气预警API
-            alert_url = f"https://devapi.qweather.com/v7/warning/now?location={location_key}&key={api_key}"
+            if ',' in location_key:
+                lat, lon = location_key.split(',')
+                lat = f"{float(lat):.2f}"
+                lon = f"{float(lon):.2f}"
+                # Note：和风天气API要求经度在前，纬度在后
+                alert_url = f"https://devapi.qweather.com/v7/warning/now?location={lon},{lat}&key={api_key}"
+            else:
+                alert_url = f"https://devapi.qweather.com/v7/warning/now?location={location_key}&key={api_key}"
             # logger.debug(f'和风天气预警请求URL: {alert_url.replace(api_key, "***" if api_key else "(空)")}')
 
             response = requests.get(alert_url, proxies=proxies, timeout=10)
@@ -1723,7 +1740,7 @@ class QWeatherProvider(GenericWeatherProvider):
     def _validate_qweather_response(self, data: Dict[str, Any]) -> bool:
         """验证和风天气响应"""
         if data.get('code') != '200':
-            logger.warning(f"和风天气预警API返回错误: {data.get('code')}")
+            logger.warning(f"和风天气预警API返回错误: {data.get('code')}，完整响应: {data}")
             return False
         return True
 
@@ -1734,12 +1751,12 @@ class QWeatherProvider(GenericWeatherProvider):
             try:
                 alert = self._build_qweather_alert(warning)
                 alerts.append(alert)
-                logger.debug(f"解析预警: {alert['title']} - {alert['level']}")
+                # logger.debug(f"解析预警: {alert['title']} - {alert['level']}")
             except Exception as e:
                 logger.error(f"解析单个预警失败: {e}")
                 continue
 
-        logger.info(f"和风天气成功解析 {len(alerts)} 条预警信息")
+        # logger.info(f"和风天气成功解析 {len(alerts)} 条预警信息")
         return alerts
 
     def _build_qweather_alert(self, warning: Dict[str, Any]) -> Dict[str, Any]:
