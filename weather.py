@@ -2715,17 +2715,188 @@ def get_weather_alert_url() -> Optional[str]:
     alerts_config = provider.config.get('alerts', {})
     return alerts_config.get('url')
 
-def get_hourly_forecast() -> List[Dict[str, Any]]:
-    """获取逐小时天气预报"""
-    return weather_manager.fetch_hourly_forecast()
+def get_hourly_forecast() -> Dict[str, Any]:
+    """获取逐小时天气预报
 
-def get_daily_forecast(days: int = 5) -> List[Dict[str, Any]]:
-    """获取多天天气预报"""
-    return weather_manager.fetch_daily_forecast(days)
+    Returns:
+        Dict[str, Any]: 包含预报数据和状态信息的字典
+            - success: bool, 是否成功获取数据
+            - supported: bool, 当前提供者是否支持逐小时预报
+            - data: List[Dict[str, Any]], 预报数据列表
+            - error: str, 错误信息（如果有）
+    """
+    try:
+        provider = weather_manager.get_current_provider()
+        if not provider:
+            return {
+                'success': False,
+                'supported': False,
+                'data': [],
+                'error': '未找到天气提供者'
+            }
+        forecast_config = provider.config.get('forecast', {})
+        hourly_supported = forecast_config.get('hourly', False)
+        if not hourly_supported:
+            logger.warning(f'{provider.api_name} 不支持逐小时预报')
+            return {
+                'success': False,
+                'supported': False,
+                'data': [],
+                'error': f'{provider.api_name} 不支持逐小时预报'
+            }
 
-def get_precipitation_info() -> List[Dict[str, Any]]:
-    """获取降水信息"""
-    return weather_manager.get_precipitation_info()
+        forecast_data = weather_manager.fetch_hourly_forecast()
+        return {
+            'success': True,
+            'supported': True,
+            'data': forecast_data if forecast_data else [],
+            'error': None
+        }
+
+    except Exception as e:
+        logger.error(f'获取逐小时预报失败: {e}')
+        return {
+            'success': False,
+            'supported': False,
+            'data': [],
+            'error': str(e)
+        }
+
+def get_daily_forecast(days: int = 5) -> Dict[str, Any]:
+    """获取多天天气预报
+
+    Args:
+        days: 预报天数，默认5天
+
+    Returns:
+        Dict[str, Any]: 包含预报数据和状态信息的字典
+            - success: bool, 是否成功获取数据
+            - supported: bool, 当前提供者是否支持多天预报
+            - data: List[Dict[str, Any]], 预报数据列表
+            - days: int, 实际获取的天数
+            - error: str, 错误信息（如果有）
+    """
+    try:
+        provider = weather_manager.get_current_provider()
+        if not provider:
+            return {
+                'success': False,
+                'supported': False,
+                'data': [],
+                'days': 0,
+                'error': '未找到天气提供者'
+            }
+        # 检查是否支持多天预报
+        forecast_config = provider.config.get('forecast', {})
+        daily_supported = forecast_config.get('daily', False)
+        if not daily_supported:
+            logger.warning(f'{provider.api_name} 不支持多天预报')
+            return {
+                'success': False,
+                'supported': False,
+                'data': [],
+                'days': 0,
+                'error': f'{provider.api_name} 不支持多天预报'
+            }
+
+        if days <= 0:
+            days = 5
+        elif days > 15:  # 限制最大天数
+            days = 15
+            logger.warning('预报天数超过限制, 已调整为15天')
+
+        forecast_data = weather_manager.fetch_daily_forecast(days)
+        return {
+            'success': True,
+            'supported': True,
+            'data': forecast_data if forecast_data else [],
+            'days': len(forecast_data) if forecast_data else 0,
+            'error': None
+        }
+
+    except Exception as e:
+        logger.error(f'获取多天预报失败: {e}')
+        return {
+            'success': False,
+            'supported': False,
+            'data': [],
+            'days': 0,
+            'error': str(e)
+        }
+
+def get_precipitation_info() -> Dict[str, Any]:
+    """获取降水信息
+
+    Returns:
+        Dict[str, Any]: 包含降水信息和状态的字典
+            - success: bool, 是否成功获取数据
+            - supported: bool, 当前提供者是否支持降水分析
+            - data: Dict[str, Any], 降水信息数据
+            - error: str, 错误信息（如果有）
+    """
+    try:
+        provider = weather_manager.get_current_provider()
+        if not provider:
+            return {
+                'success': False,
+                'supported': False,
+                'data': {
+                    'precipitation': False,
+                    'precipitation_time': [],
+                    'tomorrow_precipitation': False,
+                    'precipitation_day': 0,
+                    'first_hour_precip': False,
+                    'same_precipitation': True,
+                    'temp_change': 0
+                },
+                'error': '未找到天气提供者'
+            }
+
+        # 检查是否支持降水分析 (需要逐小时和多天预报)
+        forecast_config = provider.config.get('forecast', {})
+        hourly_supported = forecast_config.get('hourly', False)
+        daily_supported = forecast_config.get('daily', False)
+        if not (hourly_supported and daily_supported):
+            logger.warning(f'{provider.api_name} 不完全支持降水分析 (需要逐小时和多天预报)')
+            return {
+                'success': False,
+                'supported': False,
+                'data': {
+                    'precipitation': False,
+                    'precipitation_time': [],
+                    'tomorrow_precipitation': False,
+                    'precipitation_day': 0,
+                    'first_hour_precip': False,
+                    'same_precipitation': True,
+                    'temp_change': 0
+                },
+                'error': f'{provider.api_name} 不完全支持降水分析'
+            }
+
+        precipitation_data = weather_manager.get_precipitation_info()
+        return {
+            'success': True,
+            'supported': True,
+            'data': precipitation_data,
+            'error': None
+        }
+
+    except Exception as e:
+        logger.error(f'获取降水信息失败: {e}')
+        return {
+            'success': False,
+            'supported': False,
+            'data': {
+                'precipitation': False,
+                'precipitation_time': [],
+                'tomorrow_precipitation': False,
+                'precipitation_day': 0,
+                'first_hour_precip': False,
+                'same_precipitation': True,
+                'temp_change': 0
+            },
+            'error': str(e)
+        }
 
 
 if __name__ == '__main__':
@@ -2789,12 +2960,13 @@ if __name__ == '__main__':
         icon_path = get_weather_icon_by_code('0')
         print(f"天气代码0对应的图标: {icon_path}")
         # 测试逐小时预报
-        hourly_forecast = get_hourly_forecast()
-        if hourly_forecast:
+        hourly_result = get_hourly_forecast()
+        print(f"逐小时预报支持状态: {hourly_result['supported']}, 成功: {hourly_result['success']}")
+        if hourly_result['success'] and hourly_result['data']:
             print("逐小时天气预报 (近12小时):")
             precipitation_time = None
 
-            for hour in hourly_forecast:
+            for hour in hourly_result['data']:
                 if "precipitation_time" in hour:
                     precipitation_time = hour["precipitation_time"]
                     continue
@@ -2806,16 +2978,17 @@ if __name__ == '__main__':
             if precipitation_time:
                 print(f"降水时间分组: {precipitation_time}")
         else:
-            print("无逐小时预报数据")
+            print(f"无逐小时预报数据: {hourly_result.get('error', '未知错误')}")
 
         # 测试5天预报
-        daily_forecast = get_daily_forecast(5)
-        if daily_forecast:
+        daily_result = get_daily_forecast(5)
+        print(f"\n多天预报支持状态: {daily_result['supported']}, 成功: {daily_result['success']}, 实际天数: {daily_result['days']}")
+        if daily_result['success'] and daily_result['data']:
             print("\n5 天天气预报:")
             tomorrow_precip = False
             precip_days = 0
 
-            for day in daily_forecast:
+            for day in daily_result['data']:
                 if "tomorrow_precipitation" in day:
                     tomorrow_precip = day["tomorrow_precipitation"]
                     precip_days = day["precipitation_day"]
@@ -2831,10 +3004,15 @@ if __name__ == '__main__':
                 print(f"  状态: {precip_status}, {day_precip_status}")
 
         else:
-            print("无 5 天预报数据")
+            print(f"无 5 天预报数据: {daily_result.get('error', '未知错误')}")
 
-        precipitation_info = get_precipitation_info()
-        print(precipitation_info)
+        precipitation_result = get_precipitation_info()
+        print(f"\n降水分析支持状态: {precipitation_result['supported']}, 成功: {precipitation_result['success']}")
+        if precipitation_result['success']:
+            print("降水信息:")
+            print(precipitation_result['data'])
+        else:
+            print(f"无法获取降水信息: {precipitation_result.get('error', '未知错误')}")
 
         print(weather_manager.get_weather_reminders())
 
