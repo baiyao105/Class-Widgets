@@ -47,7 +47,8 @@
     "api_key": "",
     "refresh_interval": "15",
     "temperature_unit": "°C",
-    "alert_exclude": ""
+    "alert_exclude": "",
+    "widget_display": "'temperature', 'alert', 'reminder'"
   },
   "Color": {
     "floating_time": "959595",

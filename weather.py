@@ -1093,14 +1093,19 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
         try:
             # 结构: now.current.visibility
             current = data.get("current", {})
-            visibility = current.get('visibility', {})
-            visibility_value = visibility.get('value')
-            visibility_unit = visibility.get('unit', 'km')
-            if visibility_value is not None and str(visibility_value).strip():
-                return f"{visibility_value} {visibility_unit}"
-            else:
-                logger.warning(f"小米天气能见度数据为空或无效: '{visibility_value}'")
-                return "-- km"
+            visibility = current.get('visibility')
+            if isinstance(visibility, dict):
+                visibility_value = visibility.get('value')
+                visibility_unit = visibility.get('unit', 'km')
+                if visibility_value is not None and str(visibility_value).strip():
+                    return f"{visibility_value} {visibility_unit}"
+            elif isinstance(visibility, (int, float)):
+                return f"{visibility} km"
+            elif isinstance(visibility, str) and visibility.strip():
+                return f"{visibility} km"
+
+            logger.warning(f"小米天气能见度数据为空或格式不正确: '{visibility}' (类型: {type(visibility)})")
+            return "-- km"
         except Exception as e:
             logger.error(f"解析能见度失败(小米天气): {e}")
             return None
@@ -2236,10 +2241,26 @@ class OpenMeteoProvider(GenericWeatherProvider):
         try:
             current = data.get('current', {})
             visibility = current.get('visibility')
+
             if visibility is not None:
-                # 转换为公里
-                visibility_km = visibility / 1000
-                return f"{visibility_km:.1f} km"
+                if isinstance(visibility, (int, float)):
+                    visibility_km = visibility / 1000
+                    return f"{visibility_km:.1f} km"
+                elif isinstance(visibility, dict):
+                    visibility_value = visibility.get('value')
+                    if isinstance(visibility_value, (int, float)):
+                        visibility_km = visibility_value / 1000
+                        return f"{visibility_km:.1f} km"
+                elif isinstance(visibility, str):
+                    try:
+                        visibility_num = float(visibility)
+                        visibility_km = visibility_num / 1000
+                        return f"{visibility_km:.1f} km"
+                    except ValueError:
+                        logger.warning(f"Open-Meteo能见度字符串无法转换为数值: '{visibility}'")
+                        return None
+
+                logger.warning(f"Open-Meteo能见度数据格式不正确: '{visibility}' (类型: {type(visibility)})")
             return None
         except Exception as e:
             logger.error(f"解析 Open-Meteo 能见度失败: {e}")
@@ -2611,8 +2632,17 @@ class WeatherDataProcessor:
 
     def _find_weather_code(self, weather_status: Dict[str, Any], code: str, api_name: Optional[str]) -> Optional[str]:
         """查找代码"""
+        if code is None or str(code).strip() == '' or str(code) == 'None':
+            logger.error(f'天气代码为空或无效({api_name}): {code}')
+            return None
+
+        if not weather_status or 'weatherinfo' not in weather_status:
+            logger.error(f'天气状态数据无效({api_name}): {weather_status}')
+            return None
+
         for weather in weather_status.get('weatherinfo', []):
-            if str(weather.get('code')) == str(code):
+            weather_code = weather.get('code')
+            if weather_code is not None and str(weather_code) == str(code):
                 original_code = weather.get('original_code')
                 if original_code is not None:
                     return str(original_code)
