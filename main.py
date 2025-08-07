@@ -1703,7 +1703,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.last_widgets = list_.get_widget_config()
         self.path = path
         theme_config = conf.load_theme_config(str('default' if theme is None else theme)).config
-        self.last_code = 101010100
+        initial_api = config_center.read_conf('Weather', 'api') or 'unknown'
+        initial_city = config_center.read_conf('Weather', 'city') or '0'
+        self.last_code = f"{initial_api}|{initial_city}"
         self.radius = theme_config.radius
         self.last_theme = config_center.read_conf('General', 'theme')
         self.last_color_mode = config_center.read_conf('General', 'color_mode')
@@ -2271,7 +2273,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             self._update_weather_alert_display()
         except Exception as e:
             logger.error(f'处理天气提醒数据失败: {e}')
-
     def _on_alerts_ready(self, alerts: list) -> None:
         """处理异步获取的天气预警数据"""
         try:
@@ -2303,10 +2304,21 @@ class DesktopWidget(QWidget):  # 主要小组件
             logger.error(f'更新天气预警显示失败: {e}')
 
     def detect_weather_code_changed(self) -> None:
-        current_code = config_center.read_conf('Weather')
-        if current_code != self.last_code:
-            self.last_code = current_code
-            self.get_weather_data()
+        current_api = config_center.read_conf('Weather', 'api')
+        current_city = config_center.read_conf('Weather', 'city')
+        current_key_config = f"{current_api}|{current_city}"
+        
+        if current_key_config != self.last_code:
+            last_api = self.last_code.split('|')[0] if '|' in self.last_code else ''
+            if current_api != last_api:
+                # logger.debug(f'检测到天气API变化: {last_api} -> {current_api}，等待城市代码稳定')
+                self.last_code = current_key_config
+                from weather import on_weather_api_changed
+                on_weather_api_changed(current_api)
+            else:
+                # logger.debug(f'检测到城市配置变化: {self.last_code} -> {current_key_config}')
+                self.last_code = current_key_config
+                self.get_weather_data()
 
     def toggle_weather_alert(self) -> None:
         """在温度、预警和提醒之间切换显示"""

@@ -1190,6 +1190,7 @@ class SettingsMenu(FluentWindow):
             self.refresh_button = self.wtInterface.findChild(ToolButton, 'ToolButton') # 刷新按钮
             select_weather_api = self.wtInterface.findChild(ComboBox, 'select_weather_api') # 天气api选择器
             api_key_edit = self.wtInterface.findChild(LineEdit, 'api_key_edit') # api_key输入框
+            self.api_key_card = self.wtInterface.findChild(QWidget, 'CardWidget_5') # api_key卡片容器
             self.alerts_title_label = self.wtInterface.findChild(SubtitleLabel, 'alerts_title_label')  # 预警标题
             self.weather_alerts_section = self.wtInterface.findChild(QVBoxLayout, 'weather_alerts_section')  # 预警区域
             alerts_container_widget = self.wtInterface.findChild(QWidget, 'alerts_container_widget')  # 预警容器widget
@@ -1245,8 +1246,20 @@ class SettingsMenu(FluentWindow):
             self.weather_fetch_thread.weather_data_ready.connect(self._on_weather_data_ready)
             self.weather_fetch_thread.weather_error.connect(self._on_weather_error)
             self.weather_fetch_thread.start()
+            self._update_api_key_card_visibility()
         except Exception as e:
             logger.error(f"天气界面初始化失败: {e}")
+
+    def _update_api_key_card_visibility(self) -> None:
+        """APIkey卡片显示状态"""
+        try:
+            if hasattr(self, 'api_key_card') and self.api_key_card:
+                current_api = config_center.read_conf('Weather', 'api')
+                # 检查当前API是否需要key (qweather, amap_weather, qq_weather)
+                needs_api_key = current_api in ['qweather', 'amap_weather', 'qq_weather']
+                self.api_key_card.setVisible(needs_api_key)
+        except Exception as e:
+            logger.error(f"更新API key卡片显示状态失败: {e}")
 
     def _on_refresh_clicked(self) -> None:
         """刷新按钮"""
@@ -1717,6 +1730,15 @@ class SettingsMenu(FluentWindow):
             config_center.write_conf('Weather', 'api', new_api)
             config_center.write_conf('Weather', 'city', '0')
             self._hide_weather_alerts_section()
+            self._update_api_key_card_visibility()
+            Flyout.create(
+                icon=InfoBarIcon.INFORMATION,
+                title=self.tr('天气API已切换'),
+                content=self.tr('建议重新选择城市以获取准确的天气数据'),
+                target=select_weather_api,
+                parent=self.wtInterface,
+                isClosable=True
+            )
             if hasattr(wd, 'on_weather_api_changed'):
                 wd.on_weather_api_changed(new_api)
             self._on_refresh_clicked()
