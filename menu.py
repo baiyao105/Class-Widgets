@@ -1013,8 +1013,7 @@ class TTSPreviewThread(QThread):
                 return
                 
             from play_audio import play_audio
-            import os
-            
+
             logger.info(f"使用引擎 {self.engine} 生成预览语音")
             audio_file = generate_speech_sync(
                 text=self.text,
@@ -1562,8 +1561,10 @@ class SettingsMenu(FluentWindow):
                         scaled_pixmap = pixmap.scaled(75, 75, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         alert_icon.setPixmap(scaled_pixmap)
             if alerts_label:
-                alert_text = wd.simplify_alert_text(alert_data.get('type', '未知'))
-                alerts_label.setText(alert_text + '预警')
+                alert_text = wd.simplify_alert_text(alert_data.get('type', self.tr('未知')))
+                alerts_label.setText(alert_text + self.tr('预警'))
+            card_widget.mousePressEvent = lambda event, data=alert_data: self._show_alert_detail(data)
+            card_widget.setCursor(Qt.PointingHandCursor)  # 悬停光标
             # logger.debug(f"alerts_container_layout: hasattr={hasattr(self, 'alerts_container_layout')}, value={getattr(self, 'alerts_container_layout', None)}")
             if hasattr(self, 'alerts_container_layout') and self.alerts_container_layout is not None:
                 # logger.debug(f"正在添加卡片: {alert_data.get('type', '未知预警')}")
@@ -1577,6 +1578,91 @@ class SettingsMenu(FluentWindow):
             logger.error(f"创建预警卡片失败: {e}")
             # import traceback
             # logger.error(f"详细错误信息: {traceback.format_exc()}")
+
+    def _show_alert_detail(self, alert_data: dict) -> None:
+        """预警详情msg_box"""
+        try:
+            ui_file_path = os.path.join(os.path.dirname(__file__), 'view', 'menu', 'weather_alert_msgbox.ui')
+            detail_widget = uic.loadUi(ui_file_path)
+            msgbox = MessageBoxBase(self)
+            msgbox.viewLayout.addWidget(detail_widget)
+            msgbox.viewLayout.setContentsMargins(0, 0, 0, 0)
+            alert_icon = detail_widget.findChild(QLabel, 'alertIcon')
+            if alert_icon:
+                icon_path = wd.get_alert_icon_by_severity(alert_data.get('severity', 'unknown'))
+                if icon_path and os.path.exists(icon_path):
+                    pixmap = QPixmap(icon_path)
+                    if not pixmap.isNull():
+                        scaled_pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        alert_icon.setPixmap(scaled_pixmap)
+            alert_title = detail_widget.findChild(QLabel, 'alertTitle')
+            if alert_title:
+                display_text = alert_data.get('display_text', '')
+                if not display_text:
+                    alert_text = wd.simplify_alert_text(alert_data.get('type', '未知'))
+                    severity_text = wd.get_severity_text(alert_data.get('severity', 'unknown'))
+                    display_text = f"{alert_text}{severity_text}预警"
+                alert_title.setText(display_text)
+            publish_time = detail_widget.findChild(QLabel, 'publishTime')
+            if publish_time:
+                time_str = (alert_data.get('start_time') or self.tr('未知时间'))
+                if time_str and time_str != '未知时间':
+                    try:
+                        if 'T' in time_str:
+                            dt = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                            time_str = dt.strftime('%Y-%m-%d %H:%M')
+                    except:
+                        pass
+                publish_time.setText(time_str)
+            alert_description = detail_widget.findChild(QLabel, 'alertDescription')
+            if alert_description:
+                description = alert_data.get('description', self.tr('暂无详细描述'))
+                alert_description.setText(description)
+            msgbox.yesButton.setText(self.tr('确定'))
+            msgbox.cancelButton.setText(self.tr('不再显示该类型预警'))
+            msgbox.cancelButton.show()
+            def on_hide_alert():
+                self._add_to_alert_exclude(alert_data)
+                msgbox.reject()
+            msgbox.cancelButton.clicked.disconnect()
+            msgbox.cancelButton.clicked.connect(on_hide_alert)
+            msgbox.setWindowTitle(self.tr('天气预警详情'))
+            msgbox.widget.setFixedSize(620, 420)
+            msgbox.exec_()
+
+        except Exception as e:
+            logger.error(f"显示预警详情失败: {e}")
+            # import traceback
+            # logger.error(f"详细错误信息: {traceback.format_exc()}")
+    
+    def _add_to_alert_exclude(self, alert_data: dict) -> None:
+        """添加预警排除"""
+        try:
+            alert_title = alert_data.get('display_text', '')
+            if not alert_title:
+                alert_text = wd.simplify_alert_text(alert_data.get('type', '未知'))
+                severity_text = wd.get_severity_text(alert_data.get('severity', 'unknown'))
+                alert_title = f"{alert_text}{severity_text}预警"
+            current_exclude = config_center.read_conf('Weather', 'alert_exclude', '')
+            if current_exclude:
+                new_exclude = f"{current_exclude} {alert_title}"
+            else:
+                new_exclude = alert_title
+
+            config_center.write_conf('Weather', 'alert_exclude', new_exclude)
+            self._refresh_alert_exclude_ui()
+            self._on_refresh_clicked()
+        except Exception as e:
+            logger.error(f"添加预警到排除列表失败: {e}")
+
+    def _refresh_alert_exclude_ui(self) -> None:
+        try:
+            alert_exclude_widget = self.wtInterface.findChild(LineEdit, 'alert_exclude')
+            if alert_exclude_widget:
+                current_exclude = config_center.read_conf('Weather', 'alert_exclude', '')
+                alert_exclude_widget.setText(current_exclude)
+        except Exception as e:
+            logger.error(f"刷新alert_exclude失败: {e}")
 
     # def _update_weather_forecasts(self, weather_data):
     #     """天气预报"""

@@ -2696,6 +2696,34 @@ def simplify_alert_text(text: str) -> str:
         return '未知预警'
 
 
+def get_severity_text(severity: Union[str, int]) -> str:
+    """根据预警等级获取对应的文本描述"""
+    try:
+        severity_text_map = {
+            '1': '蓝色',
+            '2': '黄色', 
+            '3': '橙色',
+            '4': '红色',
+            'minor': '蓝色',
+            'moderate': '黄色',
+            'severe': '橙色',
+            'extreme': '红色',
+            'blue': '蓝色',
+            'yellow': '黄色',
+            'orange': '橙色',
+            'red': '红色',
+            '蓝': '蓝色',
+            '黄': '黄色',
+            '橙': '橙色',
+            '红': '红色'
+        }
+        severity_str = str(severity).lower() if severity else '2'
+        return severity_text_map.get(severity_str, '黄色')
+    except Exception as e:
+        logger.error(f"获取预警等级文本失败: {e}")
+        return '黄色'
+
+
 def is_supported_alert() -> bool:
     """检查是否支持预警"""
     return weather_processor.is_alert_supported()
