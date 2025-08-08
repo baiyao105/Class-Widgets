@@ -1261,6 +1261,7 @@ class SettingsMenu(FluentWindow):
             self.weather_fetch_thread.weather_error.connect(self._on_weather_error)
             self.weather_fetch_thread.start()
             self._update_api_key_card_visibility()
+            self._is_refreshing = False  # 刷新标志
         except Exception as e:
             logger.error(f"天气界面初始化失败: {e}")
 
@@ -1278,18 +1279,24 @@ class SettingsMenu(FluentWindow):
     def _on_refresh_clicked(self) -> None:
         """刷新按钮"""
         try:
+            if hasattr(self, '_is_refreshing') and self._is_refreshing:
+                return
+            self._is_refreshing = True
             if hasattr(self, 'refresh_animation'):
                 self.refresh_animation.start()
             if hasattr(self, 'weather_fetch_thread') and self.weather_fetch_thread.isRunning():
                 self.weather_fetch_thread.stop()
+                self.weather_fetch_thread.wait()
             self.weather_fetch_thread = wd.WeatherFetchThread(self.weather_manager)
             self.weather_fetch_thread.weather_data_ready.connect(self._on_weather_data_ready)
             self.weather_fetch_thread.weather_error.connect(self._on_weather_error)
+            self.weather_fetch_thread.finished.connect(lambda: setattr(self, '_is_refreshing', False))
             self.weather_fetch_thread.start()
             if hasattr(self, 'main_window') and self.main_window:
                 self.main_window.get_weather_data()
         except Exception as e:
             logger.error(f"刷新天气数据失败: {e}")
+            self._is_refreshing = False
     
     def _on_refresh_interval_changed(self, value: int) -> None:
         """天气刷新间隔改变事件"""
@@ -1337,8 +1344,11 @@ class SettingsMenu(FluentWindow):
                 self._show_weather_error(weather_now['error'])
                 return
             self._update_basic_weather_info(weather_now)
+            QApplication.processEvents()
             self._update_weather_details(weather_now)
+            QApplication.processEvents()
             self._update_weather_alerts(weather_data)
+            QApplication.processEvents()
             # self._update_weather_forecasts(weather_now)
         except Exception as e:
             logger.error(f"同步更新天气显示失败: {e}")

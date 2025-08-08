@@ -2310,6 +2310,14 @@ class DesktopWidget(QWidget):  # 主要小组件
             else:
                 self.weather_alert_text.hide()
                 self.alert_icon.hide()
+                self.weather_icon.show()
+                self.temperature.show()
+                self.showing_temperature = True
+                self.showing_alert = False
+                self.showing_reminder = False
+                if hasattr(self, 'weather_alert_timer') and self.weather_alert_timer:
+                    self.weather_alert_timer.stop()
+                    self._reset_weather_alert_state()
         except Exception as e:
             logger.error(f'更新天气预警显示失败: {e}')
 
@@ -2917,6 +2925,13 @@ class DesktopWidget(QWidget):  # 主要小组件
                     self.alert_icon.hide()
                     self.weather_alert_text.hide()
                     self.temperature.setText('--°')
+                    self.current_alerts = []
+                    self.current_alert_index = 0
+                    self.current_reminders = []
+                    self.current_reminder_index = 0
+                    if hasattr(self, 'weather_alert_timer') and self.weather_alert_timer:
+                        self.weather_alert_timer.stop()
+                        self._reset_weather_alert_state()
                     current_city = self.findChild(QLabel, 'current_city')
                     if current_city:
                         city_name = city=db.search_by_num(config_center.read_conf('Weather', 'city'))
