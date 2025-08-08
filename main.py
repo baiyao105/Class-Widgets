@@ -2429,14 +2429,9 @@ class DesktopWidget(QWidget):  # 主要小组件
     def _add_temperature_fade_out(self, fade_out_group: QParallelAnimationGroup) -> None:
         """温度控件淡出动画"""
         try:
-            if not hasattr(self, 'weather_opacity') or not self.weather_opacity:
-                try:
-                    if not self.weather_opacity.parent():
-                        self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
-                        self.weather_icon.setGraphicsEffect(self.weather_opacity)
-                except RuntimeError as e:
-                    self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
-                    self.weather_icon.setGraphicsEffect(self.weather_opacity)
+            if not hasattr(self, 'weather_opacity') or not self.weather_opacity or not self.weather_opacity.parent():
+                self.weather_opacity = QGraphicsOpacityEffect(self.weather_icon)
+                self.weather_icon.setGraphicsEffect(self.weather_opacity)
             if not hasattr(self, 'temperature_opacity') or not self.temperature_opacity or not self.temperature_opacity.parent():
                 self.temperature_opacity = QGraphicsOpacityEffect(self.temperature)
                 self.temperature.setGraphicsEffect(self.temperature_opacity)
