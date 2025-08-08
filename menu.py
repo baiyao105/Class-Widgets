@@ -10,6 +10,19 @@ import zipfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+import re
+import zipfile
+import shutil
+
+from PyQt5 import uic, QtCore
+from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QTranslator, QObject, QTimer, QLocale
+from PyQt5.QtGui import QIcon, QDesktopServices, QColor
+# from PyQt5.QtPrintSupport import QPrinter
+from PyQt5.QtCore import Qt, pyqtSignal, QRectF
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
+    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget, QStyle
+from packaging.version import Version
 from typing import Tuple, Union
 
 from loguru import logger
@@ -52,6 +65,7 @@ from file import config_center, schedule_center
 from network_thread import VersionThread, proxies, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
+import i18n_manager
 from utils import TimeManagerFactory
 
 
@@ -1089,7 +1103,7 @@ class SettingsMenu(FluentWindow):
             self.i18n_manager = global_i18n_manager
             logger.debug(f"复用i18n旧例,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
         else:
-            self.i18n_manager = I18nManager()
+            self.i18n_manager = i18n_manager.I18nManager()
             self.i18n_manager.init_from_config()
             logger.debug(f"创建新i18n管理,界面语言: {self.i18n_manager.get_current_language_view_name()}, 组件语言: {self.i18n_manager.get_current_language_widgets_name()}")
 
@@ -5433,12 +5447,7 @@ def sp_get_class_num():  # 获取当前周课程数（未完成）
 
 
 if __name__ == '__main__':
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-    
-    app = QApplication(sys.argv)
+    from i18n_manager import app
     settings = SettingsMenu()
     settings.show()
     # settings.setMicaEffectEnabled(True)

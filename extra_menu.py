@@ -20,12 +20,6 @@ from menu import SettingsMenu
 from utils import TimeManagerFactory
 from loguru import logger
 
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
 settings = None
 
 current_week = TimeManagerFactory.get_instance().get_current_weekday()
@@ -221,7 +215,7 @@ class ExtraMenu(FluentWindow):
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    from i18n_manager import app
     ex = ExtraMenu()
     ex.show()
     sys.exit(app.exec())

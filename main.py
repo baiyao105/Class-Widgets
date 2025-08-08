@@ -29,6 +29,7 @@ from qfluentwidgets import Theme, setTheme, setThemeColor, SystemTrayMenu, Actio
 from PyQt5.QtGui import QCloseEvent, QShowEvent, QHideEvent, QMouseEvent, QFocusEvent
 from PyQt5.QtCore import QCoreApplication
 
+from i18n_manager import global_i18n_manager, app
 import conf
 import list_
 import tip_toast
@@ -39,7 +40,7 @@ import weather as db
 from conf import base_directory, load_theme_config
 from extra_menu import ExtraMenu, open_settings, settings
 from generate_speech import generate_speech_sync, list_pyttsx3_voices
-from menu import open_plaza, I18nManager
+from menu import open_plaza
 from weather import WeatherReportThread as weatherReportThread
 from weather import get_unified_weather_alerts, get_alert_image, weather_manager
 from network_thread import check_update
@@ -49,12 +50,6 @@ from file import config_center, schedule_center
 
 if os.name == 'nt':
     import pygetwindow
-
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 today = dt.date.today()
 
@@ -3345,12 +3340,7 @@ if __name__ == '__main__':
     scale_factor = float(config_center.read_conf('General', 'scale'))
     os.environ['QT_SCALE_FACTOR'] = str(scale_factor)
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
-
-    app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-
-    global_i18n_manager = I18nManager()
-    global_i18n_manager.init_from_config()
     
     logger.debug(f"i18n加载,界面: {global_i18n_manager.get_current_language_view_name()},组件: {global_i18n_manager.get_current_language_widgets_name()}")
     menu.global_i18n_manager = global_i18n_manager
