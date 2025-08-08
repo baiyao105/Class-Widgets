@@ -2260,6 +2260,11 @@ class DesktopWidget(QWidget):  # 主要小组件
 
     def get_weather_data(self) -> None:
         logger.info('获取天气数据')
+        if hasattr(weather_manager, 'get_weather_reminders') and hasattr(weather_manager.get_weather_reminders, 'clear_cache'):
+            weather_manager.get_weather_reminders.clear_cache()
+        if hasattr(weather_manager, 'fetch_weather_data') and hasattr(weather_manager.fetch_weather_data, 'clear_cache'):
+            weather_manager.fetch_weather_data.clear_cache()
+        self._reset_weather_alert_state()
         # 停止旧的天气线程
         if hasattr(self, 'weather_thread') and self.weather_thread.isRunning():
             self.weather_thread.stop()

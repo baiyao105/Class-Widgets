@@ -3970,6 +3970,8 @@ class SettingsMenu(FluentWindow):
                             aniType=FlyoutAnimationType.PULL_UP
                         )
             if city_changed:
+                if hasattr(self.weather_manager, 'get_weather_reminders') and hasattr(self.weather_manager.get_weather_reminders, 'clear_cache'):
+                    self.weather_manager.get_weather_reminders.clear_cache()
                 self._hide_weather_alerts_section()
                 self._on_refresh_clicked()
 

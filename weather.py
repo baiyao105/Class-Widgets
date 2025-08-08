@@ -67,7 +67,9 @@ class WeatherReminderThread(QThread):
         try:
             self._is_running = True
             if self._is_running:
-                reminders = self.weather_manager.get_weather_reminders()
+                current_api = self.weather_manager.get_current_api()
+                current_location = self.weather_manager._get_location_key()
+                reminders = self.weather_manager.get_weather_reminders(current_api, current_location)
                 if self._is_running:
                     self.reminders_ready.emit(reminders)
             if self._is_running:
@@ -337,6 +339,8 @@ class WeatherManager:
         self.current_alert_data = None
         if hasattr(self.fetch_weather_data, 'clear_cache'):
             self.fetch_weather_data.clear_cache()
+        if hasattr(self.get_weather_reminders, 'clear_cache'):
+            self.get_weather_reminders.clear_cache()
 
     def clear_processor_cache(self, processor):
         """清理数据处理器缓存"""
@@ -677,8 +681,18 @@ class WeatherManager:
             }
 
     @cache_result(expire_seconds=600)  # 缓存10分钟
-    def get_weather_reminders(self) -> List[Dict[str, Any]]:
-        """获取天气提醒信息"""
+    def get_weather_reminders(self, api_name: str = None, location_key: str = None) -> List[Dict[str, Any]]:
+        """获取天气提醒信息
+
+        Args:
+            api_name: API名称
+            location_key: 城市位置键
+        """
+        if api_name is None:
+            api_name = self.get_current_api()
+        if location_key is None:
+            location_key = self._get_location_key()
+
         provider = self.get_current_provider()
         if not provider:
             return []
@@ -3748,7 +3762,9 @@ if __name__ == '__main__':
         else:
             print(f"无法获取降水信息: {precipitation_result.get('error', '未知错误')}")
 
-        print(weather_manager.get_weather_reminders())
+        current_api = weather_manager.get_current_api()
+        current_location = weather_manager._get_location_key()
+        print(weather_manager.get_weather_reminders(current_api, current_location))
 
     except Exception as e:
         print(f"测试出错: {e}")
