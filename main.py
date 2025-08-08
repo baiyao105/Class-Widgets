@@ -2271,7 +2271,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_thread.start()
     
     def _on_reminders_ready(self, reminders: list) -> None:
-        """处理异步获取的天气提醒数据"""
+        """获取的天气提醒数据"""
         try:
             self.current_reminders = reminders
             self.current_reminder_index = 0
@@ -2284,7 +2284,7 @@ class DesktopWidget(QWidget):  # 主要小组件
         except Exception as e:
             logger.error(f'处理天气提醒数据失败: {e}')
     def _on_alerts_ready(self, alerts: list) -> None:
-        """处理异步获取的天气预警数据"""
+        """处理获取的天气预警数据"""
         try:
             self.current_alerts = alerts
             self.current_alert_index = 0
@@ -2740,33 +2740,44 @@ class DesktopWidget(QWidget):  # 主要小组件
             alert_text = alert_title  # 极端情况去除预警二字
         else:
             alert_text = alert_title + '预警'
-
-        char_count = len(alert_text)  # 动态调整宽度
-        if char_count > 4:
-            new_width = min(76 + (char_count - 4) * 16, 118)  # 计算宽度
-            self.weather_alert_text.setFixedWidth(new_width)
-        else:
-            self.weather_alert_text.setFixedWidth(76)  # 默认
-
+        char_count = len(alert_text)
         font = self.weather_alert_text.font()
-        if len(alert_text) <= 5:
+        if char_count <= 4:
             font.setPointSize(14)
-        elif len(alert_text) == 6:
+            self.weather_alert_text.setFixedWidth(76)
+        elif char_count == 5:
             font.setPointSize(13)
-        elif len(alert_text) == 7:
+            self.weather_alert_text.setFixedWidth(85)
+        elif char_count == 6:
             font.setPointSize(12)
-        elif len(alert_text) == 8:
+            self.weather_alert_text.setFixedWidth(95)
+        elif char_count == 7:
             font.setPointSize(11)
-        else:
+            self.weather_alert_text.setFixedWidth(105)
+        elif char_count == 8:
             font.setPointSize(10)
+            self.weather_alert_text.setFixedWidth(115)
+        else:
+            font.setPointSize(9)
+            self.weather_alert_text.setFixedWidth(min(125, 76 + char_count * 8))
         self.weather_alert_text.setFont(font)
         self.weather_alert_text.setText(alert_text)
         self.weather_alert_text.setAlignment(Qt.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
         if hasattr(self, 'alert_icon'):
             icon_path = db.get_alert_icon_by_severity(severity)
-            if icon_path:
-                self.alert_icon.setIcon(QIcon(icon_path))
+            if icon_path and os.path.exists(icon_path):
+                try:
+                    # IconWidget使用setIcon方法设置图标
+                    icon = QIcon(icon_path)
+                    if not icon.isNull():
+                        self.alert_icon.setIcon(icon)
+                    else:
+                        logger.warning(f'无法创建图标对象: {icon_path}')
+                except Exception as e:
+                    logger.error(f'设置预警图标失败: {e}')
+            else:
+                logger.warning(f'预警图标文件不存在: {icon_path}')
 
     def _reset_weather_alert_state(self) -> None:
         """重置天气预警、提醒显示状态"""
@@ -2804,12 +2815,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         """显示当前索引的提醒信息"""
         if not self.current_reminders or self.current_reminder_index >= len(self.current_reminders):
             return
-            
         reminder = self.current_reminders[self.current_reminder_index]
-        
         # 提醒文本
         self.weather_reminder_text.setText(reminder['title'])
-        
         # 调整字号
         char_count = len(reminder['title'])
         if char_count <= 5:
@@ -2820,21 +2828,39 @@ class DesktopWidget(QWidget):  # 主要小组件
             font_size = 12
         else:
             font_size = 11
-        
         font = self.weather_reminder_text.font()
         font.setPointSize(font_size)
         self.weather_reminder_text.setFont(font)
-        
-        # 设置图标
+
+        # 设置图标, 布局
+        content_layout = self.findChild(QHBoxLayout, 'horizontalLayout_2')
         if char_count <= 6:
-            self.reminder_icon.setIcon(QIcon(f"{base_directory}/img/weather/reminders/{reminder['icon']}.svg"))
-            self.reminder_icon.show()
+            if content_layout.indexOf(self.reminder_icon) == -1:
+                text_index = content_layout.indexOf(self.weather_reminder_text)
+                if text_index != -1:
+                    content_layout.insertWidget(text_index, self.reminder_icon)
+                else:
+                    content_layout.addWidget(self.reminder_icon)
+            try:
+                icon_path = f"{base_directory}/img/weather/reminders/{reminder['icon']}.svg"
+                if os.path.exists(icon_path):
+                    self.reminder_icon.setImage(icon_path)
+                    self.reminder_icon.show()
+                else:
+                    logger.warning(f'天气提醒图标不存在: {icon_path}')
+                    self.reminder_icon.hide()
+            except Exception as e:
+                logger.warning(f'设置天气提醒图标失败: {e}')
+                self.reminder_icon.hide()
+
             if char_count == 6:
                 self.weather_reminder_text.setFixedWidth(102)
             else:
                 self.weather_reminder_text.setFixedWidth(96)
         else:
-            self.reminder_icon.hide()
+            if content_layout.indexOf(self.reminder_icon) != -1:
+                content_layout.removeWidget(self.reminder_icon)
+                self.reminder_icon.hide()
             self.weather_reminder_text.setFixedWidth(138)
 
     def detect_theme_changed(self) -> None:

@@ -676,7 +676,7 @@ class WeatherManager:
                 'temp_change': 0
             }
 
-    @cache_result(expire_seconds=600)  # 缓存10分钟，减少重复请求
+    @cache_result(expire_seconds=600)  # 缓存10分钟
     def get_weather_reminders(self) -> List[Dict[str, Any]]:
         """获取天气提醒信息"""
         provider = self.get_current_provider()
