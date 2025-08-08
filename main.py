@@ -2504,7 +2504,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             if hasattr(self, 'reminder_icon'):
                 self.reminder_icon.hide()
     
-    def _setup_animation(self, animation: QPropertyAnimation, start_value: float, end_value: float, time:float=500) -> None:
+    def _setup_animation(self, animation: QPropertyAnimation, start_value: float, end_value: float, time: float = 500) -> None:
         """动画属性"""
         animation.setDuration(time)
         animation.setEasingCurve(QEasingCurve.Type.OutCubic)
