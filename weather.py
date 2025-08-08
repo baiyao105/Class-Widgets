@@ -1099,6 +1099,8 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 visibility_unit = visibility.get('unit', 'km')
                 if visibility_value is not None and str(visibility_value).strip():
                     return f"{visibility_value} {visibility_unit}"
+                else:
+                    return f"-- {visibility_unit}"
             elif isinstance(visibility, (int, float)):
                 return f"{visibility} km"
             elif isinstance(visibility, str) and visibility.strip():
