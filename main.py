@@ -2773,7 +2773,6 @@ class DesktopWidget(QWidget):  # 主要小组件
             icon_path = db.get_alert_icon_by_severity(severity)
             if icon_path and os.path.exists(icon_path):
                 try:
-                    # IconWidget使用setIcon方法设置图标
                     icon = QIcon(icon_path)
                     if not icon.isNull():
                         self.alert_icon.setIcon(icon)
