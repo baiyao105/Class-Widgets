@@ -278,12 +278,6 @@ class I18nManager:
             self.load_language_view('zh_CN')
 
 
-# 适配高DPI缩放
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
 from PyQt5.QtCore import QCoreApplication
 
 global_i18n_manager = None
