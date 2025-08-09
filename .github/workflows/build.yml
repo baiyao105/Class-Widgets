@@ -174,6 +174,14 @@ jobs:
             brew link --overwrite --force gettext
           fi
 
+      - name: Cache Python (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\hostedtoolcache\windows\Python\${{ env.PYTHON_VERSION }}*
+          key: ${{ runner.os }}-${{ matrix.arch }}-python${{ env.PYTHON_VERSION }}
+
       - name: Setup Python
         uses: actions/setup-python@v5.6.0
         with:
@@ -246,7 +254,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            C:\hostedtoolcache\windows\Python\${{ env.PYTHON_VERSION }}*
             ~/.cache/uv
             ~\AppData\Local\uv
             .venv
