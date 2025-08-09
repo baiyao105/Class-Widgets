@@ -44,6 +44,10 @@ jobs:
     outputs:
       is_release: ${{ steps.build-info.outputs.is_release }}
       build_type: ${{ steps.build-info.outputs.build_type }}
+      build_time: ${{ steps.build-info.outputs.build_time }}
+      build_commit: ${{ steps.build-info.outputs.build_commit }}
+      build_branch: ${{ steps.build-info.outputs.build_branch }}
+      build_runid: ${{ steps.build-info.outputs.build_runid }}
       skip_ci: ${{ steps.check-skip-ci.outputs.skip_ci }}
     steps:
       - name: Checkout repository
@@ -147,6 +151,10 @@ jobs:
       PYTHON_VERSION: ${{ (startsWith(matrix.os, 'macos') || matrix.platform == 'linux-x64') && '3.12' || '3.8' }}
       IS_RELEASE: ${{ needs.prepare.outputs.is_release }}
       BUILD_TYPE: ${{ needs.prepare.outputs.build_type }}
+      BUILD_TIME: ${{ needs.prepare.outputs.build_time }}
+      BUILD_COMMIT: ${{ needs.prepare.outputs.build_commit }}
+      BUILD_BRANCH: ${{ needs.prepare.outputs.build_branch }}
+      BUILD_RUNID: ${{ needs.prepare.outputs.build_runid }}
 
     steps:
       - name: Install dependencies (Linux)
