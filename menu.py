@@ -1358,27 +1358,31 @@ class SettingsMenu(FluentWindow):
         """基本天气信息"""
         try:
             city_code = config_center.read_conf('Weather', 'city', '0')
-            city_name = wd.weather_database.search_city_by_code(city_code) if city_code != '0' else '未知城市'
+            if city_code == '0':
+                city_name = '未知城市'
+            else:
+                city_name = wd.weather_database.search_city_by_code(city_code)
+                if city_name == 'coordinates' and ',' in city_code:
+                    try:
+                        lat, lon = city_code.split(',')
+                        city_name = f"({float(lat):.2f}, {float(lon):.2f})"
+                    except (ValueError, IndexError):
+                        city_name = ''
             if self.city_location_label:
-                self.city_location_label.setText(f"{city_name} · 当前天气")
-            # 更新最后更新时间 - 使用真实的天气数据更新时间
+                if city_name:
+                    self.city_location_label.setText(f"{city_name} · 当前天气")
+                else:
+                    self.city_location_label.setText("当前天气")
             update_time_str = wd.get_weather_data('updateTime', weather_data)
             if update_time_str:
                 try:
-                    # 尝试解析ISO格式的时间字符串
-                    import re
-                    
-                    # 处理不同格式的时间字符串
                     if 'T' in update_time_str:
-                        # ISO格式: 2021-02-16T14:42+08:00
                         time_part = update_time_str.split('T')[1]
                         if '+' in time_part:
                             time_part = time_part.split('+')[0]
                         elif 'Z' in time_part:
                             time_part = time_part.replace('Z', '')
                         display_time = time_part[:5]  # 取HH:MM部分
-                        
-                        # 获取日期部分
                         date_part = update_time_str.split('T')[0]
                         # 转换为 MM/DD/YYYY 格式
                         try:
@@ -1388,13 +1392,11 @@ class SettingsMenu(FluentWindow):
                         except:
                             display_datetime = f"{date_part} {display_time}"
                     else:
-                        # 其他格式，使用当前时间
                         display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
                 except Exception as e:
-                    logger.warning(f"解析更新时间失败: {e}，使用当前时间")
+                    logger.warning(f"解析更新时间失败: {e}, 使用当前时间")
                     display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
             else:
-                # 如果没有更新时间数据，使用当前时间
                 display_datetime = datetime.datetime.now().strftime("%m/%d/%Y %H:%M")
             
             if self.weather_update_time:
@@ -1713,14 +1715,6 @@ class SettingsMenu(FluentWindow):
                 alert_exclude_widget.setText(current_exclude)
         except Exception as e:
             logger.error(f"刷新alert_exclude失败: {e}")
-
-    # def _update_weather_forecasts(self, weather_data):
-    #     """天气预报"""
-    #     try:
-    #         #TODO: PR后
-    #         pass
-    #     except Exception as e:
-    #         logger.error(f"更新天气预报失败: {e}")
 
     def _show_weather_error(self, error_info: Union[str, dict]) -> None:
         """显示天气错误信息"""
