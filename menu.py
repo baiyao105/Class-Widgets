@@ -1365,7 +1365,7 @@ class SettingsMenu(FluentWindow):
                 if city_name == 'coordinates' and ',' in city_code:
                     try:
                         lat, lon = city_code.split(',')
-                        city_name = f"({float(lat):.2f}, {float(lon):.2f})"
+                        city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
                     except (ValueError, IndexError):
                         city_name = ''
             if self.city_location_label:
