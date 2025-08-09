@@ -1364,7 +1364,7 @@ class SettingsMenu(FluentWindow):
                 city_name = wd.weather_database.search_city_by_code(city_code)
                 if city_name == 'coordinates' and ',' in city_code:
                     try:
-                        lat, lon = city_code.split(',')
+                        lon, lat = city_code.split(',')
                         city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
                     except (ValueError, IndexError):
                         city_name = ''
@@ -3946,12 +3946,7 @@ class SettingsMenu(FluentWindow):
                 lat = search_city_dialog.latitude_edit.text()
                 if lon and lat:
                     try:
-                        # 和风天气使用 lat,lon 格式
-                        if current_api == 'qweather':
-                            config_center.write_conf('Weather', 'city', f"{float(lat)},{float(lon)}")
-                        else:
-                            # 其他API使用 lon,lat 格式
-                            config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
+                        config_center.write_conf('Weather', 'city', f"{float(lon)},{float(lat)}")
                         city_changed = True
                     except ValueError:
                         Flyout.create(

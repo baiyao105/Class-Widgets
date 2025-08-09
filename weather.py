@@ -1647,7 +1647,7 @@ class QWeatherProvider(GenericWeatherProvider):
         try:
             from network_thread import proxies
             if ',' in location_key:
-                lat, lon = location_key.split(',')
+                lon, lat = location_key.split(',')
                 # 和风天气坐标格式：经度,纬度（经度在前纬度在后），只支持小数点后两位
                 lat = f"{float(lat):.2f}"
                 lon = f"{float(lon):.2f}"
