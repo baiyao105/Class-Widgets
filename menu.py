@@ -4118,9 +4118,6 @@ class SettingsMenu(FluentWindow):
     def check_version(self, version):  # 检查更新
         if 'error' in version:
             self.version_number_label.setText(self.tr('版本号：获取失败！'))
-            self.build_commit_label.setText(self.tr('获取失败！'))
-            self.build_uuid_label.setText(self.tr('获取失败！'))
-            self.build_date_label.setText(self.tr('获取失败！'))
 
             if utils.tray_icon:
                 utils.tray_icon.push_error_notification(

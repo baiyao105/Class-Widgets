@@ -94,15 +94,15 @@ jobs:
           is_release=false
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
             is_release=true
-            build_type="PyInstaller - Release"
+            build_type="Release"
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.is_release }}" == "true" ]]; then
             is_release=true
-            build_type="PyInstaller - Release"
+            build_type="Release"
           elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             build_branch="$PR_BRANCH"
-            build_type="PyInstaller - Debug (PR-#${PR_NUMBER})"
+            build_type="Debug (PR-#${PR_NUMBER})"
           else
-            build_type="PyInstaller - Debug"
+            build_type="Debug"
           fi
           echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
           echo "build_type=$build_type" >> $GITHUB_OUTPUT
@@ -277,14 +277,14 @@ jobs:
           is_release=false
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
             is_release=true
-            build_type="PyInstaller - Release"
+            build_type="Release"
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.is_release }}" == "true" ]]; then
             is_release=true
-            build_type="PyInstaller - Release"
+            build_type="Release"
           elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            build_type="PyInstaller - Debug (PR-#${PR_NUMBER})"
+            build_type="Debug (PR-#${PR_NUMBER})"
           else
-            build_type="PyInstaller - Debug"
+            build_type="Debug"
           fi
           echo "IS_RELEASE=$is_release" >> $GITHUB_ENV
           echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
