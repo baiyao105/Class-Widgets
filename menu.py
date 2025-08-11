@@ -2865,6 +2865,10 @@ class SettingsMenu(FluentWindow):
         bilibili_page.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(
             self.tr('https://space.bilibili.com/569522843'))))
 
+        weblate_page = self.findChild(PushButton, 'button_weblate')
+        weblate_page.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(
+            'https://hosted.weblate.org/engage/class-widgets-1')))
+
         license_button = self.findChild(PushButton, 'button_show_license')
         license_button.clicked.connect(self.show_license)
 

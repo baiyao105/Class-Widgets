@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>821</width>
-    <height>843</height>
+    <height>839</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -426,6 +426,31 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="PushButton" name="button_weblate">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>360</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>翻译此应用</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
          <item>
@@ -452,7 +477,7 @@
              </property>
              <property name="maximumSize">
               <size>
-               <width>360</width>
+               <width>310</width>
                <height>16777215</height>
               </size>
              </property>
@@ -490,7 +515,7 @@
              </property>
              <property name="maximumSize">
               <size>
-               <width>360</width>
+               <width>310</width>
                <height>16777215</height>
               </size>
              </property>
