@@ -57,13 +57,14 @@ jobs:
           CURRENT_VERSION: ${{ needs.check-commits.outputs.nightly_version }}
         run: |
           echo "当前要发布的版本: $CURRENT_VERSION"
-          nightly_releases=$(gh release list --limit 100 | grep "nightly-" | awk '{print $1}' || true)
+          nightly_releases=$(gh release list --limit 4 | grep "nightly-" | awk '{print $1}' || true)
           if [ -z "$nightly_releases" ]; then
             echo "[DEBUG] 未找到旧的 nightly 版本"
             exit 0
           fi
           echo "[DEBUG] 找到的 nightly 版本:"
           echo "$nightly_releases"
+
           for release in $nightly_releases; do
             if [ "$release" != "$CURRENT_VERSION" ]; then
               echo "[DEBUG] 删除旧版本: $release"
