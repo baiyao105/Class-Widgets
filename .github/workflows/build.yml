@@ -44,6 +44,12 @@ on:
       run_id:
         description: "构建运行ID"
         value: ${{ jobs.prepare.outputs.build_runid }}
+      package_count:
+        description: "打包文件数量"
+        value: ${{ jobs.package.outputs.package-count }}
+      package_result:
+        description: "打包作业结果"
+        value: ${{ jobs.package.result }}
   pull_request:
     types: [opened, synchronize, closed]
     paths-ignore:
@@ -120,9 +126,7 @@ jobs:
           build_commit="${GITHUB_SHA:0:7}"
           build_branch="${GITHUB_REF_NAME}"
           build_runid="${GITHUB_RUN_ID}"
-          release_type="false"
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" =~ ^refs/tags/v ]]; then
-            release_type="release"
             build_type="Release"
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             build_type="${{ github.event.inputs.build_type }}"
@@ -142,7 +146,6 @@ jobs:
           echo "build_commit=$build_commit" >> $GITHUB_OUTPUT
           echo "build_branch=$build_branch" >> $GITHUB_OUTPUT
           echo "build_runid=$build_runid" >> $GITHUB_OUTPUT
-          echo "release_type=$release_type" >> $GITHUB_OUTPUT
           {
             echo "## 📋 构建信息"
             echo "| 项目 | 值 |"
@@ -275,7 +278,7 @@ jobs:
           config_text="${config_text//__BUILD_BRANCH__/$BUILD_BRANCH}"
           config_text="${config_text//__BUILD_RUNID__/$BUILD_RUNID}"
           config_text="${config_text//__BUILD_TYPE__/$BUILD_TYPE}"
-          if [[ "$BUILD_TYPE" != "Debug" ]]; then
+          if [[ "$BUILD_TYPE" == "Release" ]] || [[ "$BUILD_TYPE" == "Nightly" ]]; then
             VERSION="${{ inputs.release_version }}"
             config_text="${config_text//__BUILD_VERSION__/$VERSION}"
           fi
@@ -418,7 +421,7 @@ jobs:
 
   sign:
     needs: [prepare, build]
-    if: needs.build.result == 'success' && needs.prepare.outputs.skip_ci != 'true' && (github.event.inputs.is_signing == 'true' || github.event.inputs.is_signing == null)
+    if: needs.build.result == 'success' && needs.prepare.outputs.skip_ci != 'true' && (github.event.inputs.is_signing == 'true')
     runs-on: windows-latest
     strategy:
       matrix:
@@ -494,7 +497,7 @@ jobs:
 
   package:
     needs: [prepare, build, sign]
-    if: (needs.build.result == 'success') && (needs.sign.result == 'success' || needs.sign.result == 'failure') && needs.prepare.outputs.skip_ci != 'true'
+    if: (needs.build.result == 'success') && (needs.prepare.outputs.build_type== 'Release' || needs.prepare.outputs.build_type== 'Nightly') && needs.prepare.outputs.skip_ci != 'true'
     runs-on: ubuntu-latest
     outputs:
       package-count: ${{ steps.organize.outputs.package-count }}

@@ -87,7 +87,7 @@ jobs:
   release-nightly:
     name: Publish Nightly
     needs: [check-commits, build-nightly]
-    if: needs.build-nightly.result == 'success'
+    if: needs.build-nightly.result == 'success' && needs.build-nightly.outputs.package_count > 0
     uses: ./.github/workflows/release.yml
     with:
       run_id: ${{ needs.build-nightly.outputs.run_id }}
