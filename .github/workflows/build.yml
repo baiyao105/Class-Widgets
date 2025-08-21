@@ -496,7 +496,7 @@ jobs:
           path: ./signed-packages
 
   package:
-    needs: [prepare, build, sign]
+    needs: [prepare, build]
     if: (needs.build.result == 'success') && (needs.prepare.outputs.build_type== 'Release' || needs.prepare.outputs.build_type== 'Nightly') && needs.prepare.outputs.skip_ci != 'true'
     runs-on: ubuntu-latest
     outputs:
