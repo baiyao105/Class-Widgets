@@ -1952,8 +1952,8 @@ class SettingsMenu(FluentWindow):
                 has_settings = bool(card.enable_settings)
                 if (filter_type == self.filter_combo_items[1]
                     and not is_enabled) or (filter_type == self.filter_combo_items[2]
-                    and is_enabled) or (filter_type == self.filter_combo_items[3] 
-                    and not has_settings) or (filter_type == self.filter_combo_items[4] 
+                    and is_enabled) or (filter_type == self.filter_combo_items[3]
+                    and not has_settings) or (filter_type == self.filter_combo_items[4]
                     and has_settings):
                     should_show = False
             card.setVisible(should_show)
