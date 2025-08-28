@@ -458,37 +458,37 @@ class TimeManagerInterface(ABC):
     @abstractmethod
     def get_real_time(self) -> dt.datetime:
         """获取真实当前时间（无偏移）"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def get_current_time(self) -> dt.datetime:
         """获取程序内时间 (偏移后)"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def get_current_time_without_ms(self) -> dt.datetime:
         """获取程序内时间 (偏移后，舍去毫秒)"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def get_current_time_str(self, format_str: str = '%H:%M:%S') -> str:
         """获取格式化时间字符串"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def get_today(self) -> dt.date:
         """获取今天日期 (偏移后)"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def get_current_weekday(self) -> int:
         """获取当前星期几 (0=周一, 6=周日)"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def sync_with_ntp(self) -> bool:
         """同步NTP时间"""
-        pass
+        pass  # noqa
 
 class LocalTimeManager(TimeManagerInterface):
     """本地时间管理器"""

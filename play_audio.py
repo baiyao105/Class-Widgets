@@ -10,7 +10,6 @@ from loguru import logger
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from basic_dirs import CW_HOME
-import conf
 from file import config_center
 
 

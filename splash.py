@@ -1,10 +1,10 @@
-from typing import Any, List, Optional, Tuple
+from typing import Optional, Tuple
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5.QtGui import QPixmap
 from PyQt5 import uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QLabel
-from qfluentwidgets import BodyLabel, ProgressBar, theme, Theme, setTheme
+from qfluentwidgets import ProgressBar, theme, Theme
 import time
 from loguru import logger
 

@@ -3,12 +3,12 @@ import os
 import shutil
 import zipfile  # 解压插件zip
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 from loguru import logger
 from packaging.version import Version
-from PyQt5.QtCore import QEventLoop, QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal
 
 import conf
 import list_
@@ -16,7 +16,6 @@ import utils
 import weather as db
 from basic_dirs import CACHE_HOME, CW_HOME
 from file import config_center
-from weather import WeatherReportThread as weatherReportThread
 
 headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache"}  # 设置请求头
 """

@@ -2,13 +2,11 @@ import ctypes
 import datetime as dt
 import json
 import os
-from pathlib import Path
 import platform
 import re
 import signal
 import subprocess
 import sys
-import time
 import traceback
 from shutil import copy
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -20,7 +18,6 @@ from PyQt5 import uic
 from PyQt5.QtCore import (
     QCoreApplication,
     QEasingCurve,
-    QObject,
     QParallelAnimationGroup,
     QPoint,
     QPropertyAnimation,
@@ -94,7 +91,7 @@ from basic_dirs import CONFIG_HOME, CW_HOME, LOG_HOME, SCHEDULE_DIR
 from conf import load_theme_config
 from extra_menu import ExtraMenu, open_settings, settings
 from file import config_center, schedule_center
-from generate_speech import generate_speech_sync, list_pyttsx3_voices
+from generate_speech import generate_speech_sync
 from i18n_manager import app, global_i18n_manager
 from menu import open_plaza
 from network_thread import check_update
@@ -102,7 +99,7 @@ from plugin import p_loader
 from tip_toast import active_windows
 from utils import DarkModeWatcher, TimeManagerFactory, restart, stop, update_timer
 from weather import WeatherReportThread as weatherReportThread
-from weather import get_alert_image, get_unified_weather_alerts, weather_manager
+from weather import weather_manager
 
 if os.name == 'nt':
     import pygetwindow
@@ -1033,7 +1030,7 @@ class WidgetsManager:
         self.calculate_widgets_width()
         screen_geometry = app.primaryScreen().availableGeometry()
         screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
+        screen_geometry.height()
 
         margin = max(0, int(config_center.read_conf('General', 'margin')))
         self.start_pos_y = margin
@@ -1301,7 +1298,7 @@ class FloatingWidget(QWidget):  # 浮窗
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
+        screen_geometry.height()
 
         # 加载保存的位置
         saved_pos = self.load_position()

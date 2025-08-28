@@ -3,7 +3,6 @@ from shutil import copy
 from typing import List
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QScroller
 from loguru import logger
@@ -42,7 +41,6 @@ def cleanup_settings() -> None:
     global settings
     logger.info('关闭“设置”')
     del settings
-    settings = None
 
 
 class ExtraMenu(FluentWindow):

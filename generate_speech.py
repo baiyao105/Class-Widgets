@@ -225,7 +225,7 @@ class TTSVoiceProvider:
 
     def shutdown(self) -> None:
         """关闭提供器,清理资源(默认)"""
-        pass
+        pass  # noqa
 
 
 class EdgeTTSProvider(TTSVoiceProvider):

@@ -162,32 +162,32 @@ class WeatherapiProvider(ABC):
     @abstractmethod
     def fetch_current_weather(self, location_key: str, api_key: str) -> Dict[str, Any]:
         """获取当前天气数据"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def fetch_weather_alerts(self, location_key: str, api_key: str) -> Optional[Dict[str, Any]]:
         """获取天气预警数据"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def parse_temperature(self, data: Dict[str, Any]) -> Optional[str]:
         """解析温度数据"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def parse_weather_icon(self, data: Dict[str, Any]) -> Optional[str]:
         """解析天气图标代码"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def parse_weather_description(self, data: Dict[str, Any]) -> Optional[str]:
         """解析天气描述"""
-        pass
+        pass  # noqa
 
     @abstractmethod
     def parse_update_time(self, data: Dict[str, Any]) -> Optional[str]:
         """解析更新时间"""
-        pass
+        pass  # noqa
 
     def supports_alerts(self) -> bool:
         """检查是否支持天气预警"""
@@ -200,12 +200,10 @@ class WeatherapiProvider(ABC):
     @abstractmethod
     def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 5) -> Dict[str, Any]:
         """获取预报数据的统一方法"""
-        pass
 
     @abstractmethod
     def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
         """解析预报数据的统一方法"""
-        pass
 
 
 @dataclass
@@ -1166,7 +1164,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             wind = current.get('wind', {})
             direction = wind.get('direction', {})
             direction_value = direction.get('value')
-            direction_unit = direction.get('unit', '°')
+            direction.get('unit', '°')
             if direction_value is not None and str(direction_value).strip():
                 # 将角度转换为方向描述
                 direction_desc = self._convert_wind_direction(float(direction_value))
@@ -1228,7 +1226,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                     result = {'warning': alerts}
                     return result
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     def parse_weather_alerts(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1239,7 +1237,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 return []
 
             return self._process_xiaomi_alerts(alerts_data)
-        except Exception as e:
+        except Exception:
             return []
 
     def _process_xiaomi_alerts(self, alerts_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -2895,7 +2893,7 @@ class WeatherDataProcessor:
                 return None
             return result
 
-        except Exception as e:
+        except Exception:
             return None
 
     def get_weather_alerts(self, weather_data: Dict[str, Any]) -> List[Dict[str, Any]]:

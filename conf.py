@@ -2,9 +2,8 @@ import configparser as config
 import json
 import os
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 from dateutil import parser
 from loguru import logger

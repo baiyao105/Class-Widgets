@@ -15,12 +15,12 @@ from PyQt5 import uic, QtCore
 from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QTranslator, QObject, QTimer, QLocale
 from PyQt5.QtGui import QIcon, QDesktopServices, QColor
 # from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtCore import Qt, pyqtSignal, QRectF
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
-    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget, QStyle
+    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget
 from packaging.version import Version
-from typing import Tuple, Union, Dict, List, Optional
+from typing import Tuple, Union, Dict, List
 
 from loguru import logger
 from packaging.version import Version
@@ -416,7 +416,6 @@ def cleanup_plaza():
     global plugin_plaza
     logger.info('关闭“插件广场”')
     del plugin_plaza
-    plugin_plaza = None
 
 
 def get_timeline()-> Dict[str, Dict[str, List[Tuple[int, str, int, int]]]]:
@@ -2719,7 +2718,7 @@ class SettingsMenu(FluentWindow):
             return
 
         voice_selector = self.voice_selector
-        switch_enable_TTS = self.switch_enable_TTS
+        self.switch_enable_TTS
         voice_selector.clear()
         voice_selector.addItem(self.tr("加载失败"), userData=None)
         voice_selector.setEnabled(False)
@@ -3648,11 +3647,10 @@ class SettingsMenu(FluentWindow):
             def _save_and_close(self):
                 try:
                     if self.parent_menu:
-                        current_url = ""
                         if hasattr(self.parent_menu, 'adInterface'):
                             ntp_url_widget = self.parent_menu.adInterface.findChild(LineEdit, 'ntp_server_url')
                             if ntp_url_widget:
-                                current_url = ntp_url_widget.text()
+                                ntp_url_widget.text()
                         self._close_flyout()
                         if hasattr(self.parent_menu, '_show_ntp_flyout'):
                             self.parent_menu._show_ntp_flyout(
@@ -4952,7 +4950,7 @@ class SettingsMenu(FluentWindow):
         te_select_week_type = self.findChild(ComboBox, 'select_week_type')
         te_timeline_list = self.findChild(ListWidget, 'timeline_list')
         te_select_timeline = self.findChild(ComboBox, 'select_timeline')
-        te_copy_timeline = self.findChild(PushButton, 'copy_timeline')
+        self.findChild(PushButton, 'copy_timeline')
         try:
             if te_select_timeline.currentIndex() == 0:
                 te_timeline_list.clear()
@@ -5066,7 +5064,7 @@ class SettingsMenu(FluentWindow):
     # 保存时间线
     def te_save_item(self):
         te_part_list = self.findChild(ListWidget, 'part_list')
-        te_select_week_type = self.findChild(ComboBox, 'select_week_type')
+        self.findChild(ComboBox, 'select_week_type')
         data_dict = {"part": {}, "part_name": {}, 'timeline': {'default': [], **{str(w): [] for w in range(7)}}, 'timeline_even': {'default': [], **{str(w): [] for w in range(7)}}}
         data_timeline_dict = deepcopy(timeline_dict)
         # 逐条把列表里的信息整理保存

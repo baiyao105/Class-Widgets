@@ -1,13 +1,11 @@
 import configparser
 import json
 import os
-import sys
 from pathlib import Path
 from shutil import copy
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
-from packaging.version import Version
 from PyQt5.QtCore import QCoreApplication
 
 from basic_dirs import CONFIG_HOME, CW_HOME, PLUGIN_HOME, SCHEDULE_DIR
@@ -43,7 +41,7 @@ class ConfigCenter:
             from qfluentwidgets import Dialog
             from PyQt5.QtWidgets import QApplication
             import sys
-            app = QApplication.instance() or QApplication(sys.argv)
+            QApplication.instance() or QApplication(sys.argv)
             dlg = Dialog(
                 QCoreApplication.translate("file", 'Class Widgets 启动失败w(ﾟДﾟ)w'),
                 QCoreApplication.translate("file", '加载默认配置文件失败,请检查文件完整性或尝试重新安装。\n错误信息: {e}').format(e=e)
