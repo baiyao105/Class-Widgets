@@ -1,4 +1,6 @@
 import asyncio
+import builtins
+import contextlib
 import hashlib
 import os
 import platform
@@ -259,10 +261,8 @@ class EdgeTTSProvider(TTSVoiceProvider):
                 if not loop.is_closed():
                     pending = asyncio.all_tasks(loop)
                     if pending:
-                        try:
+                        with contextlib.suppress(RuntimeError):
                             loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                        except RuntimeError:
-                            pass
                     loop.close()
             except Exception as e:
                 logger.warning(f"清理事件循环时出错: {e}")
@@ -283,10 +283,8 @@ class EdgeTTSProvider(TTSVoiceProvider):
                     loop.close()
             except Exception:
                 pass
-            try:
+            with contextlib.suppress(Exception):
                 asyncio.set_event_loop(None)
-            except Exception:
-                pass
 
     def _fetch_voices(self) -> List[TTSVoice]:
         """获取 Edge TTS 语音列表"""
@@ -408,10 +406,8 @@ class EdgeTTSProvider(TTSVoiceProvider):
         except Exception as e:
             logger.error(f"Edge TTS 合成失败: {e}")
             if os.path.exists(output_path) and os.path.getsize(output_path) == 0:
-                try:
+                with contextlib.suppress(builtins.BaseException):
                     os.remove(output_path)
-                except:
-                    pass
             return False
 
 
@@ -820,7 +816,7 @@ class TTSService(QObject):
                  on_error: Optional[Callable[[str], None]] = None) -> Optional[str]:
         """播放TTS语音(生成并播放)"""
         try:
-            task_id = self.generate_speech_async(
+            return self.generate_speech_async(
                 text=text,
                 voice_id=voice_id,
                 speed=speed,
@@ -828,7 +824,6 @@ class TTSService(QObject):
                 on_complete=lambda text, file_path: self._handle_play_complete(file_path, on_complete),
                 on_error=lambda text, error: self._handle_play_error(error, on_error)
             )
-            return task_id
         except Exception as e:
             error_msg = f"TTS播放失败: {e!s}"
             logger.error(error_msg)

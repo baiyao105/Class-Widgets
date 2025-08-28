@@ -572,7 +572,7 @@ class PluginPlaza(MSFluentWindow):
                 keyword = self.search_plugin.text()
                 print(f'结果：{search(keyword)}')  # 结果
                 plugin_num = 0  # 计数
-                for key, data in search(keyword).items():
+                for _key, data in search(keyword).items():
                     plugin_card = PluginCard_Horizontal(title=data['name'], content=data['description'],
                                                         tag=data['tag'], version=data['version'], url=data['url'],
                                                         author=data['author'], data=data, parent=self)
@@ -661,6 +661,7 @@ class PluginPlaza(MSFluentWindow):
             QDesktopServices.openUrl(QUrl(
                 self.banners_data[self.img_list[self.banner_view.currentIndex()]]['link']
             ))
+        return None
 
     def set_tags_data(self, data):
         global tags, search_items, recommend_plugins

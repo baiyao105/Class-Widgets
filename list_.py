@@ -159,8 +159,8 @@ try:  # 加载课程/主题配置文件
         for dir in root_dir.iterdir()
         if (info := validate_theme(dir)) is not None
     )
-    theme_folder = list(folder.path.name for folder in __theme.values())
-    theme_names = list(folder.config.name for folder in __theme.values())
+    theme_folder = [folder.path.name for folder in __theme.values()]
+    theme_names = [folder.config.name for folder in __theme.values()]
 except Exception as e:
     logger.error(f'加载课程/主题配置文件发生错误，使用默认配置：{e}')
     config_center.write_conf('General', 'theme', 'default')
@@ -197,14 +197,14 @@ countdown_modes = [QCoreApplication.translate("list_", '轮播'), QCoreApplicati
 
 def get_widget_list() -> List[str]:
     rl = []
-    for item, value in widget_conf.items():
+    for item, _value in widget_conf.items():
         rl.append(item)
     return rl
 
 
 def get_widget_names() -> List[str]:
     rl = []
-    for item, value in widget_name.items():
+    for _item, value in widget_name.items():
         rl.append(value)
     return rl
 
@@ -326,10 +326,7 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
                 check_data['timeline'][i] = {}
 
             for item_name, _ in old_timeline.items():
-                if item_name[1] == 'a':
-                    ma_to_num = 1
-                else:
-                    ma_to_num = 0
+                ma_to_num = 1 if item_name[1] == 'a' else 0
                 new_name = item_name[0]+str(ma_to_num)+item_name[2]
                 check_data['timeline']['default'][new_name] = check_data['timeline'][item_name]
                 del check_data['timeline'][item_name]

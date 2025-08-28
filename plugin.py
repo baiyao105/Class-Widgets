@@ -94,9 +94,8 @@ class PluginLoader:  # 插件加载器
 
     def update_plugins(self) -> None:
         for plugin in self.plugins_dict.values():
-            if hasattr(plugin, 'update'):
-                if self.manager:
-                    plugin.update(self.manager.get_app_contexts())
+            if hasattr(plugin, 'update') and self.manager:
+                plugin.update(self.manager.get_app_contexts())
 
     def delete_plugin(self, plugin_name: str) -> bool:
         plugin_dir = conf.PLUGIN_HOME / plugin_name

@@ -177,7 +177,7 @@ class tip_toast(QWidget):
                 generate_gradient_color(attend_class_color)[1],
                 generate_gradient_color(attend_class_color)[2]
             ]
-        elif state == 0 or state == 2:  # 下课铃声
+        elif state in {0, 2}:  # 下课铃声
             bg_color = [
                 generate_gradient_color(finish_class_color)[0],
                 generate_gradient_color(finish_class_color)[1],
@@ -324,7 +324,7 @@ class wave_Effect(QWidget):
 
         if state == 1:
             self.color = QColor(attend_class_color)
-        elif state == 0 or state == 2:
+        elif state in {0, 2}:
             self.color = QColor(finish_class_color)
         elif state == 3:
             self.color = QColor(prepare_class_color)
@@ -406,8 +406,7 @@ def generate_gradient_color(theme_color: str) -> List[str]:  # 计算渐变色
         return f'rgba({r}, {g}, {b}, 255)'
 
     color = QColor(theme_color)
-    gradient = [adjust_color(color, 0), adjust_color(color, 0.24), adjust_color(color, -0.11)]
-    return gradient
+    return [adjust_color(color, 0), adjust_color(color, 0.24), adjust_color(color, -0.11)]
 
 
 def main(state: int = 1, lesson_name: str = '', title: str = '通知示例', subtitle: str = '副标题',
@@ -478,9 +477,7 @@ def detect_enable_toast(state: int = 0) -> bool:
         return True
     if (config_center.read_conf('Toast', 'finish_class') != '1') and (state in [0, 2]):
         return True
-    if config_center.read_conf('Toast', 'prepare_class') != '1' and state == 3:
-        return True
-    return False
+    return bool(config_center.read_conf('Toast', 'prepare_class') != '1' and state == 3)
 
 
 def push_notification(state: int = 1, lesson_name: str = '', title: Optional[str] = None, subtitle: Optional[str] = None,

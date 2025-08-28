@@ -10,7 +10,7 @@ import zipfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from loguru import logger
 from packaging.version import Version
@@ -165,7 +165,7 @@ class I18nManager:
                     logger.warning(f"{lang_code} 未在语言映射中找到显示名称")
             completed_themes = self.completed_i18n_config.get("completed_languages", {}).get("themes", {})
             all_theme_langs = set()
-            for theme_name, lang_list in completed_themes.items():
+            for _theme_name, lang_list in completed_themes.items():
                 all_theme_langs.update(lang_list)
             for lang_code in all_theme_langs:
                 if name := self._get_language_display_name(lang_code):
@@ -353,6 +353,9 @@ class I18nManager:
             self.load_language_view('zh_CN')
 
 
+import builtins
+import contextlib
+
 from PyQt5.QtCore import QCoreApplication
 
 global_i18n_manager = None
@@ -442,20 +445,17 @@ def load_schedule_dict(schedule, week_type, part, part_name):
     for week, item in schedule.items():
         all_class = []
         count = []  # 初始化计数器
-        for i in range(len(part)):
+        for _i in range(len(part)):
             count.append(0)
         if str(week) in loaded_data['timeline_even' if week_type else 'timeline'] and loaded_data['timeline_even' if week_type else 'timeline'][str(week)]:
             timeline = get_timeline()['even' if week_type else 'odd'][str(week)]
         else:
             timeline = get_timeline()['even' if week_type else 'odd']['default']
 
-        for isbreak, item_name, item_index, item_time in timeline:
+        for isbreak, item_name, item_index, _item_time in timeline:
             if not isbreak:
                 try:
-                    if item_name == '0':
-                        count_num = 0
-                    else:
-                        count_num = sum(count[:int(item_name)])
+                    count_num = 0 if item_name == '0' else sum(count[:int(item_name)])
 
                     prefix = item[item_index - 1 + count_num]
                     period = part_name[str(item_name)]
@@ -1805,10 +1805,7 @@ class SettingsMenu(FluentWindow):
                 severity_text = wd.get_severity_text(alert_data.get('severity', 'unknown'))
                 alert_title = f"{alert_text}{severity_text}预警"
             current_exclude = config_center.read_conf('Weather', 'alert_exclude', '')
-            if current_exclude:
-                new_exclude = f"{current_exclude} {alert_title}"
-            else:
-                new_exclude = alert_title
+            new_exclude = f"{current_exclude} {alert_title}" if current_exclude else alert_title
 
             config_center.write_conf('Weather', 'alert_exclude', new_exclude)
             self._refresh_alert_exclude_ui()
@@ -2186,8 +2183,8 @@ class SettingsMenu(FluentWindow):
         self.available_voices = voices
         if hasattr(self, 'voice_selector') and self.voice_selector and hasattr(self, 'update_tts_voices'):
             self.update_tts_voices(self.available_voices)
-        self.switch_enable_TTS.setEnabled(True if voices else False)
-        self.voice_selector.setEnabled(True if voices else False)
+        self.switch_enable_TTS.setEnabled(bool(voices))
+        self.voice_selector.setEnabled(bool(voices))
 
     class TTSSettings(MessageBoxBase): # TTS设置页
         def __init__(self, parent=None):
@@ -2297,11 +2294,7 @@ class SettingsMenu(FluentWindow):
                 'content': self.tr('这是一条测试通知ヾ(≧▽≦*)o')
             })
             if (
-                text_type == 'attend_class'
-                or text_type == 'finish_class'
-                or text_type == 'prepare_class'
-                or text_type == 'after_school'
-                or text_type == 'otherwise'
+                text_type in {'attend_class', 'finish_class', 'prepare_class', 'after_school', 'otherwise'}
             ):
                 text_to_speak = text_template.format_map(format_values)
             else:
@@ -2993,12 +2986,11 @@ class SettingsMenu(FluentWindow):
         window_status_combo = self.adInterface.findChild(ComboBox, 'window_status_combo')
         window_status_combo.addItems(list_.window_status)
         window_status_combo.setCurrentIndex(int(config_center.read_conf('General', 'pin_on_top', '0')))
-        if os.name != 'nt':
-            if window_status_combo.count() > 3:
-                window_status_combo.setItemEnabled(3, False)
-                original_text = window_status_combo.itemText(3)
-                if ' (仅Windows)' not in original_text:
-                    window_status_combo.setItemText(3, original_text + self.tr(' (仅Windows)'))
+        if os.name != 'nt' and window_status_combo.count() > 3:
+            window_status_combo.setItemEnabled(3, False)
+            original_text = window_status_combo.itemText(3)
+            if ' (仅Windows)' not in original_text:
+                window_status_combo.setItemText(3, original_text + self.tr(' (仅Windows)'))
 
         def on_window_status_changed():
             """刷新窗口状态"""
@@ -3356,10 +3348,8 @@ class SettingsMenu(FluentWindow):
                         return
                     success = current_manager.sync_with_ntp()
                     if success:
-                        try:
+                        with contextlib.suppress(Exception):
                             self.update_ntp_status_display()
-                        except Exception:
-                            pass
                 except Exception as e:
                     logger.error(f"NTP自动同步异常: {e}")
             self._ntp_auto_sync_callback = ntp_auto_sync_callback
@@ -3441,16 +3431,14 @@ class SettingsMenu(FluentWindow):
             )
             logger.warning(f"NTP服务器URL格式可能不正确: {url}")
 
-    def _show_ntp_flyout(self, target_widget, flyout_type: str, message: str, invalid_url: str = None):
+    def _show_ntp_flyout(self, target_widget, flyout_type: str, message: str, invalid_url: Optional[str] = None):
         if hasattr(self, '_current_ntp_flyout') and self._current_ntp_flyout:
-            try:
+            with contextlib.suppress(builtins.BaseException):
                 self._current_ntp_flyout.close()
-            except:
-                pass
             self._current_ntp_flyout = None
 
         class NTPServerFlyoutView(FlyoutViewBase):
-            def __init__(self, flyout_type: str, message: str, invalid_url: str = None, parent=None):
+            def __init__(self, flyout_type: str, message: str, invalid_url: Optional[str] = None, parent=None):
                 super().__init__(parent)
                 self.flyout_type = flyout_type
                 self.invalid_url = invalid_url
@@ -3550,11 +3538,10 @@ class SettingsMenu(FluentWindow):
                 )
                 if re.search(r'[`~!@#$%^&*()+=\[\]{}|\\:;"<>?/]', url):
                     pass
-                elif valid_domain_pattern.match(url):
-                    if not re.search(r'\.\.|\.\-|\-\.|^\.|\.$', url):
-                        tld = url.split('.')[-1]
-                        if len(tld) >= 2 and tld.isalpha():
-                            suggestions.append(url)
+                elif valid_domain_pattern.match(url) and not re.search(r'\.\.|\.\-|\-\.|^\.|\.$', url):
+                    tld = url.split('.')[-1]
+                    if len(tld) >= 2 and tld.isalpha():
+                        suggestions.append(url)
                 # 好一个智能匹配(闲)
                 def calculate_similarity(server: str, user_input: str) -> float:
                     """计算url和输入的相似度"""
@@ -3597,10 +3584,8 @@ class SettingsMenu(FluentWindow):
                         if ntp_url_widget:
                             if hasattr(self.parent_menu, '_ntp_flyout_timer'):
                                 self.parent_menu._ntp_flyout_timer.stop()
-                            try:
+                            with contextlib.suppress(TypeError):
                                 ntp_url_widget.textChanged.disconnect()
-                            except TypeError:
-                                pass
                             ntp_url_widget.setText(suggestion)
                             self._close_flyout()
                             ntp_url_widget.textChanged.connect(self.parent_menu.on_ntp_server_url_changed)
@@ -3665,10 +3650,8 @@ class SettingsMenu(FluentWindow):
                 def safe_close():
                     flyout_obj = flyout_ref()
                     if flyout_obj and not flyout_obj.isHidden():
-                        try:
+                        with contextlib.suppress(RuntimeError):
                             flyout_obj.close()
-                        except RuntimeError:
-                            pass
                 QTimer.singleShot(2000, safe_close)
             return flyout
         except Exception as e:
@@ -3760,11 +3743,10 @@ class SettingsMenu(FluentWindow):
         try:
             if hasattr(self, 'ntp_thread') and self.ntp_thread:
                 try:
-                    if self.ntp_thread.isRunning():
-                        if not self.ntp_thread.wait(3000):
-                            logger.warning("NTP线程未能在3秒内正常结束，强制终止")
-                            self.ntp_thread.terminate()
-                            self.ntp_thread.wait(1000)
+                    if self.ntp_thread.isRunning() and not self.ntp_thread.wait(3000):
+                        logger.warning("NTP线程未能在3秒内正常结束，强制终止")
+                        self.ntp_thread.terminate()
+                        self.ntp_thread.wait(1000)
                 except RuntimeError:
                     logger.warning("已删除的QThread对象")
                 try:
@@ -4173,7 +4155,7 @@ class SettingsMenu(FluentWindow):
     def clear_log(self):  # 清空日志
         def get_directory_size(path):  # 计算目录大小
             total_size = 0
-            for dir_path, dir_names, filenames in os.walk(path):
+            for dir_path, _dir_names, filenames in os.walk(path):
                 for file_name in filenames:
                     file_path = os.path.join(dir_path, file_name)
                     total_size += os.path.getsize(file_path)
@@ -4291,6 +4273,7 @@ class SettingsMenu(FluentWindow):
                 alert.buttonLayout.insertStretch(0, 1)
                 if alert.exec():
                     return 0
+        return None
 
     def check_update(self):
         self.version_thread = VersionThread()
@@ -4331,6 +4314,7 @@ class SettingsMenu(FluentWindow):
 
             if utils.tray_icon:
                 utils.tray_icon.push_update_notification(self.tr("新版本速递：{new_version}").format(new_version=new_version))
+        return None
 
     def cf_import_schedule_cses(self, file_path: str):  # 导入课程表（CSES）
         # TODO: 切换到 pathlib.Path
@@ -4466,10 +4450,8 @@ class SettingsMenu(FluentWindow):
             logger.error(f'更新预览界面时发生错误：{e}')
 
     def cf_reload_table(self):
-        try:
+        with contextlib.suppress(builtins.BaseException):
             self.table.currentRowChanged.disconnect()
-        except:
-            pass
 
         self.table.clear()
 
@@ -4644,7 +4626,7 @@ class SettingsMenu(FluentWindow):
     def cf_post_schedule(self):
         url = self.cf_file_list[self.table.currentIndex().row()].url
         try:
-            if url == '' or url == 'local':
+            if url in {'', 'local'}:
                 n2_dialog = TextFieldMessageBox(
                         self, self.tr('请输入课表链接'),
                         self.tr('当前可缩写数据库：\n{dbs}\n你可以使用缩写来代替完整的数据库链接').format(dbs='\n'.join([f"{k} - {v}" for k, v in list_.schedule_dbs.items()])), '')
@@ -4894,14 +4876,11 @@ class SettingsMenu(FluentWindow):
         for week_type, timeline_data in timeline.items():  # 加载时间线
             for week, data in timeline_data.items():  # 加载节点
                 all_line = []
-                for isbreak, item_name, item_index, item_time in data:  # 加载时间线
+                for isbreak, item_name, _item_index, item_time in data:  # 加载时间线
                     prefix = ''
                     item_time = self.tr('{data}分钟').format(data=item_time)
                     # 判断前缀和时段
-                    if not isbreak:
-                        prefix = self.tr('课程')
-                    else:
-                        prefix = self.tr('课间')
+                    prefix = self.tr('课程') if not isbreak else self.tr('课间')
                     period = part_name[item_name]
 
                     # 还原 item_text
@@ -5040,10 +5019,7 @@ class SettingsMenu(FluentWindow):
             item_text = te_part_list.item(i).text()
             item_info = item_text.split(' - ')
             time_tostring = item_info[1].split(':')
-            if len(item_info) == 3:
-                part_type = ['part', 'break'][item_info[2] == self.tr('休息段')]
-            else:
-                part_type = 'part'
+            part_type = ['part', 'break'][item_info[2] == self.tr('休息段')] if len(item_info) == 3 else 'part'
             data_dict['part'][str(i)] = [int(time_tostring[0]), int(time_tostring[1]), part_type]
             data_dict['part_name'][str(i)] = item_info[0]
 
@@ -5469,10 +5445,8 @@ class SettingsMenu(FluentWindow):
         try:
             self.navigationInterface.currentItemChanged.connect(self._on_page_changed)
         except AttributeError:
-            try:
+            with contextlib.suppress(AttributeError):
                 self.stackedWidget.currentChanged.connect(self._on_page_changed)
-            except AttributeError:
-                pass
 
     def init_window(self):
         self.stackedWidget.setCurrentIndex(0)  # 设置初始页面
@@ -5630,10 +5604,10 @@ class NTPSyncWorker(QObject):
 
 def sp_get_class_num():  # 获取当前周课程数（未完成）
     highest_count = 0
-    for timeline_ in get_timeline()['even' if conf.get_week_type() else 'odd'].keys():
+    for timeline_ in get_timeline()['even' if conf.get_week_type() else 'odd']:
         timeline = get_timeline()['even' if conf.get_week_type() else 'odd'][timeline_]
         count = 0
-        for isbreak, item_name, item_index, item_time in timeline:
+        for isbreak, _item_name, _item_index, _item_time in timeline:
             if not isbreak:
                 count += 1
         highest_count = max(highest_count, count)

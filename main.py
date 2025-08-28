@@ -82,6 +82,8 @@ splash_window.run()
 
 splash_window.update_status((0, QCoreApplication.translate('main', '加载模块...')))
 
+import contextlib
+
 import conf
 import list_
 import menu
@@ -328,7 +330,7 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
     for i in range(len(parts_start_time)):  # 遍历每个Part
         time_len = dt.timedelta(minutes=0)  # Part长度
 
-        for isbreak, item_name, item_index, item_time in timeline_data:
+        for _isbreak, item_name, _item_index, item_time in timeline_data:
             # if item_name.startswith(f'a{str(order[i])}') or item_name.startswith(f'f{str(order[i])}'):
             if item_name == order[i]:
                 time_len += dt.timedelta(minutes=int(item_time))  # 累计Part的时间点总长度
@@ -365,17 +367,14 @@ def get_current_lessons() -> None:  # 获取当前课程
     timeline = get_timeline_data()
     if config_center.read_conf('General', 'enable_alt_schedule') == '1' or conf.is_temp_week():
         try:
-            if conf.get_week_type():
-                schedule = loaded_data.get('schedule_even')
-            else:
-                schedule = loaded_data.get('schedule')
+            schedule = loaded_data.get('schedule_even') if conf.get_week_type() else loaded_data.get('schedule')
         except Exception as e:
             logger.error(f'加载课程表文件[单双周]出错：{e}')
             schedule = loaded_data.get('schedule')
     else:
         schedule = loaded_data.get('schedule')
     class_count = 0
-    for isbreak, item_name, item_index, item_time in timeline:
+    for isbreak, item_name, _item_index, _item_time in timeline:
         if not isbreak:
             if schedule[str(current_week)]:
                 try:
@@ -415,7 +414,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
         c_time, part = get_part()
 
         if current_dt >= c_time:
-            for isbreak, item_name, item_index, item_time in timeline_data:
+            for isbreak, item_name, _item_index, item_time in timeline_data:
                 # if item_name.startswith(f'a{str(part)}') or item_name.startswith(f'f{str(part)}'):
                 if item_name == str(part):
                     # 判断时间是否上下课，发送通知
@@ -473,7 +472,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                     next_lesson_name = None
                     next_lesson_key = None
                     if timeline_data:
-                        for isbreak, item_name, item_index, item_time in timeline_data:
+                        for isbreak, item_name, _item_index, item_time in timeline_data:
                             # if key.startswith(f'a{str(part)}'):
                             if not isbreak and item_name == str(part):
                                 next_lesson_key = part
@@ -485,15 +484,12 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                     if current_state == 0:
                         now = TimeManagerFactory.get_instance().get_current_time()
                         if not last_notify_time or (now - last_notify_time).seconds >= notify_cooldown:
-                            if next_lesson_name != None:
+                            if next_lesson_name is not None:
                                     notification.push_notification(3, next_lesson_name)
             # if f'a{part}1' in timeline_data:
 
             def have_class():
-                for data in timeline_data:
-                    if data[0] == False and data[1] == str(part) and data[2] == 1:
-                        return True
-                return False
+                return any(not data[0] and data[1] == str(part) and data[2] == 1 for data in timeline_data)
 
             if have_class():  # 有课程
                 time_diff = c_time - current_dt
@@ -502,6 +498,7 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
             else:
                 return_text = [QCoreApplication.translate('main', '目前课程已结束'), '00:00', 100]
         return return_text
+    return None
 
 
 # 获取将发生的活动
@@ -516,19 +513,12 @@ def get_next_lessons() -> None:
         c_time, part = get_part()
 
         def before_class():
-            if part == 0 or part == 3:
+            if part in {0, 3}:
                 return True
-            if current_dt >= TimeManagerFactory.get_instance().get_current_time().replace(
-                hour=parts_start_time[part].hour,
-                minute=parts_start_time[part].minute,
-                second=parts_start_time[part].second,
-                microsecond=parts_start_time[part].microsecond
-            ) - dt.timedelta(minutes=60):
-                return True
-            return False
+            return current_dt >= TimeManagerFactory.get_instance().get_current_time().replace(hour=parts_start_time[part].hour, minute=parts_start_time[part].minute, second=parts_start_time[part].second, microsecond=parts_start_time[part].microsecond) - dt.timedelta(minutes=60)
 
         if before_class():
-            for isbreak, item_name, item_index, item_time in timeline_data:
+            for isbreak, item_name, _item_index, item_time in timeline_data:
                 # if item_name.startswith(f'a{str(part)}') or item_name.startswith(f'f{str(part)}'):
                 if item_name == str(part):
                     add_time = int(item_time)
@@ -563,7 +553,7 @@ def get_current_lesson_name() -> None:
                 current_lesson_name = loaded_data['part_name'][str(part)]
                 current_state = 2
 
-            for isbreak, item_name, item_index, item_time in timeline_data:
+            for isbreak, item_name, _item_index, item_time in timeline_data:
                 # if item_name.startswith(f'a{str(part)}') or item_name.startswith(f'f{str(part)}'):
                 if item_name == str(part):
                     add_time = int(item_time)
@@ -666,15 +656,14 @@ def check_fullscreen() -> bool:  # 检查是否全屏
     if is_covering_screen:
         screen_area = (screen_rect_desktop.right - screen_rect_desktop.left) * (screen_rect_desktop.bottom - screen_rect_desktop.top)
         window_area = (rect.right - rect.left) * (rect.bottom - rect.top)
-        is_fullscreen = window_area >= screen_area * 0.95
+        return window_area >= screen_area * 0.95
         # logger.debug(f"覆盖屏幕: {is_covering_screen}, 窗口面积: {window_area}, 屏幕面积: {screen_area}, 是否全屏判断: {is_fullscreen}")
-        return is_fullscreen
     return False
 
 class ErrorDialog(Dialog):  # 重大错误提示框
     def __init__(self, error_details: str = 'Traceback (most recent call last):', parent: Optional[Any] = None) -> None:
         # KeyboardInterrupt 直接 exit
-        if error_details.endswith('KeyboardInterrupt') or error_details.endswith('KeyboardInterrupt\n'):
+        if error_details.endswith(('KeyboardInterrupt', 'KeyboardInterrupt\n')):
             stop()
 
         global splash_window
@@ -852,9 +841,7 @@ class PluginMethod:  # 插件方法
 
     @staticmethod
     def is_get_notification() -> bool:  # 检查是否有通知
-        if notification.pushed_notification:
-            return True
-        return False
+        return bool(notification.pushed_notification)
 
     @staticmethod
     def send_notification(state: int = 1, lesson_name: str = QCoreApplication.translate('main', '示例课程'), title: str = QCoreApplication.translate('main', '通知示例'), subtitle: str = QCoreApplication.translate('main', '副标题'),
@@ -956,7 +943,7 @@ class WidgetsManager:
         # 添加小组件实例
         for w in range(len(self.widgets_list)):
             cnt_all[self.widgets_list[w]] = cnt_all.get(self.widgets_list[w], -1) + 1
-            widget = DesktopWidget(self, self.widgets_list[w], True if w == 0 else False,cnt = cnt_all[self.widgets_list[w]], position=self.get_widget_pos("", w), widget_cnt = w)
+            widget = DesktopWidget(self, self.widgets_list[w], w == 0,cnt = cnt_all[self.widgets_list[w]], position=self.get_widget_pos("", w), widget_cnt = w)
             self.widgets.append(widget)
 
         self.create_widgets()
@@ -971,7 +958,7 @@ class WidgetsManager:
 
     def check_widgets_exist(self) -> None:
         for widget in self.widgets_list:
-            if widget not in list_.widget_width.keys():
+            if widget not in list_.widget_width:
                 self.widgets_list.remove(widget)
 
     @staticmethod
@@ -1117,10 +1104,8 @@ class WidgetsManager:
             widget_path = getattr(widget, 'path', self.tr('未知组件'))
             try:
                 if hasattr(widget, 'weather_timer') and widget.weather_timer:
-                    try:
+                    with contextlib.suppress(RuntimeError):
                         widget.weather_timer.stop()
-                    except RuntimeError:
-                        pass
                 if hasattr(widget, 'weather_thread') and widget.weather_thread:
                     try:
                         if widget.weather_thread.isRunning():
@@ -1377,10 +1362,8 @@ class FloatingWidget(QWidget):  # 浮窗
             except Exception as e:
                 logger.error(f"检查或设置浮窗置顶时出错: {e}")
                 if self._is_topmost_callback_added:
-                    try:
+                    with contextlib.suppress(ValueError):
                         utils.update_timer.remove_callback(self._ensure_topmost)
-                    except ValueError:
-                        pass
                     self._is_topmost_callback_added = False
                     logger.debug(f"因错误 {e} 移除浮窗置顶回调。")
 
@@ -1445,17 +1428,16 @@ class FloatingWidget(QWidget):  # 浮窗
         self.setWindowFlags(flags)
 
         # 始终添加置顶回调逻辑
-        if os.name == 'nt':
-            if not self._is_topmost_callback_added:
-                try:
-                    if hasattr(utils, 'update_timer') and utils.update_timer:
-                        utils.update_timer.add_callback(self._ensure_topmost, 0.5)
-                        self._is_topmost_callback_added = True
-                        self._ensure_topmost() # 立即执行一次确保初始置顶
-                    else:
-                        logger.warning("utils.update_timer 不可用，无法为浮窗添加置顶回调。")
-                except Exception as e:
-                    logger.error(f"为浮窗添加置顶回调时出错: {e}")
+        if os.name == 'nt' and not self._is_topmost_callback_added:
+            try:
+                if hasattr(utils, 'update_timer') and utils.update_timer:
+                    utils.update_timer.add_callback(self._ensure_topmost, 0.5)
+                    self._is_topmost_callback_added = True
+                    self._ensure_topmost() # 立即执行一次确保初始置顶
+                else:
+                    logger.warning("utils.update_timer 不可用，无法为浮窗添加置顶回调。")
+            except Exception as e:
+                logger.error(f"为浮窗添加置顶回调时出错: {e}")
 
         if sys.platform == 'darwin':
             self.setWindowFlags(
@@ -1661,10 +1643,8 @@ class FloatingWidget(QWidget):  # 浮窗
             self.save_position()
             self.animating = False
             if self._is_topmost_callback_added:
-                try:
+                with contextlib.suppress(ValueError):
                     utils.update_timer.remove_callback(self._ensure_topmost)
-                except ValueError:
-                    pass
                 self._is_topmost_callback_added = False
 
         self.animation_rect.finished.connect(cleanup)
@@ -1711,7 +1691,7 @@ class FloatingWidget(QWidget):  # 浮窗
         self.save_position()
         # 特定隐藏模式下不执行操作
         hide_mode = config_center.read_conf('General', 'hide')
-        if hide_mode == '1' or hide_mode == '2':
+        if hide_mode in {'1', '2'}:
              return # 阻止手动展开/收起
         if (
                 hasattr(self, "p_Position")
@@ -2039,17 +2019,16 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.fade_in_animation.start()
 
             if pin_on_top == '1':  # 置顶
-                if os.name == 'nt':
-                    if not self._is_topmost_callback_added:
-                        try:
-                            if hasattr(utils, 'update_timer') and utils.update_timer:
-                                utils.update_timer.add_callback(self._ensure_topmost, 0.5)
-                                self._is_topmost_callback_added = True
-                                self._ensure_topmost()
-                            else:
-                                logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
-                        except Exception as e:
-                            logger.error(f"添加置顶回调时出错: {e}")
+                if os.name == 'nt' and not self._is_topmost_callback_added:
+                    try:
+                        if hasattr(utils, 'update_timer') and utils.update_timer:
+                            utils.update_timer.add_callback(self._ensure_topmost, 0.5)
+                            self._is_topmost_callback_added = True
+                            self._ensure_topmost()
+                        else:
+                            logger.warning("utils.update_timer 不可用，无法添加置顶回调。")
+                    except Exception as e:
+                        logger.error(f"添加置顶回调时出错: {e}")
 
             elif pin_on_top == '2':  # 置底
                 self.lower()
@@ -2116,10 +2095,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             except Exception as e:
                 logger.error(f"检查或设置窗口置顶时出错: {e}")
                 if self._is_topmost_callback_added:
-                    try:
+                    with contextlib.suppress(ValueError):
                         utils.update_timer.remove_callback(self._ensure_topmost)
-                    except ValueError:
-                        pass
                     self._is_topmost_callback_added = False
                     logger.debug(f"因错误 {e} 移除置顶回调。")
 
@@ -2489,10 +2466,8 @@ class DesktopWidget(QWidget):  # 主要小组件
         def on_fade_out_finished():
             self._hide_current_mode(from_mode)
             self._show_target_mode(to_mode)
-        try:
+        with contextlib.suppress(TypeError):
             fade_out_group.finished.disconnect()
-        except TypeError:
-            pass
 
         fade_out_group.finished.connect(on_fade_out_finished)
         fade_out_group.start()
@@ -2725,10 +2700,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_opacity.setOpacity(0.0)
             self.alert_icon_opacity.setOpacity(0.0)
             fade_in_group.start()
-        try:
+        with contextlib.suppress(TypeError):
             fade_out_group.finished.disconnect()
-        except TypeError:
-            pass
         fade_out_group.finished.connect(_start_next_alert_fade_in)
         fade_out_group.start()
 
@@ -2763,10 +2736,8 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.reminder_opacity.setOpacity(0.0)
             self.reminder_icon_opacity.setOpacity(0.0)
             fade_in_group.start()
-        try:
+        with contextlib.suppress(TypeError):
             fade_out_group.finished.disconnect()
-        except TypeError:
-            pass
         fade_out_group.finished.connect(_start_next_reminder_fade_in)
         fade_out_group.start()
 
@@ -3074,7 +3045,7 @@ class DesktopWidget(QWidget):  # 主要小组件
     @staticmethod
     def hide_show_widgets() -> None:  # 隐藏/显示主界面（全部隐藏）
         hide_mode = config_center.read_conf('General', 'hide')
-        if hide_mode == '1' or hide_mode == '2':
+        if hide_mode in {'1', '2'}:
             hide_mode_text = QCoreApplication.translate('main', "上课时自动隐藏") if hide_mode == '1' else QCoreApplication.translate('main', "窗口最大化时隐藏")
             w = Dialog(
                 QCoreApplication.translate('main', "暂时无法变更“状态”"),
@@ -3102,7 +3073,7 @@ class DesktopWidget(QWidget):  # 主要小组件
     @staticmethod
     def minimize_to_floating() -> None:  # 最小化到浮窗
         hide_mode = config_center.read_conf('General', 'hide')
-        if hide_mode == '1' or hide_mode == '2':
+        if hide_mode in {'1', '2'}:
             hide_mode_text = QCoreApplication.translate('main', "上课时自动隐藏") if hide_mode == '1' else QCoreApplication.translate('main', "窗口最大化时隐藏")
             w = Dialog(
                 QCoreApplication.translate('main', "暂时无法变更“状态”"),
@@ -3199,7 +3170,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
         self.animation.start()
 
-    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1, pos_y: int = None) -> None:  # 窗口形变
+    def widget_transition(self, pos_x: int, width: int, height: int, opacity: float = 1, pos_y: Optional[int] = None) -> None:  # 窗口形变
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(525)  # 持续时间
         self.animation.setStartValue(QRect(self.x(), self.y(), self.width(), self.height()))
@@ -3340,11 +3311,10 @@ def check_windows_maximize() -> bool:  # 检查窗口是否最大化
                 continue
 
             # 如果进程是 explorer.exe,但不是“资源管理器”则认为是特殊explorer(应该是桌面)
-            if process_name == 'explorer.exe':
-                if title_lower in excluded_titles_exact_lower or \
-                   any(keyword in title_lower for keyword in excluded_keywords_in_title_lower):
-                    # logger.debug(f"explorer.exe 窗口 '{title_lower}' 命中标题排除规则, 排除.")
-                    continue
+            if process_name == 'explorer.exe' and (title_lower in excluded_titles_exact_lower or \
+                   any(keyword in title_lower for keyword in excluded_keywords_in_title_lower)):
+                # logger.debug(f"explorer.exe 窗口 '{title_lower}' 命中标题排除规则, 排除.")
+                continue
             # logger.debug(f"找到有效最大化窗口: '{title}' (PID: {win_pid}, 进程: {process_name}). 返回 True.")
             return True
 
@@ -3392,10 +3362,9 @@ def init() -> None:
             widgets.remove(widget)  # 移除不存在的组件(确保移除插件后不会出错)
 
     mgr.init_widgets()
-    if not first_start and was_floating_mode:
-        if fw:
-            fw.show()
-            mgr.full_hide_windows()
+    if not first_start and was_floating_mode and fw:
+        fw.show()
+        mgr.full_hide_windows()
 
     update_timer.add_callback(mgr.update_widgets)
     update_timer.start()

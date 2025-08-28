@@ -530,9 +530,8 @@ class WeatherManager:
             raw_data = provider.fetch_forecast_data(location_key, api_key, forecast_type, days)
 
             # 解析数据
-            parsed_data = provider.parse_forecast_data(raw_data, forecast_type)
+            return provider.parse_forecast_data(raw_data, forecast_type)
 
-            return parsed_data
         except Exception as e:
             logger.error(f'获取 {forecast_type} 预报失败: {e}')
             return []
@@ -681,7 +680,7 @@ class WeatherManager:
             }
 
     @cache_result(expire_seconds=600)  # 缓存10分钟
-    def get_weather_reminders(self, api_name: str = None, location_key: str = None) -> List[Dict[str, Any]]:
+    def get_weather_reminders(self, api_name: Optional[str] = None, location_key: Optional[str] = None) -> List[Dict[str, Any]]:
         """获取天气提醒信息
 
         Args:
@@ -930,10 +929,9 @@ class GenericWeatherProvider(WeatherapiProvider):
                 key=api_key,
                 days=days
             )
-            if self.config.get('method') == 'coordinates':
-                if ',' in location_key:
-                    lon, lat = location_key.split(',')
-                    url = url.format(lon=lon, lat=lat)
+            if self.config.get('method') == 'coordinates' and ',' in location_key:
+                lon, lat = location_key.split(',')
+                url = url.format(lon=lon, lat=lat)
 
             # logger.debug(f"获取 {forecast_type} 预报数据: {url}")
             response = requests.get(url, proxies=proxies, timeout=10)
@@ -1181,7 +1179,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
         try:
             # 结构: aqi字段内
             aqi_data = data.get('aqi', {})
-            result = {
+            return {
                 'aqi': aqi_data.get('aqi'),
                 'co': aqi_data.get('co'),
                 'no2': aqi_data.get('no2'),
@@ -1192,7 +1190,6 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 'suggest': aqi_data.get('suggest'),
                 'src': aqi_data.get('src')
             }
-            return result
         except Exception as e:
             logger.error(f"解析空气质量数据失败(小米天气): {e}")
             return {}
@@ -1216,8 +1213,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             if weather_data:
                 alerts = self.parse_weather_alerts(weather_data)
                 if alerts:
-                    result = {'warning': alerts}
-                    return result
+                    return {'warning': alerts}
             return None
         except Exception:
             return None
@@ -1369,8 +1365,8 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
 
                 day_data = {
                     "day": i,  # 日期偏移
-                    "temp_high": temp_ranges[i]["to"] if "to" in temp_ranges[i] else "",
-                    "temp_low": temp_ranges[i]["from"] if "from" in temp_ranges[i] else "",
+                    "temp_high": temp_ranges[i].get("to", ""),
+                    "temp_low": temp_ranges[i].get("from", ""),
                     "weather_day": weather_day,
                     "weather_night": weather_night,
                     "precipitation_day": is_precip_day,  # 标记是否为降水日
@@ -1412,8 +1408,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 return {}
 
             if forecast_type == 'hourly':
-                hourly_forecast = full_data.get("forecastHourly", {})
-                return hourly_forecast
+                return full_data.get("forecastHourly", {})
             if forecast_type == 'daily':
                 daily_forecast = full_data.get("forecastDaily", {})
                 # 根据请求的天数截取数据
@@ -1458,9 +1453,8 @@ class QWeatherProvider(GenericWeatherProvider):
             # logger.debug(f'{self.api_name} 请求URL: {url.replace(api_key, "***" if api_key else "(空)")}')
             response = requests.get(url, proxies=proxies, timeout=10)
             response.raise_for_status()
-            result = response.json()
+            return response.json()
             # logger.debug(f'{self.api_name} API响应: {result}')
-            return result
         except Exception as e:
             logger.error(f'{self.api_name} 获取天气数据失败: {e}')
             raise

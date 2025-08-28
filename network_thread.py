@@ -66,8 +66,7 @@ class getRepoFileList(QThread):  # 获取仓库文件目录
             url = f"{mirror_url}{self.download_url}"
             response = requests.get(url, proxies=proxies, headers=headers)  # 禁用代理
             if response.status_code == 200:
-                data = response.json()
-                return data
+                return response.json()
             logger.error(f"获取banner信息失败：{response.status_code}")
             return {"error": response.status_code}
         except Exception as e:
@@ -97,8 +96,7 @@ class getPluginInfo(QThread):  # 获取插件信息(json)
             url = f"{mirror_url}{self.download_url}"
             response = requests.get(url, proxies=proxies, headers=headers)  # 禁用代理
             if response.status_code == 200:
-                data = response.json()
-                return data
+                return response.json()
             logger.error(f"获取插件信息失败：{response.status_code}")
             return {}
         except Exception as e:
@@ -128,8 +126,7 @@ class getTags(QThread):  # 获取插件标签(json)
             url = f"{mirror_url}{self.download_url}"
             response = requests.get(url, proxies=proxies, headers=headers)  # 禁用代理
             if response.status_code == 200:
-                data = response.json()
-                return data
+                return response.json()
             logger.error(f"获取Tag信息失败：{response.status_code}")
             return {}
         except Exception as e:
@@ -279,8 +276,7 @@ class VersionThread(QThread):  # 获取最新版本号
             response = requests.get(url, proxies=proxies, timeout=30)
             logger.debug(f"更新请求响应: {response.status_code}")
             if response.status_code == 200:
-                data = response.json()
-                return data
+                return response.json()
             logger.error(f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}")
             return {'error': f"请求失败，错误代码：{response.status_code}"}
         except requests.exceptions.RequestException as e:
@@ -445,12 +441,13 @@ def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
         logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
         if Version(server_version) > Version(local_version):
             utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
+    return None
 
 
 class scheduleThread(QThread):  # 获取课表
     update_signal = pyqtSignal(dict)
 
-    def __init__(self,url:str, method:str='GET', data:dict=None):
+    def __init__(self,url:str, method:str='GET', data:Optional[dict]=None):
         super().__init__()
         self.url = url
         self.method = method
