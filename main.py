@@ -1154,8 +1154,12 @@ class WidgetsManager:
 
     def decide_to_hide(self) -> None:
         if config_center.read_conf('General', 'hide_method') == '0':  # 正常
+            if fw.isVisible() and not fw.animating:
+                fw.close()
             self.hide_windows()
         elif config_center.read_conf('General', 'hide_method') == '1':  # 单击即完全隐藏
+            if fw.isVisible() and not fw.animating:
+                fw.close()
             self.full_hide_windows()
         elif config_center.read_conf('General', 'hide_method') == '2':  # 最小化为浮窗
             if not fw.animating:
