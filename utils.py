@@ -228,7 +228,7 @@ class UnionUpdateTimer(QObject):
         self.timer: QTimer = QTimer(self)
         self.timer.timeout.connect(self._on_timeout)
         # 使用最小堆存储任务信息
-        self.task_heap = []  # [(next_run, callback, interval), ...]
+        self.task_heap = []  # [(next_run, id(callback), callback, interval), ...]
         heapify(self.task_heap)
         self.callback_info = {}  # {callback: interval}
         self._is_running: bool = False
@@ -251,7 +251,7 @@ class UnionUpdateTimer(QObject):
                 return
             # 处理所有到期的任务
             while self.task_heap and (self.task_heap[0][0] <= current_time):
-                next_run, callback, interval = heappop(self.task_heap)
+                next_run, _, callback, interval = heappop(self.task_heap)
 
                 if callback not in self.callback_info:
                     continue
@@ -260,7 +260,7 @@ class UnionUpdateTimer(QObject):
                     callback()
                     # 重新计算下次执行时间并加入堆
                     next_time = current_time + dt.timedelta(seconds=interval)
-                    heappush(self.task_heap, (next_time, callback, interval))
+                    heappush(self.task_heap, (next_time, id(callback), callback, interval))
                 except RuntimeError as e:
                     logger.error(f"回调调用错误 (可能对象已删除): {e}")
                     invalid_callbacks.append(callback)
@@ -271,7 +271,7 @@ class UnionUpdateTimer(QObject):
                     logger.error(f"执行回调时发生未知错误: {e}")
                     # 其他异常可能是临时错误，仍然重新加入堆
                     next_time = current_time + dt.timedelta(seconds=interval)
-                    heappush(self.task_heap, (next_time, callback, interval))
+                    heappush(self.task_heap, (next_time, id(callback), callback, interval))
 
             # 移除无效的回调
             if invalid_callbacks:
@@ -311,14 +311,14 @@ class UnionUpdateTimer(QObject):
         with self._lock:
             if callback not in self.callback_info:
                 self.callback_info[callback] = interval
-                heappush(self.task_heap, (next_run, callback, interval))
+                heappush(self.task_heap, (next_run, id(callback), callback, interval))
                 should_start = not self._is_running
             else:
                 # 更新间隔
                 self.callback_info[callback] = interval
-                self.task_heap = [(t, cb, i) for t, cb, i in self.task_heap if cb != callback]
+                self.task_heap = [(t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback]
                 heapify(self.task_heap)
-                heappush(self.task_heap, (next_run, callback, interval))
+                heappush(self.task_heap, (next_run, id(callback), callback, interval))
                 should_start = False
 
         if should_start:
@@ -329,7 +329,7 @@ class UnionUpdateTimer(QObject):
         with self._lock:
             if callback in self.callback_info:
                 interval = self.callback_info.pop(callback)
-                self.task_heap = [(t, cb, i) for t, cb, i in self.task_heap if cb != callback]
+                self.task_heap = [(t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback]
                 heapify(self.task_heap)
                 if not self.task_heap:
                     self._is_running = False
@@ -369,9 +369,9 @@ class UnionUpdateTimer(QObject):
             if callback in self.callback_info:
                 # 更新间隔重新加入堆
                 self.callback_info[callback] = interval
-                self.task_heap = [(t, cb, i) for t, cb, i in self.task_heap if cb != callback]
+                self.task_heap = [(t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback]
                 heapify(self.task_heap)
-                heappush(self.task_heap, (next_run, callback, interval))
+                heappush(self.task_heap, (next_run, id(callback), callback, interval))
                 return True
             return False
 
