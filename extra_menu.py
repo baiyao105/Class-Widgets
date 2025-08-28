@@ -36,21 +36,30 @@ temp_schedule = {'schedule': {}, 'schedule_even': {}}
 
 
 def open_settings(main_window=None) -> None:
+    """打开设置窗口"""
     global settings
-    if settings is None or not settings.isVisible():
+    try:
+        if settings is None or not hasattr(settings, 'isVisible') or not settings.isVisible():
+            settings = SettingsMenu(main_window=main_window)
+            settings.closed.connect(cleanup_settings)
+            settings.show()
+            logger.info('打开“设置”')
+        else:
+            settings.raise_()
+            settings.activateWindow()
+    except (NameError, AttributeError):
         settings = SettingsMenu(main_window=main_window)
         settings.closed.connect(cleanup_settings)
         settings.show()
-        logger.info('打开“设置”')
-    else:
-        settings.raise_()
-        settings.activateWindow()
+        logger.info('打开“设置” (重新初始化)')
 
 
 def cleanup_settings() -> None:
     global settings
     logger.info('关闭“设置”')
-    del settings
+    if 'settings' in globals() and settings is not None:
+        settings.close()
+        settings = None
 
 
 class ExtraMenu(FluentWindow):
