@@ -447,20 +447,22 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                             after_school()
 
                     if (
-                        current_dt
-                        == c_time
-                        - dt.timedelta(
-                            minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))
+                        (
+                            current_dt
+                            == c_time
+                            - dt.timedelta(
+                                minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))
+                            )
+                            and current_dt != last_notify_time
                         )
-                        and current_dt != last_notify_time
-                    ) and (
-                        config_center.read_conf('Toast', 'prepare_minutes') != '0'
-                        and toast
-                        and not isbreak
-                    ) and not current_state:  # 课间
-                        notification.push_notification(
-                            3, next_lessons[0]
-                        )  # 准备上课（预备铃）
+                        and (
+                            config_center.read_conf('Toast', 'prepare_minutes') != '0'
+                            and toast
+                            and not isbreak
+                        )
+                        and not current_state
+                    ):  # 课间
+                        notification.push_notification(3, next_lessons[0])  # 准备上课（预备铃）
                         last_notify_time = current_dt
 
                     # 放学

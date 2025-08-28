@@ -6322,10 +6322,15 @@ class SettingsMenu(FluentWindow):
             logger.error(f"清理TTS语音加载线程失败: {e}")
 
         try:
-            if hasattr(self, 'TTSSettingsDialog') and self.TTSSettingsDialog and (
-                hasattr(self.TTSSettingsDialog, 'tts_preview_thread')
-                and self.TTSSettingsDialog.tts_preview_thread
-            ) and self.TTSSettingsDialog.tts_preview_thread.isRunning():
+            if (
+                hasattr(self, 'TTSSettingsDialog')
+                and self.TTSSettingsDialog
+                and (
+                    hasattr(self.TTSSettingsDialog, 'tts_preview_thread')
+                    and self.TTSSettingsDialog.tts_preview_thread
+                )
+                and self.TTSSettingsDialog.tts_preview_thread.isRunning()
+            ):
                 self.TTSSettingsDialog.tts_preview_thread.requestInterruption()
                 self.TTSSettingsDialog.tts_preview_thread.quit()
                 if not self.TTSSettingsDialog.tts_preview_thread.wait(1000):
