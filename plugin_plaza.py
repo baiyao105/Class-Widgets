@@ -52,9 +52,9 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as fIcon
 
-from basic_dirs import CW_HOME, PLUGIN_HOME
 import list_ as l
 import network_thread as nt
+from basic_dirs import CW_HOME, PLUGIN_HOME
 from file import config_center
 from plugin import p_loader
 from utils import calculate_size, restart
@@ -501,7 +501,7 @@ class PluginPlaza(MSFluentWindow):
         self.thread_manager = ThreadManager()
         global installed_plugins
         try:
-            with open(CONF_PATH, 'r', encoding='utf-8') as file:
+            with open(CONF_PATH, encoding='utf-8') as file:
                 installed_plugins = json.load(file).get('plugins')
             # 校验
             for plugin in installed_plugins:
@@ -881,7 +881,7 @@ def load_local_plugins_version() -> None:
     global local_plugins_version
     for plugin in installed_plugins:
         try:
-            with open(f"plugins/{plugin}/plugin.json", 'r', encoding='utf-8') as f:
+            with open(f"plugins/{plugin}/plugin.json", encoding='utf-8') as f:
                 data = json.load(f)
                 local_plugins_version[plugin] = data['version']
         except Exception as e:

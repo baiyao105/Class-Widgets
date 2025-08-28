@@ -10,34 +10,14 @@ import zipfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
-
-from PyQt5 import uic, QtCore
-from PyQt5.QtCore import Qt, QTime, QUrl, QDate, pyqtSignal, QSize, QThread, QTranslator, QObject, QTimer, QLocale
-from PyQt5.QtGui import QIcon, QDesktopServices, QColor
-# from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QApplication, QHeaderView, QTableWidgetItem, QLabel, QHBoxLayout, QSizePolicy, \
-    QSpacerItem, QFileDialog, QVBoxLayout, QScroller, QWidget, QFrame, QListWidgetItem, QWidget
-from packaging.version import Version
-from typing import Tuple, Union, Dict, List
+from typing import Dict, List, Tuple, Union
 
 from loguru import logger
 from packaging.version import Version
 from PyQt5 import QtCore, uic
-from PyQt5.QtCore import (
-    QDate,
-    QLocale,
-    QObject,
-    QSize,
-    Qt,
-    QThread,
-    QTime,
-    QTimer,
-    QTranslator,
-    QUrl,
-    pyqtSignal,
-)
+from PyQt5.QtCore import QDate, QLocale, QObject, QSize, Qt, QThread, QTime, QTimer, QTranslator, QUrl, pyqtSignal
+
+# from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (
@@ -153,7 +133,7 @@ class I18nManager:
         """加载完整翻译配置文件"""
         try:
             if self.config_file_path.exists():
-                with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                with open(self.config_file_path, encoding='utf-8') as f:
                     self.completed_i18n_config = json.load(f)
                 logger.info(f"已加载翻译完整性配置: {self.config_file_path}")
             else:
@@ -164,7 +144,7 @@ class I18nManager:
                         "themes": {}
                     }
                 }
-                logger.warning(f"翻译完整性配置文件不存在")
+                logger.warning("翻译完整性配置文件不存在")
         except Exception as e:
             logger.error(f"加载翻译完整性配置时出错: {e}")
             self.completed_i18n_config = {
@@ -224,7 +204,7 @@ class I18nManager:
             'it_IT': 'Italiano',
             'ar_SA': 'العربية'
         }
-        return language_names.get(lang_code, None)
+        return language_names.get(lang_code)
 
     def get_available_languages_QLocale(self, lang_code):
         locale_list = {
@@ -294,7 +274,7 @@ class I18nManager:
             import importlib
             importlib.reload(list_)
 
-            if not utils.main_mgr is None:
+            if utils.main_mgr is not None:
                 utils.main_mgr.clear_widgets()
 
             return True
@@ -318,8 +298,7 @@ class I18nManager:
                 if translator.load(str(qm_path)):
                     #logger.debug(f"成功加载文件: {qm_path}")
                     return translator
-                else:
-                    logger.warning(f"无法加载文件: {qm_path}")
+                logger.warning(f"无法加载文件: {qm_path}")
             else:
                 logger.warning(f"文件不存在: {qm_path}")
 
@@ -334,15 +313,14 @@ class I18nManager:
 
             result = subprocess.run(
                 ['lrelease', str(ts_path), '-qm', str(qm_path)],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True
             )
 
             if result.returncode == 0:
                 logger.info(f"成功编译翻译文件: {ts_path} -> {qm_path}")
                 return True
-            else:
-                logger.warning(f"编译翻译文件失败: {result.stderr}")
+            logger.warning(f"编译翻译文件失败: {result.stderr}")
 
         except FileNotFoundError:
             logger.warning("未找到lrelease工具，无法编译翻译文件")
@@ -428,7 +406,7 @@ def open_dir(path: str):
     if sys.platform.startswith('win32'):
         os.startfile(path)
     elif sys.platform.startswith('linux'):
-        subprocess.run(['xdg-open', path])
+        subprocess.run(['xdg-open', path], check=False)
     else:
         msg_box = Dialog(
             QCoreApplication.translate('menu','无法打开文件夹'), QCoreApplication.translate('menu','Class Widgets 在您的系统下不支持自动打开文件夹，请手动打开以下地址：\n{path}').format(path=path)
@@ -681,12 +659,10 @@ class selectCity(MessageBoxBase):  # 选择城市
                     if data['status'] == 'success':
                         logger.info(f"获取坐标成功：{data['lat']}, {data['lon']}")
                         return (data['lat'], data['lon'])
-                    else:
-                        logger.error(f"获取坐标失败：{data['message']}")
-                        raise ValueError(f"获取坐标失败：{data['message']}")
-                else:
-                    logger.error(f"获取坐标失败：{req.status_code}")
-                    raise ValueError(f"获取坐标失败：{req.status_code}")
+                    logger.error(f"获取坐标失败：{data['message']}")
+                    raise ValueError(f"获取坐标失败：{data['message']}")
+                logger.error(f"获取坐标失败：{req.status_code}")
+                raise ValueError(f"获取坐标失败：{req.status_code}")
             except Exception as e:
                 logger.error(f"获取坐标失败：{e}")
                 raise ValueError(f"获取坐标失败：{e}")
@@ -807,7 +783,7 @@ class licenseDialog(MessageBoxBase):  # 显示软件许可协议
         self.yesButton.setText(QCoreApplication.translate('menu','好'))  # 按钮组件汉化
         self.cancelButton.hide()
         self.buttonLayout.insertStretch(0, 1)
-        self.license_text.setPlainText(open('LICENSE', 'r', encoding='utf-8').read())
+        self.license_text.setPlainText(open('LICENSE', encoding='utf-8').read())
         self.license_text.setReadOnly(True)
 
         # 将组件添加到布局中
@@ -993,7 +969,7 @@ class PluginCard(CardWidget):  # 插件卡片
             success = p_loader.delete_plugin(self.plugin_dir)
             if success:
                 try:
-                    with open(PLUGIN_HOME / "plugins_from_pp.json", 'r', encoding='utf-8') as f:
+                    with open(PLUGIN_HOME / "plugins_from_pp.json", encoding='utf-8') as f:
                         installed_data = json.load(f)
                     installed_plugins = installed_data.get('plugins', [])
                     if self.plugin_dir in installed_plugins:
@@ -1070,7 +1046,7 @@ class TextFieldMessageBox(MessageBoxBase):
         if f'{self.textField.text()}.json' in self.check_list:
             self.tipsLabel.setText(self.tr('不可以和之前的课程名重复哦 o(TヘTo)'))
             return
-        if not (self.check_func is None):
+        if self.check_func is not None:
             is_valid, message = self.check_func(self.textField.text())
             if not is_valid:
                 self.tipsLabel.setText(message)
@@ -1181,7 +1157,7 @@ class TTSPreviewThread(QThread):
             play_audio(audio_file, tts_delete_after=True)
             self.previewFinished.emit(True)
         except Exception as e:
-            logger.error(f"TTS预览生成失败: {str(e)}")
+            logger.error(f"TTS预览生成失败: {e!s}")
             self.previewError.emit(str(e))
 
 
@@ -1974,13 +1950,11 @@ class SettingsMenu(FluentWindow):
             if should_show and filter_type != '全部插件':
                 is_enabled = card.plugin_dir in enabled_plugins.get('enabled_plugins', [])
                 has_settings = bool(card.enable_settings)
-                if filter_type == self.filter_combo_items[1] and not is_enabled:
-                    should_show = False
-                elif filter_type == self.filter_combo_items[2] and is_enabled:
-                    should_show = False
-                elif filter_type == self.filter_combo_items[3] and not has_settings:
-                    should_show = False
-                elif filter_type == self.filter_combo_items[4] and has_settings:
+                if (filter_type == self.filter_combo_items[1]
+                    and not is_enabled) or (filter_type == self.filter_combo_items[2]
+                    and is_enabled) or (filter_type == self.filter_combo_items[3] 
+                    and not has_settings) or (filter_type == self.filter_combo_items[4] 
+                    and has_settings):
                     should_show = False
             card.setVisible(should_show)
             if should_show:
@@ -2026,7 +2000,7 @@ class SettingsMenu(FluentWindow):
                 self._import_from_zip(file_path)
 
         except Exception as e:
-            logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
+            logger.error(f"插件导入失败 - 未知错误: {file_path}, 错误类型: {type(e).__name__}, 错误详情: {e!s}")
             self._show_error_dialog(self.tr('导入插件时发生错误：{e}').format(e=f"{e}"))
 
     def _import_from_plugin_json(self, raw_json_file_path: str):
@@ -2059,10 +2033,10 @@ class SettingsMenu(FluentWindow):
             w.exec_()
 
         except json.JSONDecodeError as e:
-            logger.error(f"插件导入失败 - JSON配置文件格式错误: {raw_json_file_path}, 错误详情: {str(e)}")
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {raw_json_file_path}, 错误详情: {e!s}")
             self._show_error_dialog(self.tr('插件配置文件格式错误'))
         except Exception as e:
-            logger.error(f"插件导入失败 - 文件夹复制错误: {raw_json_file_path}, 错误详情: {str(e)}")
+            logger.error(f"插件导入失败 - 文件夹复制错误: {raw_json_file_path}, 错误详情: {e!s}")
             self._show_error_dialog(self.tr('复制插件文件夹时发生错误：{e}').format(e=f"{e}"))
 
     def _import_from_zip(self, zip_file_path: str):
@@ -2097,10 +2071,10 @@ class SettingsMenu(FluentWindow):
                 w.exec_()
 
         except zipfile.BadZipFile as e:
-            logger.error(f"插件导入失败 - 无效的ZIP文件: {zip_file_path}, 错误详情: {str(e)}")
+            logger.error(f"插件导入失败 - 无效的ZIP文件: {zip_file_path}, 错误详情: {e!s}")
             self._show_error_dialog(self.tr('无效的ZIP文件'))
         except json.JSONDecodeError as e:
-            logger.error(f"插件导入失败 - JSON配置文件格式错误: {zip_file_path}, 错误详情: {str(e)}")
+            logger.error(f"插件导入失败 - JSON配置文件格式错误: {zip_file_path}, 错误详情: {e!s}")
             self._show_error_dialog(self.tr('插件配置文件格式错误'))
 
     def _show_error_dialog(self, message):
@@ -2322,15 +2296,13 @@ class SettingsMenu(FluentWindow):
                 'title': self.tr('通知'),
                 'content': self.tr('这是一条测试通知ヾ(≧▽≦*)o')
             })
-            if text_type == 'attend_class':
-                text_to_speak = text_template.format_map(format_values)
-            elif text_type == 'finish_class':
-                text_to_speak = text_template.format_map(format_values)
-            elif text_type == 'prepare_class':
-                text_to_speak = text_template.format_map(format_values)
-            elif text_type == 'after_school':
-                text_to_speak = text_template.format_map(format_values)
-            elif text_type == 'otherwise':
+            if (
+                text_type == 'attend_class'
+                or text_type == 'finish_class'
+                or text_type == 'prepare_class'
+                or text_type == 'after_school'
+                or text_type == 'otherwise'
+            ):
                 text_to_speak = text_template.format_map(format_values)
             else:
                 text_to_speak = text_template.format_map(format_values)
@@ -2359,7 +2331,7 @@ class SettingsMenu(FluentWindow):
                 self.tts_preview_thread.start()
 
             except Exception as e:
-                logger.error(f"启动TTS预览线程失败: {str(e)}")
+                logger.error(f"启动TTS预览线程失败: {e!s}")
                 from qfluentwidgets import MessageBox
                 MessageBox(
                     self.tr("TTS预览失败"),
@@ -2625,14 +2597,13 @@ class SettingsMenu(FluentWindow):
             if index_to_select != -1:
                 voice_selector.setCurrentIndex(index_to_select)
                 config_center.write_conf('TTS', 'voice_id', current_voice_id)
+            elif available_voices:
+                voice_selector.setCurrentIndex(0)
+                first_voice_id = available_voices[0]['id']
+                config_center.write_conf('TTS', 'voice_id', first_voice_id)
             else:
-                if available_voices:
-                    voice_selector.setCurrentIndex(0)
-                    first_voice_id = available_voices[0]['id']
-                    config_center.write_conf('TTS', 'voice_id', first_voice_id)
-                else:
-                    voice_selector.setEnabled(False)
-                    switch_enable_TTS.setEnabled(False)
+                voice_selector.setEnabled(False)
+                switch_enable_TTS.setEnabled(False)
         elif available_voices: # 默认选择
             voice_selector.setCurrentIndex(0)
             first_voice_id = available_voices[0]['id']
@@ -4480,11 +4451,10 @@ class SettingsMenu(FluentWindow):
                         path = theme_path / 'dark' / preview_path
                     else:
                         path = theme_path / 'dark/preview/widget-custom.png'
+                elif (theme_path / preview_path).exists():
+                    path = theme_path / preview_path
                 else:
-                    if (theme_path / preview_path).exists():
-                        path = theme_path / preview_path
-                    else:
-                        path = theme_path / 'preview/widget-custom.png'
+                    path = theme_path / 'preview/widget-custom.png'
 
                 label = ImageLabel()
                 label.setImage(str(path))
@@ -4621,7 +4591,7 @@ class SettingsMenu(FluentWindow):
         self.schedule_get_thread.start()
 
     def cf_receive_schedule(self, data):
-        if not (data.get('error', None) is None):
+        if data.get('error', None) is not None:
             self.show_tip_flyout(self.tr('获取配置文件失败'),
                                    data['error'], self.config_download, InfoBarIcon.ERROR, FlyoutAnimationType.PULL_UP)
             return
@@ -4651,7 +4621,7 @@ class SettingsMenu(FluentWindow):
             logger.error(f'获取配置文件 {url} 时发生错误：{e}')
 
     def cf_receive_schedule_from_db(self, data):
-        if not (data.get('error', None) is None):
+        if data.get('error', None) is not None:
             self.show_tip_flyout(self.tr('获取配置文件失败'),
                                    data['error'], self.config_download, InfoBarIcon.ERROR, FlyoutAnimationType.PULL_UP)
             self.config_url.setEnabled(True)
@@ -5332,12 +5302,11 @@ class SettingsMenu(FluentWindow):
                 selected_item.setText(
                     f'{se_class_combo.currentText()}-{name_list[1]}'
                 )
-            else:
-                if se_custom_class_text.text() != '':
-                    selected_item.setText(
-                        f'{se_custom_class_text.text()}-{name_list[1]}'
-                    )
-                    se_class_combo.addItem(se_custom_class_text.text())
+            elif se_custom_class_text.text() != '':
+                selected_item.setText(
+                    f'{se_custom_class_text.text()}-{name_list[1]}'
+                )
+                se_class_combo.addItem(se_custom_class_text.text())
 
     def se_quick_set_schedule(self):  # 快速设置课表
         se_schedule_list = self.findChild(ListWidget, 'schedule_list')
@@ -5642,7 +5611,7 @@ class SettingsMenu(FluentWindow):
 
     def on_language_widgets_changed(self):
         """组件语言切换"""
-        ...
+        ...  # noqa
 
 
 class NTPSyncWorker(QObject):
@@ -5669,8 +5638,7 @@ def sp_get_class_num():  # 获取当前周课程数（未完成）
         for isbreak, item_name, item_index, item_time in timeline:
             if not isbreak:
                 count += 1
-        if count > highest_count:
-            highest_count = count
+        highest_count = max(highest_count, count)
     return highest_count
 
 

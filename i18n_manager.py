@@ -15,7 +15,7 @@ from file import config_center
 
 
 def __load_json(path: Path) -> ThemeConfig:
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(path, encoding='utf-8') as file:
         return ThemeConfig.model_validate_json(file.read())
 
 def load_theme_config(theme: str) -> ThemeInfo:
@@ -34,7 +34,7 @@ def load_theme_config(theme: str) -> ThemeInfo:
             config=__load_json(config_path)
         )
     except Exception as e:
-        logger.error(f"加载主题数据时出错: {repr(e)}，返回默认主题")
+        logger.error(f"加载主题数据时出错: {e!r}，返回默认主题")
         return ThemeInfo(
             path=default_path.parent,
             config=__load_json(default_path)
@@ -78,7 +78,7 @@ class I18nManager:
         """加载完整翻译配置文件"""
         try:
             if self.config_file_path.exists():
-                with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                with open(self.config_file_path, encoding='utf-8') as f:
                     self.completed_i18n_config = json.load(f)
                 # logger.debug(f"已加载完整翻译配置: {self.config_file_path}")
             else:
@@ -113,7 +113,7 @@ class I18nManager:
             'bo': 'བོད་ཡིག',  # 藏语
             'ug': 'ئۇيغۇرچە'   # 维吾尔语
         }
-        return language_names.get(lang_code, None)
+        return language_names.get(lang_code)
 
     def get_available_languages_QLocale(self, lang_code):
         locale_list = {
@@ -190,11 +190,12 @@ class I18nManager:
                 app.installTranslator(translator_qfw)
                 logger.success(f"成功加载 FluentWidgets 语言: {lang_code}")
 
-            import list_
             import importlib
+
+            import list_
             importlib.reload(list_)
 
-            if not utils.main_mgr is None:
+            if utils.main_mgr is not None:
                 utils.main_mgr.clear_widgets()
 
             return True
@@ -212,8 +213,7 @@ class I18nManager:
                 if translator.load(str(qm_path)):
                     #logger.debug(f"成功加载文件: {qm_path}")
                     return translator
-                else:
-                    logger.warning(f"无法加载文件: {qm_path}")
+                logger.warning(f"无法加载文件: {qm_path}")
             else:
                 logger.warning(f"文件不存在: {qm_path}")
 

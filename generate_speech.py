@@ -13,10 +13,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import edge_tts
 import pyttsx3
 from loguru import logger
-from PyQt5.QtCore import QObject, pyqtSignal, QCoreApplication
+from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
 
 from basic_dirs import CACHE_HOME
-
 
 _tts_playing = False
 _tts_lock = threading.RLock()
@@ -119,8 +118,7 @@ class TTSCache:
                 if os.path.exists(file_path):
                     self._cache_info[filename]['accessed_at'] = time.time()
                     return file_path
-                else:
-                    del self._cache_info[filename]
+                del self._cache_info[filename]
             return None
 
     def add_to_cache(self, cache_key: str, file_path: str) -> str:
@@ -396,12 +394,11 @@ class EdgeTTSProvider(TTSVoiceProvider):
                     error_msg = str(e)
                     if "No audio was received" in error_msg:
                         raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "Edge TTS服务未返回音频数据,可能是网络问题或语音参数错误。语音ID: {}").format(voice_id))
-                    elif "proxy" in error_msg.lower() or "https" in error_msg.lower():
+                    if "proxy" in error_msg.lower() or "https" in error_msg.lower():
                         raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "连接问题,可能是代理设置导致: {}").format(error_msg))
-                    elif "timeout" in error_msg.lower():
+                    if "timeout" in error_msg.lower():
                         raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "超时,请检查网络连接: {}").format(error_msg))
-                    else:
-                        raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "Edge TTS合成失败: {}").format(error_msg))
+                    raise RuntimeError(QCoreApplication.translate("EdgeTTSProvider", "Edge TTS合成失败: {}").format(error_msg))
                 finally:
                     self._safe_cleanup_loop(loop)
 
@@ -523,8 +520,7 @@ class TTSManager:
         if engine:
             if engine in self.providers:
                 return self.providers[engine].get_voices(language_filter)
-            else:
-                return []
+            return []
         all_voices = []
         for provider in self.providers.values():
             voices = provider.get_voices(language_filter)
@@ -562,9 +558,8 @@ class TTSManager:
                 cached_path = self.cache.add_to_cache(cache_key, output_path)
                 logger.debug(f"语音生成成功: {cached_path}")
                 return cached_path
-            else:
-                logger.error("语音生成失败")
-                return None
+            logger.error("语音生成失败")
+            return None
 
         except Exception as e:
             logger.error(f"生成语音时出错: {e}")
@@ -1071,9 +1066,8 @@ def list_pyttsx3_voices() -> List[Dict[str, str]]:
                 })
 
             return voice_list
-        else:
-            logger.warning("Pyttsx3 引擎不可用")
-            return []
+        logger.warning("Pyttsx3 引擎不可用")
+        return []
     except Exception as e:
         logger.error(f"获取 Pyttsx3 语音列表失败: {e}")
         return []

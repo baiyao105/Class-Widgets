@@ -2,22 +2,32 @@ import sys
 from shutil import copy
 from typing import List
 
+from loguru import logger
 from PyQt5 import uic
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QScroller
-from loguru import logger
-from qfluentwidgets import FluentWindow, FluentIcon as fIcon, ComboBox, \
-    PrimaryPushButton, Flyout, FlyoutAnimationType, InfoBarIcon, ListWidget, LineEdit, ToolButton, HyperlinkButton, \
-    SmoothScrollArea
+from qfluentwidgets import (
+    ComboBox,
+    FluentWindow,
+    Flyout,
+    FlyoutAnimationType,
+    HyperlinkButton,
+    InfoBarIcon,
+    LineEdit,
+    ListWidget,
+    PrimaryPushButton,
+    SmoothScrollArea,
+    ToolButton,
+)
+from qfluentwidgets import FluentIcon as fIcon
 
 import conf
 import file
-from conf import CW_HOME
 import list_
+from conf import CW_HOME
 from file import config_center, schedule_center
 from menu import SettingsMenu
 from utils import TimeManagerFactory
-from loguru import logger
 
 settings = None
 
@@ -86,8 +96,7 @@ class ExtraMenu(FluentWindow):
     def load_schedule() -> List[str]:
         if conf.get_week_type():
             return schedule_center.schedule_data['schedule_even'][str(current_week)]
-        else:
-            return schedule_center.schedule_data['schedule'][str(current_week)]
+        return schedule_center.schedule_data['schedule'][str(current_week)]
 
     def save_temp_conf(self) -> None:
         try:
@@ -108,12 +117,11 @@ class ExtraMenu(FluentWindow):
                     current_full_schedule_data['schedule_even'][adjusted_week] = temp_schedule['schedule_even'][adjusted_week]
                     current_full_schedule_data['adjusted_classes'] = current_full_schedule_data.get('adjusted_classes', {})
                     current_full_schedule_data['adjusted_classes'][f'even_{adjusted_week}'] = True
-            else:
-                if adjusted_week in temp_schedule.get('schedule', {}):
-                    current_full_schedule_data['schedule'] = current_full_schedule_data.get('schedule', {})
-                    current_full_schedule_data['schedule'][adjusted_week] = temp_schedule['schedule'][adjusted_week]
-                    current_full_schedule_data['adjusted_classes'] = current_full_schedule_data.get('adjusted_classes', {})
-                    current_full_schedule_data['adjusted_classes'][f'odd_{adjusted_week}'] = True
+            elif adjusted_week in temp_schedule.get('schedule', {}):
+                current_full_schedule_data['schedule'] = current_full_schedule_data.get('schedule', {})
+                current_full_schedule_data['schedule'][adjusted_week] = temp_schedule['schedule'][adjusted_week]
+                current_full_schedule_data['adjusted_classes'] = current_full_schedule_data.get('adjusted_classes', {})
+                current_full_schedule_data['adjusted_classes'][f'odd_{adjusted_week}'] = True
 
             file.save_data_to_json(current_full_schedule_data, config_center.schedule_name)
             schedule_center.update_schedule()
@@ -123,7 +131,7 @@ class ExtraMenu(FluentWindow):
             Flyout.create(
                 icon=InfoBarIcon.SUCCESS,
                 title='保存成功',
-                content=f"已保存至 ./config.ini \n重启后恢复。",
+                content="已保存至 ./config.ini \n重启后恢复。",
                 target=self.findChild(PrimaryPushButton, 'save_temp_conf'),
                 parent=self,
                 isClosable=True,
@@ -158,11 +166,10 @@ class ExtraMenu(FluentWindow):
                 tmp_schedule_list.addItems(
                     schedule_center.schedule_data['schedule'][str(current_week)]
                 )
+        elif current_schedule:
+            tmp_schedule_list.addItems(file.load_from_json('backup.json')['schedule_even'][str(current_week)])
         else:
-            if current_schedule:
-                tmp_schedule_list.addItems(file.load_from_json('backup.json')['schedule_even'][str(current_week)])
-            else:
-                tmp_schedule_list.addItems(file.load_from_json('backup.json')['schedule'][str(current_week)])
+            tmp_schedule_list.addItems(file.load_from_json('backup.json')['schedule'][str(current_week)])
 
     def upload_item(self) -> None:
         global temp_schedule
@@ -186,9 +193,8 @@ class ExtraMenu(FluentWindow):
             selected_item = selected_items[0]
             if class_combo.currentIndex() != 0:
                 selected_item.setText(class_combo.currentText())
-            else:
-                if custom_class.text() != '':
-                    selected_item.setText(custom_class.text())
+            elif custom_class.text() != '':
+                selected_item.setText(custom_class.text())
 
     def initUI(self) -> None:
         # 修复设置窗口在各个屏幕分辨率DPI下的窗口大小

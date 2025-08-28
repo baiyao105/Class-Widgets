@@ -38,9 +38,10 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f"加载默认配置文件失败: {e}")
             self.default_data = {}
-            from qfluentwidgets import Dialog
-            from PyQt5.QtWidgets import QApplication
             import sys
+
+            from PyQt5.QtWidgets import QApplication
+            from qfluentwidgets import Dialog
             QApplication.instance() or QApplication(sys.argv)
             dlg = Dialog(
                 QCoreApplication.translate("file", 'Class Widgets 启动失败w(ﾟДﾟ)w'),
@@ -62,7 +63,7 @@ class ConfigCenter:
 
     def _migrate_config(self) -> None:
         """迁移配置文件（当配置文件版本不一致时）"""
-        logger.warning(f"配置文件版本不同,重新适配")
+        logger.warning("配置文件版本不同,重新适配")
         try:
             self._perform_specific_migrations()
             for section, options in self.default_data.items():
@@ -81,7 +82,7 @@ class ConfigCenter:
             if version_from_default:
                 self.config.set('Version', 'version', version_from_default)
             self._write_config_to_file()
-            logger.success(f"配置文件已更新")
+            logger.success("配置文件已更新")
         except Exception as e:
             logger.error(f"配置文件更新失败: {e}")
 
@@ -119,7 +120,7 @@ class ConfigCenter:
             if not schedule_config:
                 copy(CW_HOME / 'data' / 'default_schedule.json',
                      schedule_dir / schedule_name)
-                logger.info(f"课程表不存在,已创建默认课程表")
+                logger.info("课程表不存在,已创建默认课程表")
             else:
                 self.write_conf('General', 'schedule', schedule_config[0])
         print(Path.cwd() / 'config' / 'schedule')
@@ -267,14 +268,13 @@ class ConfigCenter:
         if not key:
             if section in self.config:
                 return dict(self.config[section])
-            else:
-                converted_section = {}
-                for k, item_info in self.default_data.get(section, {}).items():
-                    if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
-                        converted_section[k] = self._convert_value(item_info["default"], item_info["type"])
-                    else:
-                        converted_section[k] = item_info
-                return converted_section
+            converted_section = {}
+            for k, item_info in self.default_data.get(section, {}).items():
+                if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
+                    converted_section[k] = self._convert_value(item_info["default"], item_info["type"])
+                else:
+                    converted_section[k] = item_info
+            return converted_section
         if section in self.config:
             value = self.config[section].get(key)
             if value is not None:
@@ -286,8 +286,7 @@ class ConfigCenter:
                     return translation
                 if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
                     return self._convert_value(item_info["default"], item_info["type"])
-                else:
-                    return item_info
+                return item_info
         logger.warning(f"配置项未找到: Section='{section}', Key='{key}'")
         return fallback
 
@@ -296,43 +295,40 @@ class ConfigCenter:
         if value is None:
             if value_type == "int":
                 return 0
-            elif value_type == "bool":
+            if value_type == "bool":
                 return False
-            elif value_type == "float":
+            if value_type == "float":
                 return 0.0
-            elif value_type == "list":
+            if value_type == "list":
                 return []
-            elif value_type == "json":
+            if value_type == "json":
                 return {}
-            else:
-                return ""
+            return ""
         try:
             if value_type == "int":
                 return int(value)
-            elif value_type == "bool":
+            if value_type == "bool":
                 return str(value).lower() == "true"
-            elif value_type == "float":
+            if value_type == "float":
                 return float(value)
-            elif value_type == "list":
+            if value_type == "list":
                 return [item.strip() for item in str(value).split(',')]
-            elif value_type == "json":
+            if value_type == "json":
                 return json.loads(str(value))
-            else:
-                return str(value)
+            return str(value)
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             logger.warning(f"配置值转换失败: {value} -> {value_type}, 错误: {e}")
             if value_type == "int":
                 return 0
-            elif value_type == "bool":
+            if value_type == "bool":
                 return False
-            elif value_type == "float":
+            if value_type == "float":
                 return 0.0
-            elif value_type == "list":
+            if value_type == "list":
                 return []
-            elif value_type == "json":
+            if value_type == "json":
                 return {}
-            else:
-                return str(value) if value is not None else ""
+            return str(value) if value is not None else ""
 
     def write_conf(self, section: str, key: str, value: Any) -> None:
         """写入配置项"""
@@ -378,8 +374,7 @@ class ScheduleCenter:
                                 class_num = int(item_name[2:])
                             if prefix == 'a':
                                 return part_num, class_num, 0
-                            else:
-                                return part_num, class_num, 1
+                            return part_num, class_num, 1
                         except ValueError:
                             # 如果转换失败，返回原始字符串
                             return item_name

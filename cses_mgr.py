@@ -21,10 +21,9 @@ CSES_WEEKS = [1, 2, 3, 4, 5, 6, 7]
 def _get_time(time: typing.Union[str, int]) -> datetime:
     if isinstance(time, str):
         return datetime.strptime(str(time), '%H:%M:%S')
-    elif isinstance(time, int):
+    if isinstance(time, int):
         return datetime.strptime(f'{int(time / 60 / 60)}:{int(time / 60 % 60)}:{time % 60}','%H:%M:%S')
-    else:
-        raise ValueError(f'需要 int 或 HH:MM:SS 类型，得到 {type(time)}，值为 {time}')
+    raise ValueError(f'需要 int 或 HH:MM:SS 类型，得到 {type(time)}，值为 {time}')
 
 
 class CSES_Converter:
@@ -245,7 +244,7 @@ class CSES_Converter:
 
         if cw_path != './' and cw_data is None:  # 加载Class Widgets数据
             try:
-                with open(cw_path, 'r', encoding='utf-8') as data:
+                with open(cw_path, encoding='utf-8') as data:
                     cw_data = json.load(data)
             except FileNotFoundError:
                 logger.error(f'File {cw_path} not found')

@@ -1,15 +1,16 @@
-from typing import Optional, Tuple
-from PyQt5.QtCore import QThread, pyqtSignal, QObject
-from PyQt5.QtGui import QPixmap
-from PyQt5 import uic
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QWidget, QLabel
-from qfluentwidgets import ProgressBar, theme, Theme
 import time
-from loguru import logger
+from typing import Optional, Tuple
 
-from i18n_manager import app
+from loguru import logger
+from PyQt5 import uic
+from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QLabel, QWidget
+from qfluentwidgets import ProgressBar, Theme, theme
+
 from basic_dirs import CW_HOME
+from i18n_manager import app
+
 
 class DarkModeWatcherThread(QThread):
     darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号

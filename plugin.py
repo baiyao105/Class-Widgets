@@ -1,12 +1,13 @@
 import importlib
 import json
 import shutil
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from basic_dirs import CONFIG_HOME
 import conf
+from basic_dirs import CONFIG_HOME
+
 
 class PluginLoader:  # 插件加载器
     def __init__(self, p_mgr: Optional[Any] = None) -> None:
@@ -42,12 +43,12 @@ class PluginLoader:  # 插件加载器
                     module = importlib.import_module(module_name)
 
                     if hasattr(module, 'Settings'):  # 设置页
-                        plugin_class = getattr(module, "Settings")  # 获取 Plugin 类
+                        plugin_class = module.Settings  # 获取 Plugin 类
                         # 实例化插件
                         self.plugins_settings[folder.name] = plugin_class(str(conf.PLUGIN_HOME / folder.name))
 
                     if self.manager and hasattr(module, 'Plugin'):  # 插件入口
-                        plugin_class = getattr(module, "Plugin")  # 获取 Plugin 类
+                        plugin_class = module.Plugin  # 获取 Plugin 类
                         # 实例化插件
                         self.plugins_dict[folder.name] = plugin_class(
                             self.manager.get_app_contexts(folder.name), self.manager.method
@@ -118,7 +119,7 @@ class PluginLoader:  # 插件加载器
                         json.dump(widget_config, f, ensure_ascii=False, indent=4)
                     logger.info(f"已从 config/widget.json 中移除插件 {plugin_name} 的关联组件: {widgets_to_remove}")
                 else:
-                    logger.warning(f"主配置文件 config/widget.json 不存在，无法移除插件组件。")
+                    logger.warning("主配置文件 config/widget.json 不存在，无法移除插件组件。")
             except Exception as e:
                 logger.error(f"更新 config/widget.json 失败: {e}")
 

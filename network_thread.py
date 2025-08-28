@@ -31,7 +31,7 @@ threads = []
 # 读取镜像配置
 mirror_list = []
 try:
-    with open(MIRROR_PATH, 'r', encoding='utf-8') as file:
+    with open(MIRROR_PATH, encoding='utf-8') as file:
         mirror_dict = json.load(file).get('gh_mirror')
 except Exception as e:
     logger.error(f"读取镜像配置失败: {e}")
@@ -68,9 +68,8 @@ class getRepoFileList(QThread):  # 获取仓库文件目录
             if response.status_code == 200:
                 data = response.json()
                 return data
-            else:
-                logger.error(f"获取banner信息失败：{response.status_code}")
-                return {"error": response.status_code}
+            logger.error(f"获取banner信息失败：{response.status_code}")
+            return {"error": response.status_code}
         except Exception as e:
             logger.error(f"获取banner信息失败：{e}")
             return {"error": e}
@@ -100,9 +99,8 @@ class getPluginInfo(QThread):  # 获取插件信息(json)
             if response.status_code == 200:
                 data = response.json()
                 return data
-            else:
-                logger.error(f"获取插件信息失败：{response.status_code}")
-                return {}
+            logger.error(f"获取插件信息失败：{response.status_code}")
+            return {}
         except Exception as e:
             logger.error(f"获取插件信息失败：{e}")
             return {}
@@ -132,9 +130,8 @@ class getTags(QThread):  # 获取插件标签(json)
             if response.status_code == 200:
                 data = response.json()
                 return data
-            else:
-                logger.error(f"获取Tag信息失败：{response.status_code}")
-                return {}
+            logger.error(f"获取Tag信息失败：{response.status_code}")
+            return {}
         except Exception as e:
             logger.error(f"获取Tag信息失败：{e}")
             return {}
@@ -165,9 +162,8 @@ class getImg(QThread):  # 获取图片
             response = requests.get(url, proxies=proxies, headers=headers)
             if response.status_code == 200:
                 return response.content
-            else:
-                logger.error(f"获取图片失败：{response.status_code}")
-                return None
+            logger.error(f"获取图片失败：{response.status_code}")
+            return None
         except Exception as e:
             logger.error(f"获取图片失败：{e}")
             return None
@@ -195,9 +191,8 @@ class getReadme(QThread):  # 获取README
             response = requests.get(url, proxies=proxies)
             if response.status_code == 200:
                 return response.text
-            else:
-                logger.error(f"获取README失败：{response.status_code}")
-                return ''
+            logger.error(f"获取README失败：{response.status_code}")
+            return ''
         except Exception as e:
             logger.error(f"获取README失败：{e}")
             return ''
@@ -225,12 +220,10 @@ class getCity(QThread):
                     data = data['data']
                     logger.info(f"获取城市成功：{data['city']}, {data['district']}")
                     return (data['city'], data['district'])
-                else:
-                    logger.error(f"获取城市失败：{data['message']}")
-                    raise ValueError(f"获取城市失败：{data['message']}")
-            else:
-                logger.error(f"获取城市失败：{req.status_code}")
-                raise ValueError(f"获取城市失败：{req.status_code}")
+                logger.error(f"获取城市失败：{data['message']}")
+                raise ValueError(f"获取城市失败：{data['message']}")
+            logger.error(f"获取城市失败：{req.status_code}")
+            raise ValueError(f"获取城市失败：{req.status_code}")
 
         except Exception as e:
             logger.error(f"获取城市失败：{e}")
@@ -256,12 +249,10 @@ class getCoordinates(QThread):
                 if data['status'] == 'success':
                     logger.info(f"获取坐标成功：{data['lat']}, {data['lon']}")
                     return (data['lat'], data['lon'])
-                else:
-                    logger.error(f"获取坐标失败：{data['message']}")
-                    raise ValueError(f"获取坐标失败：{data['message']}")
-            else:
-                logger.error(f"获取坐标失败：{req.status_code}")
-                raise ValueError(f"获取坐标失败：{req.status_code}")
+                logger.error(f"获取坐标失败：{data['message']}")
+                raise ValueError(f"获取坐标失败：{data['message']}")
+            logger.error(f"获取坐标失败：{req.status_code}")
+            raise ValueError(f"获取坐标失败：{req.status_code}")
         except Exception as e:
             logger.error(f"获取坐标失败：{e}")
             raise ValueError(f"获取坐标失败：{e}")
@@ -284,18 +275,17 @@ class VersionThread(QThread):  # 获取最新版本号
     def get_latest_version() -> Dict[str, Any]:
         url = "https://classwidgets.rinlit.cn/version.json"
         try:
-            logger.info(f"正在获取版本信息")
+            logger.info("正在获取版本信息")
             response = requests.get(url, proxies=proxies, timeout=30)
             logger.debug(f"更新请求响应: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
                 return data
-            else:
-                logger.error(f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}")
-                return {'error': f"请求失败，错误代码：{response.status_code}"}
+            logger.error(f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}")
+            return {'error': f"请求失败，错误代码：{response.status_code}"}
         except requests.exceptions.RequestException as e:
-            logger.error(f"请求失败，错误详情：{str(e)}")
-            return {"error": f"请求失败\n{str(e)}"}
+            logger.error(f"请求失败，错误详情：{e!s}")
+            return {"error": f"请求失败\n{e!s}"}
 
 
 class getDownloadUrl(QThread):
@@ -494,12 +484,11 @@ class scheduleThread(QThread):  # 获取课表
             if response.status_code == 200:
                 data = response.json()
                 return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
-            else:
-                logger.error(f"无法获取课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
-                return {'error': f"请求失败，错误代码：{response.status_code}"}
+            logger.error(f"无法获取课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+            return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
-            logger.error(f"请求失败，错误详情：{str(e)}")
-            return {"error": f"请求失败\n{str(e)}"}
+            logger.error(f"请求失败，错误详情：{e!s}")
+            return {"error": f"请求失败\n{e!s}"}
 
     def post_schedule(self):
         try:
@@ -509,9 +498,8 @@ class scheduleThread(QThread):  # 获取课表
             if response.status_code == 200:
                 data = response.json()
                 return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
-            else:
-                logger.error(f"无法上传课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
-                return {'error': f"请求失败，错误代码：{response.status_code}"}
+            logger.error(f"无法上传课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+            return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
-            logger.error(f"请求失败，错误详情：{str(e)}")
-            return {"error": f"请求失败\n{str(e)}"}
+            logger.error(f"请求失败，错误详情：{e!s}")
+            return {"error": f"请求失败\n{e!s}"}

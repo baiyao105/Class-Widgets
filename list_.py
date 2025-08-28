@@ -228,8 +228,7 @@ def get_theme_ui_path(name: str) -> str:
 def get_subject_abbreviation(key: str) -> str:
     if key in subject_abbreviation:
         return subject_abbreviation[key]
-    else:
-        return key[:1]
+    return key[:1]
 
 
 # 学科图标
@@ -243,8 +242,7 @@ def get_subject_icon(key: str) -> str:
 def subject_color(key: str) -> str:
     if key in subject:
         return f'{subject[key]}'
-    else:
-        return '(75, 170, 255'
+    return '(75, 170, 255'
 
 
 def get_schedule_config() -> List[str]:
@@ -273,7 +271,7 @@ def create_new_profile(filename: str) -> None:
 
 def import_schedule(filepath: str, filename: str) -> bool:  # 导入课表
     try:
-        with open(filepath, 'r', encoding='utf-8') as file:
+        with open(filepath, encoding='utf-8') as file:
             check_data = json.load(file)
     except Exception as e:
         logger.error(f"加载数据时出错: {e}")
@@ -298,16 +296,13 @@ def import_schedule(filepath: str, filename: str) -> bool:  # 导入课表
 
 def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课表
     # 校验课程表
-    if check_data is None:
-        logger.warning('此文件为空')
-        raise ValueError('此文件为空')
-    elif not check_data.get('timeline') and not check_data.get('schedule'):
+    if not check_data.get('timeline') and not check_data.get('schedule'):
         logger.warning('此文件不是课程表文件')
         raise ValueError('此文件不是课程表文件')
     # 转换为标准格式
     if not check_data.get('schedule_even'):
         logger.warning('此课程表格式不支持单双周')
-        check_data['schedule_even'] = {str(i): [] for i in range(0, 6)}
+        check_data['schedule_even'] = {str(i): [] for i in range(6)}
 
     part_data = check_data.get('part')
     if part_data and len(part_data.get('0', [])) == 2:
@@ -327,7 +322,7 @@ def convert_schedule(check_data: Dict[str, Any]) -> Dict[str, Any]:  # 转换课
             old_timeline = deepcopy(check_data['timeline'])
             # 转换为标准格式
             check_data['timeline']['default'] = {}
-            for i in range(0, 6):
+            for i in range(6):
                 check_data['timeline'][i] = {}
 
             for item_name, _ in old_timeline.items():

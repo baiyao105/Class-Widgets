@@ -191,7 +191,7 @@ class TrayIcon(QSystemTrayIcon):
                 logger.error(f"更新托盘提示时发生错误: {e}")
         else:
             self.setToolTip("Class Widgets - 未加载课表")
-            logger.debug(f'托盘文字更新: "Class Widgets - 未加载课表"')
+            logger.debug('托盘文字更新: "Class Widgets - 未加载课表"')
 
     def push_update_notification(self, text: str = '') -> None:
         self.setIcon(QIcon(str(LOGO_PATH / "favicon-update.png")))  # tray
@@ -331,7 +331,7 @@ class UnionUpdateTimer(QObject):
         """启动定时器"""
         with self._lock:
             if not self._is_running and self.callback_info:
-                logger.debug(f"启动 UnionUpdateTimer...")
+                logger.debug("启动 UnionUpdateTimer...")
                 self._is_running = True
                 self._schedule_next()
             elif not self.callback_info:
@@ -353,8 +353,7 @@ class UnionUpdateTimer(QObject):
                 self.callback_info[callback]['interval'] = interval
                 self.callback_info[callback]['next_run'] = current_time + dt.timedelta(seconds=interval)
                 return True
-            else:
-                return False
+            return False
 
     def get_callback_interval(self, callback: Callable[[], Any]) -> Optional[float]:
         """获取特定回调函数的间隔"""

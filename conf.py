@@ -33,7 +33,7 @@ countdown_cnt = 0
 
 
 def __load_json(path: Path) -> ThemeConfig:
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(path, encoding='utf-8') as file:
         return ThemeConfig.model_validate_json(file.read())
 
 
@@ -54,7 +54,7 @@ def load_theme_config(theme: str) -> ThemeInfo:
             config=__load_json(config_path)
         )
     except Exception as e:
-        logger.error(f"加载主题数据时出错: {repr(e)}，返回默认主题")
+        logger.error(f"加载主题数据时出错: {e!r}，返回默认主题")
         return ThemeInfo(
             path=default_path.parent,
             config=__load_json(default_path)
@@ -103,12 +103,11 @@ def save_installed_plugin(raw_data: List[Any]) -> bool:
 def is_temp_week() -> Union[bool, str]:
     if config_center.read_conf('Temp', 'set_week') is None or config_center.read_conf('Temp', 'set_week') == '':
         return False
-    else:
-        return config_center.read_conf('Temp', 'set_week')
+    return config_center.read_conf('Temp', 'set_week')
 
 
 def is_temp_schedule() -> bool:
-    return not (config_center.read_conf('Temp', 'temp_schedule') in [None, ''])
+    return config_center.read_conf('Temp', 'temp_schedule') not in [None, '']
 
 
 def add_shortcut_to_startmenu(file: str = '', icon: str = '') -> None:
@@ -218,21 +217,19 @@ def get_custom_countdown() -> str:
     li = config_center.read_conf('Date', 'countdown_date').split(',')
     if countdown_cnt == -1 or countdown_cnt >= len(li):
         return QCoreApplication.translate("conf", '未设置')  # 获取自定义倒计时
-    else:
-        custom_countdown = li[countdown_cnt]
-        if custom_countdown == '':
-            return QCoreApplication.translate("conf", '未设置')
-        try:
-            custom_countdown = parser.parse(custom_countdown)
-        except Exception as e:
-            logger.error(f"解析日期时出错: {custom_countdown}, 错误: {e}")
-            return '解析失败'
-        current_time = TimeManagerFactory.get_instance().get_current_time()
-        if custom_countdown < current_time:
-            return '0 天'
-        else:
-            cd_text = custom_countdown - current_time
-            return f'{cd_text.days + 1} 天'
+    custom_countdown = li[countdown_cnt]
+    if custom_countdown == '':
+        return QCoreApplication.translate("conf", '未设置')
+    try:
+        custom_countdown = parser.parse(custom_countdown)
+    except Exception as e:
+        logger.error(f"解析日期时出错: {custom_countdown}, 错误: {e}")
+        return '解析失败'
+    current_time = TimeManagerFactory.get_instance().get_current_time()
+    if custom_countdown < current_time:
+        return '0 天'
+    cd_text = custom_countdown - current_time
+    return f'{cd_text.days + 1} 天'
             # return (
             #     f"{cd_text.days} 天 {cd_text.seconds // 3600} 小时 {cd_text.seconds // 60 % 60} 分"
             # )
@@ -256,10 +253,8 @@ def get_week_type() -> int:
         week_num = (today - start_date).days // 7 + 1
         if week_num % 2 == 0:
             return 1  # 双周
-        else:
-            return 0  # 单周
-    else:
-        return 0  # 默认单周
+        return 0  # 单周
+    return 0  # 默认单周
 
 
 def get_is_widget_in(widget: str = 'example.ui') -> bool:

@@ -480,8 +480,7 @@ def detect_enable_toast(state: int = 0) -> bool:
         return True
     if config_center.read_conf('Toast', 'prepare_class') != '1' and state == 3:
         return True
-    else:
-        return False
+    return False
 
 
 def push_notification(state: int = 1, lesson_name: str = '', title: Optional[str] = None, subtitle: Optional[str] = None,
