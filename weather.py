@@ -6,7 +6,7 @@ import sqlite3
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import wraps
+from functools import lru_cache, wraps
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import requests
@@ -2648,17 +2648,16 @@ class WeatherDatabase:
         self.db_path = str(CW_HOME / "data" / str(db_name))
         return self.db_path
 
+    @lru_cache(maxsize=40)  # O(1)复用
     def search_city_by_name(self, search_term: str) -> List[str]:
         """根据城市名称搜索城市"""
         self._update_db_path()
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM citys WHERE name LIKE ?', ('%' + search_term + '%',))
-            cities_results = cursor.fetchall()
-            conn.close()
-
-            return [city[2] for city in cities_results]
+            with self._get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM citys WHERE name LIKE ?', ('%' + search_term + '%',))
+                cities_results = cursor.fetchall()
+                return [city[2] for city in cities_results]
         except Exception as e:
             logger.error(f'搜索城市失败: {e}')
             return []
@@ -2689,12 +2688,14 @@ class WeatherDatabase:
 
         return clean_city, clean_district
 
+    def _get_db_connection(self):
+        """获取数据库连接"""
+        return sqlite3.connect(self.db_path)
+
     def _search_city_in_database(self, clean_city: str, clean_district: str) -> str:
         """在数据库中搜索城市"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        try:
+        with self._get_db_connection() as conn:
+            cursor = conn.cursor()
             # 先精确匹配
             exact_result = self._try_exact_match(cursor, clean_city, clean_district)
             if exact_result:
@@ -2705,8 +2706,6 @@ class WeatherDatabase:
                 return fuzzy_result
             logger.warning(f'未找到城市: {clean_city}, 使用默认城市代码')
             return '101010100'
-        finally:
-            conn.close()
 
     def _try_exact_match(self, cursor, clean_city: str, clean_district: str) -> Optional[str]:
         """尝试精确匹配"""
@@ -2729,21 +2728,22 @@ class WeatherDatabase:
             return str(fuzzy_results[0][3])
         return None
 
+    @lru_cache(maxsize=20)  # O(1)内存缓存
     def search_city_by_code(self, city_code: str) -> str:
+        """根据城市代码获取城市名称"""
         if len(city_code.split(',')) != 1:
             return 'coordinates'
-        """根据城市代码获取城市名称"""
         self._update_db_path()
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM citys WHERE city_num LIKE ?', ('%' + city_code + '%',))
-            cities_results = cursor.fetchall()
-            conn.close()
-
-            if cities_results:
-                return cities_results[0][2]
-            return '北京'  # 默认城市
+            with self._get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    'SELECT * FROM citys WHERE city_num LIKE ?', ('%' + city_code + '%',)
+                )
+                cities_results = cursor.fetchall()
+                if cities_results:
+                    return cities_results[0][2]
+                return '北京'  # 默认城市
 
         except Exception as e:
             logger.error(f'根据代码搜索城市失败: {e}')
@@ -2796,6 +2796,7 @@ class WeatherDataProcessor:
             logger.error(f"温度单位转换失败: {e}")
             return temp_str
 
+    @lru_cache(maxsize=40)
     def _load_weather_status(self, api_name: Optional[str] = None) -> Dict[str, Any]:
         """加载天气状态配置"""
         if not api_name:

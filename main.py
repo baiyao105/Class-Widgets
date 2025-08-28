@@ -9,6 +9,7 @@ import subprocess
 import sys
 import traceback
 from shutil import copy
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import psutil
@@ -3459,110 +3460,81 @@ class DesktopWidget(QWidget):  # 主要小组件
         self.close()
 
 
-def check_windows_maximize() -> bool:  # 检查窗口是否最大化
-    if os.name != 'nt' or not pygetwindow:
-        # logger.debug("非Windows NT系统或pygetwindow未加载, 无法检查最大化.")
+# 正则表达式和排除列表(预编译)
+_EXCLUDED_TITLES = {
+    'residentsidebar',  # 希沃侧边栏
+    'program manager',  # Windows桌面
+    'desktop',  # Windows桌面 (备用)
+    'snippingtool',  # 系统截图工具
+}
+_EXCLUDED_KEYWORDS = {
+    'overlay',
+    'snipping',
+    'sidebar',
+    'flyout',
+}
+_EXCLUDED_PROCESSES = {
+    'shellexperiencehost.exe',
+    'searchui.exe',
+    'startmenuexperiencehost.exe',
+    'applicationframehost.exe',
+    'systemsettings.exe',
+    'taskmgr.exe',
+}
+_IGNORED_PROCESSES = {'easinote.exe'}
+
+
+@lru_cache(maxsize=256)  # O(n)正则
+def _should_exclude_window(title: str, process_name: str) -> bool:
+    """检查窗口是否应该被排除"""
+    title_lower = title.lower()
+    if process_name in _IGNORED_PROCESSES:
+        return True
+    if process_name in _EXCLUDED_PROCESSES:
+        return True
+    if title_lower in _EXCLUDED_TITLES:
+        return True
+    if any(keyword in title_lower for keyword in _EXCLUDED_KEYWORDS):
+        return True
+    if process_name == 'explorer.exe':
+        return title_lower in _EXCLUDED_TITLES or any(k in title_lower for k in _EXCLUDED_KEYWORDS)
+    return False
+
+
+def check_windows_maximize() -> bool:
+    """检查是否有窗口最大化"""
+    if os.name != 'nt':
         return False
-    # 需要排除的特定窗口标题 (全字匹配, 大小写不敏感)
-    excluded_titles_exact_lower = {
-        'residentsidebar',  # 希沃侧边栏
-        'program manager',  # Windows桌面
-        'desktop',  # Windows桌面 (备用)
-        'snippingtool',  # 系统截图工具
-        # '' 空标题不再默认排除
-    }
-    # 需要排除的标题中包含的关键词 (大小写不敏感)
-    excluded_keywords_in_title_lower = {
-        'overlay',
-        'snipping',
-        'sidebar',
-        'flyout',  # qfluentwidgets的浮出控件
-    }
-    # 需要排除的进程名 (全字或部分匹配, 大小写不敏感)
-    excluded_process_names_lower = {
-        'shellexperiencehost.exe',
-        'searchui.exe',
-        'startmenuexperiencehost.exe',
-        'applicationframehost.exe',
-        'systemsettings.exe',
-        'taskmgr.exe',
-    }
-    # 用户自定义的忽略进程列表 (全字匹配, 大小写不敏感)
-    # 例：easinote.exe 每行一个，用逗号分隔
-    ignored_process_names_for_maximize_lower = {'easinote.exe'}
-
     current_pid = os.getpid()
-
     try:
         all_windows = pygetwindow.getAllWindows()
     except Exception as e:
         logger.warning(f"获取窗口列表时发生错误 (pygetwindow): {e!s}")
-        # logger.debug("获取窗口列表失败.")
         return False
 
     for window in all_windows:
         try:
-            if not window._hWnd:
-                # logger.debug(f"窗口 '{getattr(window, 'title', 'N/A')}' 无效句柄, 跳过.")
+            if not all([window._hWnd, window.visible, window.isMaximized]):
                 continue
-            if not window.visible:
-                # logger.debug(f"窗口 '{window.title}' 不可见, 跳过.")
-                continue
-            if not window.isMaximized:
-                # logger.debug(f"窗口 '{window.title}' 未最大化, 跳过.")
-                continue
-            # logger.debug(f"发现可见且已最大化的窗口: '{window.title}' (句柄: {window._hWnd})")
             try:
                 hwnd_int = window._hWnd
                 pid_val = ctypes.c_ulong()
                 ctypes.windll.user32.GetWindowThreadProcessId(hwnd_int, ctypes.byref(pid_val))
-                win_pid = pid_val.value
-                if win_pid == 0:
-                    continue  # 无效PID
+                win_pid = pid_val.value  # 获取进程信息
+                if win_pid == 0 or win_pid == current_pid:
+                    continue
                 process_name = psutil.Process(win_pid).name().lower()
+                title = window.title.strip()
+                if not _should_exclude_window(title, process_name):
+                    return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError, ValueError, OSError):
-                # logger.debug(f"无法获取窗口 '{title}' 的进程信息,跳过.")
                 continue
-
-            if win_pid == current_pid:
-                # logger.debug(f"窗口 '{title}' (PID: {win_pid}, 进程: {process_name}) 是自身进程, 排除.")
-                continue
-
-            title = window.title.strip()
-            title_lower = title.lower()
-
-            if process_name in ignored_process_names_for_maximize_lower:
-                # logger.debug(f"窗口 '{title}' (进程: {process_name}) 在忽略列表, 排除.")
-                continue
-
-            if process_name in excluded_process_names_lower:
-                # logger.debug(f"窗口 '{title}' (进程: {process_name}) 在排除的进程名列表, 排除.")
-                continue
-
-            if title_lower in excluded_titles_exact_lower:
-                # logger.debug(f"窗口标题 '{title_lower}' 在排除列表, 排除.")
-                continue
-
-            if any(keyword in title_lower for keyword in excluded_keywords_in_title_lower):
-                # logger.debug(f"窗口标题 '{title_lower}' 包含排除的关键词, 排除.")
-                continue
-
-            # 如果进程是 explorer.exe,但不是“资源管理器”则认为是特殊explorer(应该是桌面)
-            if process_name == 'explorer.exe' and (
-                title_lower in excluded_titles_exact_lower
-                or any(keyword in title_lower for keyword in excluded_keywords_in_title_lower)
-            ):
-                # logger.debug(f"explorer.exe 窗口 '{title_lower}' 命中标题排除规则, 排除.")
-                continue
-            # logger.debug(f"找到有效最大化窗口: '{title}' (PID: {win_pid}, 进程: {process_name}). 返回 True.")
-            return True
 
         except Exception as e:
-            if window and hasattr(window, 'title'):
-                logger.debug(f"处理窗口 '{getattr(window, 'title', 'N/A')}' 时发生错误: {e!s}")
-            else:
-                logger.debug(f"处理一个未知窗口时发生错误: {e!s}")
+            title = getattr(window, 'title', 'N/A') if window else '未知窗口'
+            logger.debug(f"处理窗口 '{title}' 时发生错误: {e!s}")
             continue
+
     return False
 
 
