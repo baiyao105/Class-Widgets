@@ -1473,9 +1473,11 @@ class SettingsMenu(FluentWindow):
             self.alert_cards: list[QWidget] = []  # 预警卡片列表
             if select_weather_api:
                 select_weather_api.addItems(wd.weather_manager.api_config['weather_api_list_zhCN'])
-                if isinstance(wd.weather_manager.api_config, dict) and \
-                   'weather_api_list' in wd.weather_manager.api_config and \
-                   isinstance(wd.weather_manager.api_config['weather_api_list'], list):
+                if (
+                    isinstance(wd.weather_manager.api_config, dict)
+                    and 'weather_api_list' in wd.weather_manager.api_config
+                    and isinstance(wd.weather_manager.api_config['weather_api_list'], list)
+                ):
                     try:
                         select_weather_api.setCurrentIndex(
                             wd.weather_manager.api_config['weather_api_list'].index(
