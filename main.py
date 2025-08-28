@@ -336,7 +336,7 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
 
     current_dt = TimeManagerFactory.get_instance().get_current_time()  # 当前时间
 
-    for i in range(len(parts_start_time)):  # 遍历每个Part
+    for i, base_time in enumerate(parts_start_time):  # 遍历每个Part
         time_len = dt.timedelta(minutes=0)  # Part长度
 
         for _isbreak, item_name, _item_index, item_time in timeline_data:
@@ -349,7 +349,6 @@ def get_part() -> Optional[Tuple[dt.datetime, int]]:
             if i == len(parts_start_time) - 1:  # 最后一个Part
                 return return_data()
             # 将基础时间转换为当前时间基准进行比较
-            base_time = parts_start_time[i]
             current_manager = TimeManagerFactory.get_instance()
             adjusted_start_time = current_manager.get_current_time().replace(
                 hour=base_time.hour,
