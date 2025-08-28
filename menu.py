@@ -3042,7 +3042,6 @@ class SettingsMenu(FluentWindow):
             return
 
         voice_selector = self.voice_selector
-        self.switch_enable_TTS
         voice_selector.clear()
         voice_selector.addItem(self.tr("加载失败"), userData=None)
         voice_selector.setEnabled(False)
@@ -4112,8 +4111,6 @@ class SettingsMenu(FluentWindow):
                             ntp_url_widget = self.parent_menu.adInterface.findChild(
                                 LineEdit, 'ntp_server_url'
                             )
-                            if ntp_url_widget:
-                                ntp_url_widget.text()
                         self._close_flyout()
                         if hasattr(self.parent_menu, '_show_ntp_flyout'):
                             self.parent_menu._show_ntp_flyout(
