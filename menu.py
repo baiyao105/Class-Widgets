@@ -15,7 +15,19 @@ from typing import Dict, List, Optional, Tuple, Union
 from loguru import logger
 from packaging.version import Version
 from PyQt5 import QtCore, uic
-from PyQt5.QtCore import QDate, QLocale, QObject, QSize, Qt, QThread, QTime, QTimer, QTranslator, QUrl, pyqtSignal
+from PyQt5.QtCore import (
+    QDate,
+    QLocale,
+    QObject,
+    QSize,
+    Qt,
+    QThread,
+    QTime,
+    QTimer,
+    QTranslator,
+    QUrl,
+    pyqtSignal,
+)
 
 # from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap

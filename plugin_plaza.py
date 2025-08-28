@@ -6,7 +6,16 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 from PyQt5 import uic
-from PyQt5.QtCore import QCoreApplication, QSize, QStringListModel, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt5.QtCore import (
+    QCoreApplication,
+    QSize,
+    QStringListModel,
+    Qt,
+    QThread,
+    QTimer,
+    QUrl,
+    pyqtSignal,
+)
 from PyQt5.QtGui import QDesktopServices, QIcon, QPixmap
 from PyQt5.QtWidgets import (
     QCompleter,

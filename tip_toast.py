@@ -4,7 +4,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 from PyQt5 import uic
-from PyQt5.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, Qt, QThread, QTimer, pyqtProperty
+from PyQt5.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QThread,
+    QTimer,
+    pyqtProperty,
+)
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap
 from PyQt5.QtWidgets import QApplication, QFrame, QGraphicsBlurEffect, QLabel, QWidget
 from qfluentwidgets import setThemeColor
