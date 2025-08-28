@@ -15,6 +15,7 @@ class ConfigCenter:
     """
     Config中心
     """
+
     def __init__(self, schedule_update_callback: Optional[Callable[[], None]] = None) -> None:
         self.config_version = 1
         self.user_config_path = CONFIG_HOME / "config.ini"
@@ -42,10 +43,13 @@ class ConfigCenter:
 
             from PyQt5.QtWidgets import QApplication
             from qfluentwidgets import Dialog
+
             QApplication.instance() or QApplication(sys.argv)
             dlg = Dialog(
                 QCoreApplication.translate("file", 'Class Widgets 启动失败w(ﾟДﾟ)w'),
-                QCoreApplication.translate("file", '加载默认配置文件失败,请检查文件完整性或尝试重新安装。\n错误信息: {e}').format(e=e)
+                QCoreApplication.translate(
+                    "file", '加载默认配置文件失败,请检查文件完整性或尝试重新安装。\n错误信息: {e}'
+                ).format(e=e),
             )
             dlg.yesButton.setText(QCoreApplication.translate("file", '好'))
             dlg.cancelButton.hide()
@@ -94,15 +98,15 @@ class ConfigCenter:
                 'old_key': 'time_offset',
                 'new_section': 'Time',
                 'new_key': 'time_offset',
-                'remove_old': True
+                'remove_old': True,
             },
             {
                 'old_section': 'Other',
                 'old_key': 'auto_check_update',
                 'new_section': 'Version',
                 'new_key': 'auto_check_update',
-                'remove_old': True
-            }
+                'remove_old': True,
+            },
         ]
         self.migrate_config(migration_rules=migration_rules)
 
@@ -118,8 +122,7 @@ class ConfigCenter:
                 if file_name.suffix == '.json' and file_name.name != 'backup.json':
                     schedule_config.append(file_name.name)
             if not schedule_config:
-                copy(CW_HOME / 'data' / 'default_schedule.json',
-                     schedule_dir / schedule_name)
+                copy(CW_HOME / 'data' / 'default_schedule.json', schedule_dir / schedule_name)
                 logger.info("课程表不存在,已创建默认课程表")
             else:
                 self.write_conf('General', 'schedule', schedule_config[0])
@@ -139,9 +142,15 @@ class ConfigCenter:
         with open(self.user_config_path, 'w', encoding='utf-8') as configfile:
             self.config.write(configfile)
 
-    def migrate_config_item(self, old_section: str, old_key: str, new_section: str, new_key: str,
-                           transform_func: Optional[Callable[[Any], Any]] = None,
-                           remove_old: bool = True) -> bool:
+    def migrate_config_item(
+        self,
+        old_section: str,
+        old_key: str,
+        new_section: str,
+        new_key: str,
+        transform_func: Optional[Callable[[Any], Any]] = None,
+        remove_old: bool = True,
+    ) -> bool:
         """配置项迁移函数
 
         Args:
@@ -165,7 +174,9 @@ class ConfigCenter:
                 self.config.add_section(new_section)
                 logger.debug(f"创建新配置节: {new_section}")
             self.config[new_section][new_key] = str(new_value)
-            logger.debug(f"配置项迁移: {old_section}.{old_key} -> {new_section}.{new_key} (值: {old_value} -> {new_value})")
+            logger.debug(
+                f"配置项迁移: {old_section}.{old_key} -> {new_section}.{new_key} (值: {old_value} -> {new_value})"
+            )
             if remove_old:
                 del self.config[old_section][old_key]
                 logger.debug(f"已删除原配置项: {old_section}.{old_key}")
@@ -177,9 +188,16 @@ class ConfigCenter:
             logger.error(f"配置项迁移失败 {old_section}.{old_key} -> {new_section}.{new_key}: {e}")
             return False
 
-    def migrate_config(self, old_section: Optional[str] = None, old_key: Optional[str] = None, new_section: Optional[str] = None,
-                       new_key: Optional[str] = None, transform_func: Optional[Callable[[Any], Any]] = None,
-                       remove_old: bool = True, migration_rules: Optional[List[Dict[str, Any]]] = None) -> Union[bool, Dict[str, bool]]:
+    def migrate_config(
+        self,
+        old_section: Optional[str] = None,
+        old_key: Optional[str] = None,
+        new_section: Optional[str] = None,
+        new_key: Optional[str] = None,
+        transform_func: Optional[Callable[[Any], Any]] = None,
+        remove_old: bool = True,
+        migration_rules: Optional[List[Dict[str, Any]]] = None,
+    ) -> Union[bool, Dict[str, bool]]:
         """配置迁移
 
         Args:
@@ -211,8 +229,9 @@ class ConfigCenter:
             return self._batch_migrate_internal(migration_rules)
         if not all([old_section, old_key, new_section, new_key]):
             raise ValueError("需提供完整参数")
-        result = self.migrate_config_item(old_section, old_key, new_section, new_key,
-                                         transform_func, remove_old)
+        result = self.migrate_config_item(
+            old_section, old_key, new_section, new_key, transform_func, remove_old
+        )
         if result:
             self._write_config_to_file()
         return result
@@ -220,7 +239,9 @@ class ConfigCenter:
     def _batch_migrate_internal(self, migration_rules: List[Dict[str, Any]]) -> Dict[str, bool]:
         results = {}
         for i, rule in enumerate(migration_rules):
-            rule_name = f"{rule['old_section']}.{rule['old_key']}->{rule['new_section']}.{rule['new_key']}"
+            rule_name = (
+                f"{rule['old_section']}.{rule['old_key']}->{rule['new_section']}.{rule['new_key']}"
+            )
             try:
                 success = self.migrate_config_item(
                     old_section=rule['old_section'],
@@ -228,7 +249,7 @@ class ConfigCenter:
                     new_section=rule['new_section'],
                     new_key=rule['new_key'],
                     transform_func=rule.get('transform_func'),
-                    remove_old=rule.get('remove_old', True)
+                    remove_old=rule.get('remove_old', True),
                 )
                 results[rule_name] = success
             except Exception as e:
@@ -256,7 +277,9 @@ class ConfigCenter:
         except Exception as e:
             logger.error(f'更新配置文件时出错: {e}')
 
-    def read_conf(self, section: str = 'General', key: str = '', fallback: Any = None) -> Union[str, Any]:
+    def read_conf(
+        self, section: str = 'General', key: str = '', fallback: Any = None
+    ) -> Union[str, Any]:
         """读取配置项，并根据默认配置中的类型信息进行转换"""
         if section not in self.config and section not in self.default_data:
             logger.warning(f"配置节未找到: Section='{section}'")
@@ -271,7 +294,9 @@ class ConfigCenter:
             converted_section = {}
             for k, item_info in self.default_data.get(section, {}).items():
                 if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
-                    converted_section[k] = self._convert_value(item_info["default"], item_info["type"])
+                    converted_section[k] = self._convert_value(
+                        item_info["default"], item_info["type"]
+                    )
                 else:
                     converted_section[k] = item_info
             return converted_section
@@ -282,7 +307,9 @@ class ConfigCenter:
         if section in self.default_data:
             item_info = self.default_data[section].get(key)
             if item_info is not None:
-                if (translation := QCoreApplication.translate('config', f'{section}.{key}')) != f'{section}.{key}':
+                if (
+                    translation := QCoreApplication.translate('config', f'{section}.{key}')
+                ) != f'{section}.{key}':
                     return translation
                 if isinstance(item_info, dict) and "type" in item_info and "default" in item_info:
                     return self._convert_value(item_info["default"], item_info["type"])
@@ -343,11 +370,14 @@ class ScheduleCenter:
     """
     课程表中心
     """
+
     def __init__(self, config_center_instance: ConfigCenter) -> None:
         self.config_center = config_center_instance
         self.schedule_data: Dict[str, Any] = {}
         self.update_schedule()
-        self.config_center.write_conf('General', 'schedule', self.config_center.read_conf('General', 'schedule'))
+        self.config_center.write_conf(
+            'General', 'schedule', self.config_center.read_conf('General', 'schedule')
+        )
 
     def update_schedule(self) -> None:
         """
@@ -356,11 +386,21 @@ class ScheduleCenter:
         require_save = False
         self.schedule_data = load_from_json(self.config_center.read_conf('General', 'schedule'))
         if 'timeline' not in self.schedule_data:
-            self.schedule_data['timeline'] = {"default": [], "0": [], "1": [], "2": [], "3": [], "4": [], "5": [], "6": []}
+            self.schedule_data['timeline'] = {
+                "default": [],
+                "0": [],
+                "1": [],
+                "2": [],
+                "3": [],
+                "4": [],
+                "5": [],
+                "6": [],
+            }
             require_save = True
         for key, value in self.schedule_data['timeline'].items():
             if isinstance(value, dict):
                 timeline = value
+
                 def sort_timeline_key(item):
                     item_name = item[0]
                     prefix = item_name[0]
@@ -386,7 +426,9 @@ class ScheduleCenter:
                 sorted_timeline = sorted(timeline.items(), key=sort_timeline_key)
                 for item_name, item_time in sorted_timeline:
                     try:
-                        new_timeline.append([int(item_name[0]=='f'), item_name[1], int(item_name[2:]), item_time])
+                        new_timeline.append(
+                            [int(item_name[0] == 'f'), item_name[1], int(item_name[2:]), item_time]
+                        )
                     except Exception as e:
                         logger.error(f'加载课程表文件[课程数据]出错：{e}')
                 self.schedule_data['timeline'][key] = new_timeline.copy()
@@ -395,7 +437,16 @@ class ScheduleCenter:
                 raise ValueError(f"课程表时间线格式错误: {key}: {value}")
 
         if 'timeline_even' not in self.schedule_data:
-            self.schedule_data['timeline_even'] = {"default": [], "0": [], "1": [], "2": [], "3": [], "4": [], "5": [], "6": []}
+            self.schedule_data['timeline_even'] = {
+                "default": [],
+                "0": [],
+                "1": [],
+                "2": [],
+                "3": [],
+                "4": [],
+                "5": [],
+                "6": [],
+            }
             require_save = True
         if self.schedule_data.get('url', None) is None:
             self.schedule_data['url'] = 'local'
@@ -412,7 +463,9 @@ class ScheduleCenter:
 
     def save_data(self, new_data: Dict[str, Any], filename: str) -> Optional[str]:
         if 'timeline' in new_data and isinstance(new_data['timeline'], dict):
-            if 'timeline' in self.schedule_data and isinstance(self.schedule_data['timeline'], dict):
+            if 'timeline' in self.schedule_data and isinstance(
+                self.schedule_data['timeline'], dict
+            ):
                 self.schedule_data['timeline'].update(new_data['timeline'])
             else:
                 self.schedule_data['timeline'] = new_data['timeline']

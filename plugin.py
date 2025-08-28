@@ -45,7 +45,9 @@ class PluginLoader:  # 插件加载器
                     if hasattr(module, 'Settings'):  # 设置页
                         plugin_class = module.Settings  # 获取 Plugin 类
                         # 实例化插件
-                        self.plugins_settings[folder.name] = plugin_class(str(conf.PLUGIN_HOME / folder.name))
+                        self.plugins_settings[folder.name] = plugin_class(
+                            str(conf.PLUGIN_HOME / folder.name)
+                        )
 
                     if self.manager and hasattr(module, 'Plugin'):  # 插件入口
                         plugin_class = module.Plugin  # 获取 Plugin 类
@@ -112,11 +114,15 @@ class PluginLoader:  # 插件加载器
 
                     original_widgets = widget_config.get('widgets', [])
                     # 过滤掉要移除的组件
-                    widget_config['widgets'] = [w for w in original_widgets if w not in widgets_to_remove]
+                    widget_config['widgets'] = [
+                        w for w in original_widgets if w not in widgets_to_remove
+                    ]
 
                     with open(widget_config_path, 'w', encoding='utf-8') as f:
                         json.dump(widget_config, f, ensure_ascii=False, indent=4)
-                    logger.info(f"已从 config/widget.json 中移除插件 {plugin_name} 的关联组件: {widgets_to_remove}")
+                    logger.info(
+                        f"已从 config/widget.json 中移除插件 {plugin_name} 的关联组件: {widgets_to_remove}"
+                    )
                 else:
                     logger.warning("主配置文件 config/widget.json 不存在，无法移除插件组件。")
             except Exception as e:
@@ -145,6 +151,7 @@ class PluginLoader:  # 插件加载器
         except Exception as e:
             logger.error(f"删除插件目录 {plugin_dir} 失败: {e}")
             return False
+
 
 p_loader = PluginLoader()
 

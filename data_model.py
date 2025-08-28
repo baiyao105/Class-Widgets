@@ -58,13 +58,17 @@ class CsesSchedule(BaseModel):
             h, m, s = map(int, t.split(":"))
             return h * 3600 + m * 60 + s  # 还是建议引入个支持最新 YAML 格式的包）  # noqa: RUF003
 
-        offsets = [(to_offset(class_.start_time), to_offset(class_.end_time)) for class_ in self.classes]
+        offsets = [
+            (to_offset(class_.start_time), to_offset(class_.end_time)) for class_ in self.classes
+        ]
 
         n = len(offsets)
         for i in range(n):
             s1, e1 = offsets[i]
             if e1 <= s1:
-                raise ValueError({"conflict": f"class {i} has an end_time earlier than its start_time."})
+                raise ValueError(
+                    {"conflict": f"class {i} has an end_time earlier than its start_time."}
+                )
             for j in range(i + 1, n):
                 s2, e2 = offsets[j]
                 if s1 < e2 and s2 < e1:  # 若 [s1,e1) 与 [s2,e2) 有交集。
@@ -80,7 +84,9 @@ class Cses(BaseModel):
     @model_validator(mode="after")
     def validate_schedule_name(self) -> Self:
         sujects_name_set = {subject.name for subject in self.subjects}
-        classes_name_set = {class_.subject for schedule in self.schedules for class_ in schedule.classes}
+        classes_name_set = {
+            class_.subject for schedule in self.schedules for class_ in schedule.classes
+        }
         if forget_subject := (classes_name_set - sujects_name_set):
             raise ValueError({"forget": {"subjects name": forget_subject}})
         return self
@@ -92,7 +98,9 @@ class Cses(BaseModel):
             current_id = (schedule.weeks, schedule.enable_day)
             current_status = count_map.get(current_id, [])
             count_map[current_id] = [*current_status, schedule.name]
-        conflict_map = dict((id, names) for id, names in count_map.items() if len(names) > 1)  # noqa: C402
+        conflict_map = dict(
+            (id, names) for id, names in count_map.items() if len(names) > 1
+        )  # noqa: C402
         if len(conflict_map) != 0:
             raise ValueError({"conflict": {"weeks & enable_day": conflict_map}})
         return self

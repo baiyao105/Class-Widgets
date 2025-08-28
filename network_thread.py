@@ -39,7 +39,9 @@ except Exception as e:
 for name in mirror_dict:
     mirror_list.append(name)
 
-if config_center.read_conf('Plugin', 'mirror') not in mirror_list:  # 如果当前配置不在镜像列表中，则设置为默认镜像
+if (
+    config_center.read_conf('Plugin', 'mirror') not in mirror_list
+):  # 如果当前配置不在镜像列表中，则设置为默认镜像
     logger.warning(f"当前配置不在镜像列表中，设置为默认镜像: {mirror_list[0]}")
     config_center.write_conf('Plugin', 'mirror', mirror_list[0])
 
@@ -48,7 +50,8 @@ class getRepoFileList(QThread):  # 获取仓库文件目录
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner.json'
+        self,
+        url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner.json',
     ) -> None:
         super().__init__()
         self.download_url = url
@@ -78,7 +81,8 @@ class getPluginInfo(QThread):  # 获取插件信息(json)
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plugin_list.json'
+        self,
+        url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plugin_list.json',
     ) -> None:
         super().__init__()
         self.download_url = url
@@ -108,7 +112,8 @@ class getTags(QThread):  # 获取插件标签(json)
     repo_signal = pyqtSignal(dict)
 
     def __init__(
-            self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plaza_detail.json'
+        self,
+        url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Plugins/plaza_detail.json',
     ) -> None:
         super().__init__()
         self.download_url = url
@@ -137,7 +142,10 @@ class getTags(QThread):  # 获取插件标签(json)
 class getImg(QThread):  # 获取图片
     repo_signal = pyqtSignal(bytes)
 
-    def __init__(self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner_1.png') -> None:
+    def __init__(
+        self,
+        url: str = 'https://raw.githubusercontent.com/Class-Widgets/plugin-plaza/main/Banner/banner_1.png',
+    ) -> None:
         super().__init__()
         self.download_url = url
 
@@ -147,7 +155,9 @@ class getImg(QThread):  # 获取图片
             if banner_data is not None:
                 self.repo_signal.emit(banner_data)
             else:
-                with open(CW_HOME / "img" / "plaza" / "banner_pre.png", 'rb') as default_img:  # 读取默认图片
+                with open(
+                    CW_HOME / "img" / "plaza" / "banner_pre.png", 'rb'
+                ) as default_img:  # 读取默认图片
                     self.repo_signal.emit(default_img.read())
         except Exception as e:
             logger.error(f"触发图片失败: {e}")
@@ -169,7 +179,10 @@ class getImg(QThread):  # 获取图片
 class getReadme(QThread):  # 获取README
     html_signal = pyqtSignal(str)
 
-    def __init__(self, url: str = 'https://raw.githubusercontent.com/Class-Widgets/Class-Widgets/main/README.md') -> None:
+    def __init__(
+        self,
+        url: str = 'https://raw.githubusercontent.com/Class-Widgets/Class-Widgets/main/README.md',
+    ) -> None:
         super().__init__()
         self.download_url = url
 
@@ -193,6 +206,7 @@ class getReadme(QThread):  # 获取README
         except Exception as e:
             logger.error(f"获取README失败：{e}")
             return ''
+
 
 class getCity(QThread):
 
@@ -226,6 +240,7 @@ class getCity(QThread):
             logger.error(f"获取城市失败：{e}")
             raise ValueError(f"获取城市失败：{e}")
 
+
 class getCoordinates(QThread):
     def __init__(self, url: str = 'http://ip-api.com/json/?fields=status,lat,lon'):
         super().__init__()
@@ -234,7 +249,9 @@ class getCoordinates(QThread):
     def run(self) -> None:
         try:
             coordinates_data = self.get_coordinates()
-            config_center.write_conf('Weather', 'city', f"{coordinates_data[1]},{coordinates_data[0]}")
+            config_center.write_conf(
+                'Weather', 'city', f"{coordinates_data[1]},{coordinates_data[0]}"
+            )
         except Exception as e:
             logger.error(f"获取坐标失败: {e}")
 
@@ -254,12 +271,14 @@ class getCoordinates(QThread):
             logger.error(f"获取坐标失败：{e}")
             raise ValueError(f"获取坐标失败：{e}")
 
+
 class VersionThread(QThread):  # 获取最新版本号
     version_signal = pyqtSignal(dict)
     _instance_running = False
 
     def __init__(self) -> None:
         super().__init__()
+
     def run(self) -> None:
         version = self.get_latest_version()
         self.version_signal.emit(version)
@@ -277,7 +296,9 @@ class VersionThread(QThread):  # 获取最新版本号
             logger.debug(f"更新请求响应: {response.status_code}")
             if response.status_code == 200:
                 return response.json()
-            logger.error(f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}")
+            logger.error(
+                f"无法获取版本信息 错误代码：{response.status_code}，响应内容: {response.text}"
+            )
             return {'error': f"请求失败，错误代码：{response.status_code}"}
         except requests.exceptions.RequestException as e:
             logger.error(f"请求失败，错误详情：{e!s}")
@@ -308,7 +329,9 @@ class getDownloadUrl(QThread):
                 response = requests.get('https://api.github.com/users/octocat', proxies=proxies)
                 reset_time = response.headers.get('X-RateLimit-Reset')
                 reset_time = datetime.fromtimestamp(int(reset_time))
-                self.geturl_signal.emit(f"ERROR: 由于请求次数过多，到达Github API限制，请在{reset_time.minute}分钟后再试")
+                self.geturl_signal.emit(
+                    f"ERROR: 由于请求次数过多，到达Github API限制，请在{reset_time.minute}分钟后再试"
+                )
             else:
                 logger.error(f"网络连接错误：{response.status_code}")
         except Exception as e:
@@ -364,7 +387,9 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
     def download_file(self, file_path: str) -> None:
         # time.sleep(555)  # 模拟下载时间
         try:
-            self.download_url = mirror_dict[config_center.read_conf('Plugin', 'mirror')] + self.download_url
+            self.download_url = (
+                mirror_dict[config_center.read_conf('Plugin', 'mirror')] + self.download_url
+            )
             print(self.download_url)
             response = requests.get(self.download_url, stream=True, proxies=proxies)
             if response.status_code != 200:
@@ -379,7 +404,9 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
                 for chunk in response.iter_content(1024):
                     file.write(chunk)
                     downloaded_size += len(chunk)
-                    progress = (downloaded_size / total_size) * 100 if total_size > 0 else 0  # 计算进度
+                    progress = (
+                        (downloaded_size / total_size) * 100 if total_size > 0 else 0
+                    )  # 计算进度
                     self.progress_signal.emit(progress)
         except Exception as e:
             self.status_signal.emit(f'ERROR: {e}')
@@ -395,11 +422,16 @@ class DownloadAndExtract(QThread):  # 下载并解压插件
                     new_name = p_dir.rsplit('-', 1)[0]
                     if os.path.exists(os.path.join(self.extract_dir, new_name)):
                         shutil.copytree(
-                            os.path.join(self.extract_dir, p_dir), os.path.join(self.extract_dir, new_name),
-                            dirs_exist_ok=True)
+                            os.path.join(self.extract_dir, p_dir),
+                            os.path.join(self.extract_dir, new_name),
+                            dirs_exist_ok=True,
+                        )
                         shutil.rmtree(os.path.join(self.extract_dir, p_dir))
                     else:
-                        os.rename(os.path.join(self.extract_dir, p_dir), os.path.join(self.extract_dir, new_name))
+                        os.rename(
+                            os.path.join(self.extract_dir, p_dir),
+                            os.path.join(self.extract_dir, new_name),
+                        )
         except Exception as e:
             logger.error(f"解压失败: {e}")
 
@@ -428,26 +460,30 @@ def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
     threads = []
     if 'error' in version:
         utils.tray_icon.push_error_notification(
-            "检查更新失败！",
-            f"检查更新失败！\n{version['error']}"
+            "检查更新失败！", f"检查更新失败！\n{version['error']}"
         )
         return False
 
-
-    channel = int('1' if (channel := config_center.read_conf("Version", "version_channel")) not in ['0', '1'] else channel)
+    channel = int(
+        '1'
+        if (channel := config_center.read_conf("Version", "version_channel")) not in ['0', '1']
+        else channel
+    )
     server_version = version['version_release' if channel == 0 else 'version_beta']
     local_version = config_center.read_conf("Version", "version")
     if local_version != "__BUILD_VERSION__":
         logger.debug(f"服务端版本: {Version(server_version)}，本地版本: {Version(local_version)}")
         if Version(server_version) > Version(local_version):
-            utils.tray_icon.push_update_notification(f"新版本速递：{server_version}\n请在“设置”中了解更多。")
+            utils.tray_icon.push_update_notification(
+                f"新版本速递：{server_version}\n请在“设置”中了解更多。"
+            )
     return None
 
 
 class scheduleThread(QThread):  # 获取课表
     update_signal = pyqtSignal(dict)
 
-    def __init__(self,url:str, method:str='GET', data:Optional[dict]=None):
+    def __init__(self, url: str, method: str = 'GET', data: Optional[dict] = None):
         super().__init__()
         self.url = url
         self.method = method
@@ -481,7 +517,9 @@ class scheduleThread(QThread):  # 获取课表
             if response.status_code == 200:
                 data = response.json()
                 return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
-            logger.error(f"无法获取课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+            logger.error(
+                f"无法获取课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}"
+            )
             return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
             logger.error(f"请求失败，错误详情：{e!s}")
@@ -490,12 +528,16 @@ class scheduleThread(QThread):  # 获取课表
     def post_schedule(self):
         try:
             logger.info(f"正在上传课表 {self.url}")
-            response = requests.post(self.url, proxies=proxies, timeout=30, json={"data": json.dumps(self.data)})
+            response = requests.post(
+                self.url, proxies=proxies, timeout=30, json={"data": json.dumps(self.data)}
+            )
             logger.debug(f"课表 {self.url} 请求响应: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
                 return json.loads(data.get('data', "{'error': f\"没有 data 项\"}"))
-            logger.error(f"无法上传课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}")
+            logger.error(
+                f"无法上传课表 {self.url} 错误代码：{response.status_code}，响应内容: {response.text}"
+            )
             return {'error': f"请求失败，错误代码：{response.status_code}"}
         except Exception as e:
             logger.error(f"请求失败，错误详情：{e!s}")
