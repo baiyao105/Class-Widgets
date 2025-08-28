@@ -1025,7 +1025,6 @@ class WidgetsManager:
         self.calculate_widgets_width()
         screen_geometry = app.primaryScreen().availableGeometry()
         screen_width = screen_geometry.width()
-        screen_geometry.height()
 
         margin = max(0, int(config_center.read_conf('General', 'margin')))
         self.start_pos_y = margin
@@ -1293,7 +1292,6 @@ class FloatingWidget(QWidget):  # 浮窗
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         screen_width = screen_geometry.width()
-        screen_geometry.height()
 
         # 加载保存的位置
         saved_pos = self.load_position()

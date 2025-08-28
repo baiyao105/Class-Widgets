@@ -200,10 +200,12 @@ class WeatherapiProvider(ABC):
     @abstractmethod
     def fetch_forecast_data(self, location_key: str, api_key: str, forecast_type: str, days: int = 5) -> Dict[str, Any]:
         """获取预报数据的统一方法"""
+        pass  # noqa
 
     @abstractmethod
     def parse_forecast_data(self, raw_data: Dict[str, Any], forecast_type: str) -> List[Dict[str, Any]]:
         """解析预报数据的统一方法"""
+        pass  # noqa
 
 
 @dataclass
@@ -1155,7 +1157,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
             wind = current.get('wind', {})
             direction = wind.get('direction', {})
             direction_value = direction.get('value')
-            direction.get('unit', '°')
+            # direction_unit = direction.get('unit', '°')
             if direction_value is not None and str(direction_value).strip():
                 # 将角度转换为方向描述
                 direction_desc = self._convert_wind_direction(float(direction_value))

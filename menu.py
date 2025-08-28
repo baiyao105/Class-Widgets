@@ -4920,7 +4920,6 @@ class SettingsMenu(FluentWindow):
         te_select_week_type = self.findChild(ComboBox, 'select_week_type')
         te_timeline_list = self.findChild(ListWidget, 'timeline_list')
         te_select_timeline = self.findChild(ComboBox, 'select_timeline')
-        self.findChild(PushButton, 'copy_timeline')
         try:
             if te_select_timeline.currentIndex() == 0:
                 te_timeline_list.clear()
@@ -5034,7 +5033,6 @@ class SettingsMenu(FluentWindow):
     # 保存时间线
     def te_save_item(self):
         te_part_list = self.findChild(ListWidget, 'part_list')
-        self.findChild(ComboBox, 'select_week_type')
         data_dict = {"part": {}, "part_name": {}, 'timeline': {'default': [], **{str(w): [] for w in range(7)}}, 'timeline_even': {'default': [], **{str(w): [] for w in range(7)}}}
         data_timeline_dict = deepcopy(timeline_dict)
         # 逐条把列表里的信息整理保存
