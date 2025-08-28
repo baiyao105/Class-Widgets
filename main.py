@@ -453,17 +453,15 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                             minutes=int(config_center.read_conf('Toast', 'prepare_minutes'))
                         )
                         and current_dt != last_notify_time
-                    ):
-                        if (
-                            config_center.read_conf('Toast', 'prepare_minutes') != '0'
-                            and toast
-                            and not isbreak
-                        ):
-                            if not current_state:  # 课间
-                                notification.push_notification(
-                                    3, next_lessons[0]
-                                )  # 准备上课（预备铃）
-                                last_notify_time = current_dt
+                    ) and (
+                        config_center.read_conf('Toast', 'prepare_minutes') != '0'
+                        and toast
+                        and not isbreak
+                    ) and not current_state:  # 课间
+                        notification.push_notification(
+                            3, next_lessons[0]
+                        )  # 准备上课（预备铃）
+                        last_notify_time = current_dt
 
                     # 放学
                     if (
@@ -520,9 +518,8 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                         if (
                             not last_notify_time
                             or (now - last_notify_time).seconds >= notify_cooldown
-                        ):
-                            if next_lesson_name is not None:
-                                notification.push_notification(3, next_lesson_name)
+                        ) and next_lesson_name is not None:
+                            notification.push_notification(3, next_lesson_name)
             # if f'a{part}1' in timeline_data:
 
             def have_class():
@@ -2600,10 +2597,9 @@ class DesktopWidget(QWidget):  # 主要小组件
             current_mode == 'reminder'
             and hasattr(self, 'current_reminders')
             and self.current_reminders
-        ):
-            if self.current_reminder_index < len(self.current_reminders) - 1:
-                self.current_reminder_index += 1
-                return 'reminder'  # 继续显示下一个提醒
+        ) and self.current_reminder_index < len(self.current_reminders) - 1:
+            self.current_reminder_index += 1
+            return 'reminder'  # 继续显示下一个提醒
         if current_mode == 'alert':
             self.current_alert_index = 0
         elif current_mode == 'reminder':
@@ -3650,27 +3646,26 @@ if __name__ == '__main__':
         old_config_file.replace(CONFIG_HOME / "config.ini")
 
     if config_center.read_conf('Other', 'multiple_programs') != '1':
-        if not utils.guard.try_acquire():
-            if info := utils.guard.get_lock_info():
-                splash_window.error()
-                logger.debug(f'不允许多开实例，{info}')
-                from qfluentwidgets import Dialog
+        if not utils.guard.try_acquire() and (info := utils.guard.get_lock_info()):
+            splash_window.error()
+            logger.debug(f'不允许多开实例，{info}')
+            from qfluentwidgets import Dialog
 
-                app = QApplication.instance() or QApplication(sys.argv)
-                dlg = Dialog(
-                    QCoreApplication.translate('main', 'Class Widgets 正在运行'),
-                    QCoreApplication.translate(
-                        'main',
-                        'Class Widgets 正在运行！请勿打开多个实例，否则将会出现不可预知的问题。'
-                        '\n(若您需要打开多个实例，请在“设置”->“高级选项”中启用“允许程序多开”)',
-                    ),
-                )
-                dlg.yesButton.setText(QCoreApplication.translate('main', '好'))
-                dlg.cancelButton.hide()
-                dlg.buttonLayout.insertStretch(0, 1)
-                dlg.setFixedWidth(550)
-                dlg.exec()
-                sys.exit(0)
+            app = QApplication.instance() or QApplication(sys.argv)
+            dlg = Dialog(
+                QCoreApplication.translate('main', 'Class Widgets 正在运行'),
+                QCoreApplication.translate(
+                    'main',
+                    'Class Widgets 正在运行！请勿打开多个实例，否则将会出现不可预知的问题。'
+                    '\n(若您需要打开多个实例，请在“设置”->“高级选项”中启用“允许程序多开”)',
+                ),
+            )
+            dlg.yesButton.setText(QCoreApplication.translate('main', '好'))
+            dlg.cancelButton.hide()
+            dlg.buttonLayout.insertStretch(0, 1)
+            dlg.setFixedWidth(550)
+            dlg.exec()
+            sys.exit(0)
 
     scale_factor = float(config_center.read_conf('General', 'scale'))
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
