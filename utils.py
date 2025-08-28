@@ -424,7 +424,9 @@ class UnionUpdateTimer(QObject):
 
 
 # 匹配中文字符(预编译)
-_CHINESE_CHAR_PATTERN = re.compile(r'[\u4e00-\u9fff]')
+_CHINESE_CHAR_PATTERN = re.compile(
+    r"[\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df\u2a700-\u2b73f\u2b740-\u2b81f\u2b820-\u2ceaf\u2ceb0-\u2ebef]"
+)
 
 
 def get_str_length(text: str) -> int:
