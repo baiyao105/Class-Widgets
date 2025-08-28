@@ -164,7 +164,7 @@ def add_shortcut(file: str = '', icon: str = '') -> None:
 
 
 def add_to_startup(
-    file_path: str = str(CW_HOME / "ClassWidgets.exe"), icon_path: str = ''
+    file_path: Union[str, Path] = str(CW_HOME / "ClassWidgets.exe"), icon_path: Union[str, Path] = ''
 ) -> None:  # 注册到开机启动
     if os.name != 'nt':
         return
