@@ -12,9 +12,9 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       # - id: check-added-large-files
-      #   args: ['--maxkb=1000']
+      #   args: ["--maxkb=1000"]
       # - id: mixed-line-ending # EOL
-      #   args: ['--fix=lf']
+      #   args: ["--fix=lf"]
 
   # - repo: https://github.com/astral-sh/ruff-pre-commit
   #   rev: v0.12.10
@@ -27,18 +27,12 @@ repos:
   #   hooks:
   #     - id: actionlint
 
-  - repo: https://github.com/crate-ci/typos
-    rev: v1
-    hooks:
-      - id: typos
-        args: ["--format", "brief"]
-        exclude: '\.ts$'
-
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
-    hooks:
-      - id: codespell
-        exclude: '\.ts$'
+  # - repo: https://github.com/crate-ci/typos
+  #   rev: v1.35.5
+  #   hooks:
+  #     - id: typos
+  #       args: ["--format", "brief"]
+  #       exclude: '\.ts$'
 
   # 格式化
   # - repo: https://github.com/executablebooks/mdformat
