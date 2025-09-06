@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import requests
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication, QEventLoop, QThread, pyqtSignal
+from PySide6.QtCore import QCoreApplication, QEventLoop, QThread, Signal
 
 from basic_dirs import CW_HOME
 from file import config_center
@@ -23,8 +23,8 @@ ICON_DIR = CW_HOME / "img" / "weather"
 class WeatherFetchThread(QThread):
     """(异步)天气数据获取"""
 
-    weather_data_ready = pyqtSignal(dict)
-    weather_error = pyqtSignal(str)
+    weather_data_ready = Signal(dict)
+    weather_error = Signal(str)
 
     def __init__(self, weather_manager):
         super().__init__()
@@ -59,8 +59,8 @@ class WeatherFetchThread(QThread):
 class WeatherReminderThread(QThread):
     """异步天气提醒数据获取"""
 
-    reminders_ready = pyqtSignal(list)
-    alerts_ready = pyqtSignal(list)
+    reminders_ready = Signal(list)
+    alerts_ready = Signal(list)
 
     def __init__(self, weather_manager, weather_data):
         super().__init__()
@@ -3485,7 +3485,7 @@ class WeatherDataProcessor:
 class WeatherReportThread(QThread):
     """天气数据获取"""
 
-    weather_signal = pyqtSignal(dict)
+    weather_signal = Signal(dict)
 
     def __init__(self):
         super().__init__()

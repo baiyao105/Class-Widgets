@@ -13,8 +13,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from loguru import logger
 from packaging.version import Version
-from PyQt5 import QtCore, uic
-from PyQt5.QtCore import (
+from PySide6 import QtCore
+from PySide6.QtCore import (
     QDate,
     QLocale,
     QObject,
@@ -25,13 +25,13 @@ from PyQt5.QtCore import (
     QTimer,
     QTranslator,
     QUrl,
-    pyqtSignal,
+    Signal,
 )
 
-# from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import (
+# from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
@@ -106,7 +106,9 @@ from qfluentwidgets.components.widgets import ListItemDelegate
 import conf
 import i18n_manager
 import list_
+import resources_rc  # noqa: F401
 import tip_toast
+import ui_loader as uic
 import utils
 import weather as wd
 from basic_dirs import CONFIG_HOME, CW_HOME, PLUGIN_HOME, SCHEDULE_DIR, THEME_HOME
@@ -373,7 +375,7 @@ class I18nManager:
 import builtins
 import contextlib
 
-from PyQt5.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication
 
 global_i18n_manager = None
 
@@ -669,8 +671,8 @@ class selectCity(MessageBoxBase):  # 选择城市
             self.error_text.show()
 
     class getCoordinatesInternet(QThread):
-        coordinates = pyqtSignal(float, float)
-        error = pyqtSignal(str)
+        coordinates = Signal(float, float)
+        error = Signal(str)
 
         def __init__(self, url: str = 'http://ip-api.com/json/?fields=status,lat,lon'):
             super().__init__()
@@ -736,7 +738,7 @@ class selectCity(MessageBoxBase):  # 选择城市
             logger.error(f"从配置文件读取经纬度信息失败: {e}")
 
     # class getCoordinatesSystem(QThread):
-    #     location_ready = pyqtSignal(float, float)
+    #     location_ready = Signal(float, float)
 
     #     def run(self):
     #         if platform.system() == 'Windows':
@@ -1135,9 +1137,9 @@ class TextFieldMessageBox(MessageBoxBase):
 
 
 class TTSVoiceLoaderThread(QThread):
-    voicesLoaded = pyqtSignal(list)
-    errorOccurred = pyqtSignal(str)
-    previewFinished = pyqtSignal(bool)
+    voicesLoaded = Signal(list)
+    errorOccurred = Signal(str)
+    previewFinished = Signal(bool)
 
     def __init__(self, engine_filter=None, language_filter=None, parent=None):
         super().__init__(parent)
@@ -1193,8 +1195,8 @@ class TTSVoiceLoaderThread(QThread):
 
 
 class TTSPreviewThread(QThread):
-    previewFinished = pyqtSignal(bool)
-    previewError = pyqtSignal(str)
+    previewFinished = Signal(bool)
+    previewError = Signal(str)
 
     def __init__(self, text, engine, voice, parent=None):
         super().__init__(parent)
@@ -1242,7 +1244,7 @@ class TTSPreviewThread(QThread):
 
 
 class SettingsMenu(FluentWindow):
-    closed = pyqtSignal()
+    closed = Signal()
 
     def __init__(self, main_window=None):
         super().__init__()
@@ -1728,7 +1730,7 @@ class SettingsMenu(FluentWindow):
             if hasattr(self, 'weather_icon_label') and self.weather_icon_label:
                 self.weather_icon_label.setPixmap(scaled_pixmap)
                 self.weather_icon_label.setScaledContents(False)
-                self.weather_icon_label.setAlignment(Qt.AlignCenter)
+                self.weather_icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception as e:
             logger.error(f"SVG图标渲染失败: {e}")
             try:
@@ -1959,7 +1961,14 @@ class SettingsMenu(FluentWindow):
                 self._add_to_alert_exclude(alert_data)
                 msgbox.reject()
 
-            msgbox.cancelButton.clicked.disconnect()
+            # 在 PySide6 中，disconnect() 需要指定要断开的槽函数
+            # 这里我们尝试断开所有连接，使用 try-except 块处理可能的异常
+            try:
+                # 尝试断开所有连接的槽函数
+                msgbox.cancelButton.clicked.disconnect()
+            except Exception:
+                # 如果断开连接失败，可能是因为信号尚未连接，忽略异常
+                pass
             msgbox.cancelButton.clicked.connect(on_hide_alert)
             msgbox.setWindowTitle(self.tr('天气预警详情'))
             msgbox.widget.setFixedSize(620, 420)
@@ -2906,8 +2915,8 @@ class SettingsMenu(FluentWindow):
         voice_selector = self.voice_selector
         switch_enable_TTS = self.switch_enable_TTS
         try:
-            if voice_selector.currentTextChanged.disconnect():
-                pass
+            with contextlib.suppress(Exception):
+                voice_selector.currentTextChanged.disconnect()
         except TypeError:
             pass
         except Exception as e:
@@ -3143,7 +3152,8 @@ class SettingsMenu(FluentWindow):
                 def paint(self, painter: QPainter, option, index):
                     painter.save()
                     painter.setPen(Qt.NoPen)
-                    painter.setRenderHint(painter.Antialiasing)
+                    # 在 PySide6 中，Antialiasing 是 QPainter.RenderHint 枚举的值，而不是 painter 对象的属性
+                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
                     painter.setClipping(True)
                     painter.setClipRect(option.rect)
 
@@ -3213,7 +3223,7 @@ class SettingsMenu(FluentWindow):
                     item.setSizeHint(QSize(item_width - spacing, self.item_height))
                 if event:
                     super().resizeEvent(event)
-                self.update()
+                QWidget.update(self)
 
         self.table = UniformListWidget(parent=self.cfInterface)
         parent_layout.insertWidget(idx, self.table)
@@ -4073,8 +4083,8 @@ class SettingsMenu(FluentWindow):
                         if ntp_url_widget:
                             if hasattr(self.parent_menu, '_ntp_flyout_timer'):
                                 self.parent_menu._ntp_flyout_timer.stop()
-                            with contextlib.suppress(TypeError):
-                                ntp_url_widget.textChanged.disconnect()
+                            with contextlib.suppress(Exception):
+                                ntp_url_widget.textChanged.disconnect(self.parent_menu.on_ntp_server_url_changed)
                             ntp_url_widget.setText(suggestion)
                             self._close_flyout()
                             ntp_url_widget.textChanged.connect(
@@ -4251,9 +4261,11 @@ class SettingsMenu(FluentWindow):
                 except RuntimeError:
                     logger.warning("已删除的QThread对象")
                 try:
-                    self.ntp_thread.started.disconnect()
+                    with contextlib.suppress(Exception):
+                        self.ntp_thread.started.disconnect()
                     if hasattr(self, 'ntp_worker') and self.ntp_worker:
-                        self.ntp_worker.sync_finished.disconnect()
+                        with contextlib.suppress(Exception):
+                            self.ntp_worker.sync_finished.disconnect()
                 except (TypeError, RuntimeError):
                     pass
 
@@ -5102,8 +5114,13 @@ class SettingsMenu(FluentWindow):
             logger.error(f'更新预览界面时发生错误：{e}')
 
     def cf_reload_table(self):
-        with contextlib.suppress(builtins.BaseException):
-            self.table.currentRowChanged.disconnect()
+        # 在 PySide6 中，disconnect() 方法需要指定要断开的槽函数
+        # 使用 try-except 块处理可能的异常
+        try:
+            self.table.currentRowChanged.disconnect(self.cf_change_file)
+        except Exception:
+            # 如果断开连接失败，可能是因为信号尚未连接，忽略异常
+            pass
 
         self.table.clear()
 
@@ -6422,7 +6439,7 @@ class SettingsMenu(FluentWindow):
 class NTPSyncWorker(QObject):
     """NTP异步同步工作线程"""
 
-    sync_finished = pyqtSignal(bool)
+    sync_finished = Signal(bool)
 
     def __init__(self, time_manager):
         super().__init__()

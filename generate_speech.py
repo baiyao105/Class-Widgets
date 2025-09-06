@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import edge_tts
 import pyttsx3
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from basic_dirs import CACHE_HOME
 
@@ -685,8 +685,8 @@ class TTSService(QObject):
     TTS服务
     """
 
-    speech_generated = pyqtSignal(str, str)  # 语音生成完成格式:(文本, 文件路径)
-    generation_error = pyqtSignal(str, str)  # 生成错误,格式:(文本, 错误信息)
+    speech_generated = Signal(str, str)  # 语音生成完成格式:(文本, 文件路径)
+    generation_error = Signal(str, str)  # 生成错误,格式:(文本, 错误信息)
 
     _instance: Optional['TTSService'] = None
     _lock = threading.Lock()

@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from PyQt5.QtCore import QLocale, Qt, QTranslator
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import QLocale, Qt, QTranslator
+from PySide6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator
 
 import utils

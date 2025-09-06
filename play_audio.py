@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 import pygame
 import pygame.mixer
 from loguru import logger
-from PyQt5.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from basic_dirs import CW_HOME
 from file import config_center
@@ -175,8 +175,8 @@ audio_manager = AudioManager()
 class PlayAudio(QThread):
     """音频播放线程"""
 
-    play_back_signal = pyqtSignal(bool)
-    play_finished_signal = pyqtSignal(str, bool)  # (文件路径, 是否成功)
+    play_back_signal = Signal(bool)
+    play_finished_signal = Signal(str, bool)  # (文件路径, 是否成功)
 
     def __init__(
         self,

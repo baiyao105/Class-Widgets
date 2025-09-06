@@ -152,7 +152,7 @@ border-radius: 8px</string>
     <string notr="true"/>
    </property>
    <property name="pixmap">
-    <pixmap>../img/5.png</pixmap>
+    <pixmap>:/img/5.png</pixmap>
    </property>
    <property name="scaledContents">
     <bool>true</bool>

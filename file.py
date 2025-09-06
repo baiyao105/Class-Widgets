@@ -6,7 +6,7 @@ from shutil import copy
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication
 
 from basic_dirs import CONFIG_HOME, CW_HOME, PLUGIN_HOME, SCHEDULE_DIR
 
@@ -41,7 +41,7 @@ class ConfigCenter:
             self.default_data = {}
             import sys
 
-            from PyQt5.QtWidgets import QApplication
+            from PySide6.QtWidgets import QApplication
             from qfluentwidgets import Dialog
 
             QApplication.instance() or QApplication(sys.argv)

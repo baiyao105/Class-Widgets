@@ -15,9 +15,9 @@ import ntplib
 import psutil
 import pytz
 from loguru import logger
-from PyQt5.QtCore import QDir, QLockFile, QObject, QTimer, pyqtSignal
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon
+from PySide6.QtCore import QDir, QLockFile, QObject, QTimer, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from basic_dirs import CW_HOME
 from file import config_center
@@ -154,7 +154,7 @@ class DarkModeWatcher(QObject):
     颜色(暗黑)模式监听器
     """
 
-    darkModeChanged = pyqtSignal(bool)  # 发出暗黑模式变化信号
+    darkModeChanged = Signal(bool)  # 发出暗黑模式变化信号
 
     def __init__(self, interval: int = 500, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -825,7 +825,12 @@ class SingleInstanceGuard:
             self.lock_file.unlock()
 
     def get_lock_info(self):
-        ok, pid, hostname, appname = self.lock_file.getLockInfo()
+        try:
+            ok, pid, hostname, appname = self.lock_file.getLockInfo()
+        except ValueError:
+            ok, pid, hostname = self.lock_file.getLockInfo()
+            appname = "Unknown"
+
         if ok:
             return {"pid": pid, "hostname": hostname, "appname": appname}
         return None

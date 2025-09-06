@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 import requests
 from loguru import logger
 from packaging.version import Version
-from PyQt5.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 import conf
 import list_
@@ -46,7 +46,7 @@ if (
 
 
 class getRepoFileList(QThread):  # 获取仓库文件目录
-    repo_signal = pyqtSignal(dict)
+    repo_signal = Signal(dict)
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class getRepoFileList(QThread):  # 获取仓库文件目录
 
 
 class getPluginInfo(QThread):  # 获取插件信息(json)
-    repo_signal = pyqtSignal(dict)
+    repo_signal = Signal(dict)
 
     def __init__(
         self,
@@ -108,7 +108,7 @@ class getPluginInfo(QThread):  # 获取插件信息(json)
 
 
 class getTags(QThread):  # 获取插件标签(json)
-    repo_signal = pyqtSignal(dict)
+    repo_signal = Signal(dict)
 
     def __init__(
         self,
@@ -139,7 +139,7 @@ class getTags(QThread):  # 获取插件标签(json)
 
 
 class getImg(QThread):  # 获取图片
-    repo_signal = pyqtSignal(bytes)
+    repo_signal = Signal(bytes)
 
     def __init__(
         self,
@@ -176,7 +176,7 @@ class getImg(QThread):  # 获取图片
 
 
 class getReadme(QThread):  # 获取README
-    html_signal = pyqtSignal(str)
+    html_signal = Signal(str)
 
     def __init__(
         self,
@@ -274,7 +274,7 @@ class getCoordinates(QThread):
 
 
 class VersionThread(QThread):  # 获取最新版本号
-    version_signal = pyqtSignal(dict)
+    version_signal = Signal(dict)
     _instance_running = False
 
     def __init__(self) -> None:
@@ -308,7 +308,7 @@ class VersionThread(QThread):  # 获取最新版本号
 
 class getDownloadUrl(QThread):
     # 定义信号，通知下载进度或完成
-    geturl_signal = pyqtSignal(str)
+    geturl_signal = Signal(str)
 
     def __init__(self, username: str, repo: str) -> None:
         super().__init__()
@@ -341,8 +341,8 @@ class getDownloadUrl(QThread):
 
 
 class DownloadAndExtract(QThread):  # 下载并解压插件
-    progress_signal = pyqtSignal(float)  # 进度
-    status_signal = pyqtSignal(str)  # 状态
+    progress_signal = Signal(float)  # 进度
+    status_signal = Signal(str)  # 状态
 
     def __init__(self, url: str, plugin_name: str = 'test_114') -> None:
         super().__init__()
@@ -484,7 +484,7 @@ def check_version(version: Dict[str, Any]) -> bool:  # 检查更新
 
 
 class scheduleThread(QThread):  # 获取课表
-    update_signal = pyqtSignal(dict)
+    update_signal = Signal(dict)
 
     def __init__(self, url: str, method: str = 'GET', data: Optional[dict] = None):
         super().__init__()

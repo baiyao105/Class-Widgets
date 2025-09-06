@@ -15,8 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import psutil
 from loguru import logger
 from packaging.version import Version
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PySide6.QtCore import (
     QCoreApplication,
     QEasingCurve,
     QParallelAnimationGroup,
@@ -28,7 +27,7 @@ from PyQt5.QtCore import (
     QTimer,
     QUrl,
 )
-from PyQt5.QtGui import (
+from PySide6.QtGui import (
     QCloseEvent,
     QColor,
     QDesktopServices,
@@ -41,8 +40,8 @@ from PyQt5.QtGui import (
     QPixmap,
     QShowEvent,
 )
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import (
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QGraphicsBlurEffect,
@@ -76,7 +75,9 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as fIcon
 
+import resources_rc  # noqa: F401
 import splash
+import ui_loader as uic
 
 splash_window = splash.Splash()
 splash_window.run()
@@ -1953,7 +1954,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
             # 预警标签
             self.weather_alert_text = QLabel(self)
-            self.weather_alert_text.setAlignment(Qt.AlignCenter)
+            self.weather_alert_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.weather_alert_text.setStyleSheet(self.temperature.styleSheet())
             self.weather_alert_text.setFont(self.temperature.font())
             self.weather_alert_text.hide()
@@ -1981,7 +1982,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
             # 天气提醒标签
             self.weather_reminder_text = QLabel(self)
-            self.weather_reminder_text.setAlignment(Qt.AlignCenter)
+            self.weather_reminder_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.weather_reminder_text.setStyleSheet(self.temperature.styleSheet())
             self.weather_reminder_text.setFont(self.temperature.font())
             self.weather_reminder_text.setFixedWidth(138)
@@ -2667,7 +2668,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self._hide_current_mode(from_mode)
             self._show_target_mode(to_mode)
 
-        with contextlib.suppress(TypeError):
+        with contextlib.suppress(Exception):
             fade_out_group.finished.disconnect()
 
         fade_out_group.finished.connect(on_fade_out_finished)
@@ -2915,7 +2916,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.alert_icon_opacity.setOpacity(0.0)
             fade_in_group.start()
 
-        with contextlib.suppress(TypeError):
+        with contextlib.suppress(Exception):
             fade_out_group.finished.disconnect()
         fade_out_group.finished.connect(_start_next_alert_fade_in)
         fade_out_group.start()
@@ -2952,7 +2953,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.reminder_icon_opacity.setOpacity(0.0)
             fade_in_group.start()
 
-        with contextlib.suppress(TypeError):
+        with contextlib.suppress(Exception):
             fade_out_group.finished.disconnect()
         fade_out_group.finished.connect(_start_next_reminder_fade_in)
         fade_out_group.start()
@@ -3012,7 +3013,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_text.setFixedWidth(min(125, 76 + char_count * 8))
         self.weather_alert_text.setFont(font)
         self.weather_alert_text.setText(alert_text)
-        self.weather_alert_text.setAlignment(Qt.AlignCenter)
+        self.weather_alert_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
         if hasattr(self, 'alert_icon'):
             icon_path = db.get_alert_icon_by_severity(severity)

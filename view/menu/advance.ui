@@ -918,7 +918,7 @@
                 </size>
                </property>
                <property name="pixmap">
-                <pixmap>../../img/settings/default.png</pixmap>
+                <pixmap>:/png/settings/default.png</pixmap>
                </property>
                <property name="scaledContents">
                 <bool>true</bool>
@@ -972,7 +972,7 @@
                 </size>
                </property>
                <property name="pixmap">
-                <pixmap>../../img/settings/hide_all.png</pixmap>
+                <pixmap>:/png/settings/hide_all.png</pixmap>
                </property>
                <property name="scaledContents">
                 <bool>true</bool>
@@ -1026,7 +1026,7 @@
                 </size>
                </property>
                <property name="pixmap">
-                <pixmap>../../img/settings/floating.png</pixmap>
+                <pixmap>:/png/settings/floating.png</pixmap>
                </property>
                <property name="scaledContents">
                 <bool>true</bool>

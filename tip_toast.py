@@ -3,8 +3,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PySide6.QtCore import (
+    Property,
     QEasingCurve,
     QPoint,
     QPropertyAnimation,
@@ -12,14 +12,15 @@ from PyQt5.QtCore import (
     Qt,
     QThread,
     QTimer,
-    pyqtProperty,
 )
-from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap
-from PyQt5.QtWidgets import QApplication, QFrame, QGraphicsBlurEffect, QLabel, QWidget
+from PySide6.QtGui import QBrush, QColor, QPainter, QPixmap
+from PySide6.QtWidgets import QApplication, QFrame, QGraphicsBlurEffect, QLabel, QWidget
 from qfluentwidgets import setThemeColor
 
 import conf
 import list_
+import resources_rc  # noqa: F401
+import ui_loader as uic
 from basic_dirs import CW_HOME
 from file import config_center
 from generate_speech import get_tts_service
@@ -397,7 +398,7 @@ class wave_Effect(QWidget):
         self.timer.timeout.connect(self.showAnimation)
         self.timer.start()
 
-    @pyqtProperty(int)
+    @Property(int)
     def radius(self) -> int:
         return self._radius
 

@@ -97,7 +97,7 @@
               <string />
              </property>
              <property name="pixmap">
-              <pixmap>../../img/Logo.png</pixmap>
+              <pixmap>:/png/Logo.png</pixmap>
              </property>
              <property name="scaledContents">
               <bool>true</bool>
@@ -198,7 +198,7 @@
                  </size>
                 </property>
                 <property name="pixmap">
-                 <pixmap>../../img/logo/favicon-update.png</pixmap>
+                 <pixmap>:/png/logo/favicon-update.png</pixmap>
                 </property>
                 <property name="scaledContents">
                  <bool>true</bool>

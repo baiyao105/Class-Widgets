@@ -103,7 +103,7 @@ font-weight: bold;</string>
           <enum>Qt::PlainText</enum>
          </property>
          <property name="pixmap">
-          <pixmap>../../img/weather/alerts/blue.png</pixmap>
+          <pixmap>:/png/weather/alerts/blue.png</pixmap>
          </property>
          <property name="scaledContents">
           <bool>true</bool>

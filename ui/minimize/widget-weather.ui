@@ -97,7 +97,7 @@ border-image: url();
        <string/>
       </property>
       <property name="pixmap">
-       <pixmap>../../img/weather/0.svg</pixmap>
+       <pixmap>:/svg/img/weather/0.svg</pixmap>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

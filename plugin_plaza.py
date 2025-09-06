@@ -5,8 +5,7 @@ from random import shuffle
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PySide6.QtCore import (
     QCoreApplication,
     QSize,
     QStringListModel,
@@ -14,10 +13,10 @@ from PyQt5.QtCore import (
     QThread,
     QTimer,
     QUrl,
-    pyqtSignal,
+    Signal,
 )
-from PyQt5.QtGui import QDesktopServices, QIcon, QPixmap
-from PyQt5.QtWidgets import (
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
+from PySide6.QtWidgets import (
     QCompleter,
     QGridLayout,
     QHBoxLayout,
@@ -63,6 +62,8 @@ from qfluentwidgets import FluentIcon as fIcon
 
 import list_ as l
 import network_thread as nt
+import resources_rc  # noqa: F401
+import ui_loader as uic
 from basic_dirs import CW_HOME, PLUGIN_HOME
 from file import config_center
 from plugin import p_loader
@@ -544,7 +545,7 @@ class PluginCard_Horizontal(CardWidget):  # 插件卡片（横向）
 
 
 class PluginPlaza(MSFluentWindow):
-    closed = pyqtSignal()
+    closed = Signal()
 
     def __init__(self):
         super().__init__()

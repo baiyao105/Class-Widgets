@@ -155,7 +155,7 @@
                 </size>
                </property>
                <property name="pixmap">
-                <pixmap>../img/logo/favicon.ico</pixmap>
+                <pixmap>:/img/logo/favicon.ico</pixmap>
                </property>
                <property name="scaledContents">
                 <bool>true</bool>

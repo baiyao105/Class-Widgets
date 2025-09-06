@@ -6,7 +6,7 @@ from shutil import copy
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication
 
 from basic_dirs import CONFIG_HOME, CW_HOME, SCHEDULE_DIR, THEME_DIRS
 from data_model import ThemeConfig, ThemeInfo

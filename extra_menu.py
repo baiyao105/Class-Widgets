@@ -3,9 +3,8 @@ from shutil import copy
 from typing import List
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QScroller
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QScroller
 from qfluentwidgets import (
     ComboBox,
     FluentWindow,
@@ -22,6 +21,8 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as fIcon
 
 import list_
+import resources_rc  # noqa: F401
+import ui_loader as uic
 from conf import CW_HOME, get_week_type
 from file import config_center, load_from_json, save_data_to_json, schedule_center
 from menu import SettingsMenu
