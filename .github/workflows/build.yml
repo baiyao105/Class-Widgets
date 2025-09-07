@@ -24,6 +24,36 @@ on:
         required: false
         default: false
         type: boolean
+      win32_x64:
+        description: "win32-x64"
+        required: false
+        type: boolean
+        default: true
+      win32_x86:
+        description: "win32-x86"
+        required: false
+        type: boolean
+        default: true
+      win32_arm64:
+        description: "win32-arm64"
+        required: false
+        type: boolean
+        default: true
+      macos_x64:
+        description: "macos-x64"
+        required: false
+        type: boolean
+        default: true
+      macos_arm64:
+        description: "macos-arm64"
+        required: false
+        type: boolean
+        default: true
+      linux_x64:
+        description: "linux-x64"
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       build_type:
@@ -40,6 +70,36 @@ on:
         required: false
         default: false
         type: boolean
+      win32_x64:
+        description: "win32-x64"
+        required: false
+        type: boolean
+        default: true
+      win32_x86:
+        description: "win32-x86"
+        required: false
+        type: boolean
+        default: true
+      win32_arm64:
+        description: "win32-arm64"
+        required: false
+        type: boolean
+        default: true
+      macos_x64:
+        description: "macos-x64"
+        required: false
+        type: boolean
+        default: true
+      macos_arm64:
+        description: "macos-arm64"
+        required: false
+        type: boolean
+        default: true
+      linux_x64:
+        description: "linux-x64"
+        required: false
+        type: boolean
+        default: true
     outputs:
       run_id:
         description: "构建运行ID"
@@ -75,7 +135,6 @@ permissions:
 
 jobs:
   prepare:
-    # 拆的稀碎,也许还行(x
     name: Update Info
     runs-on: ubuntu-latest
     outputs:
@@ -86,6 +145,9 @@ jobs:
       build_runid: ${{ steps.build-info.outputs.build_runid }}
       release_version: ${{ steps.build-info.outputs.release_version }}
       skip_ci: ${{ steps.check-skip-ci.outputs.skip_ci }}
+      platforms: ${{ steps.build-info.outputs.platforms }}
+      platforms_array: ${{ steps.build-info.outputs.platforms_array }}
+      matrix: ${{ steps.build-info.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -148,13 +210,80 @@ jobs:
             echo "[DEBUG] 默认构建类型: $build_type"
           fi
           release_version="${{ inputs.release_version }}"
-
+          platforms=""
+          input_val="${{ inputs.win32_x64 || github.event.inputs.win32_x64 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+              platforms="${platforms}win32-x64,"
+          fi
+          input_val="${{ inputs.win32_x86 || github.event.inputs.win32_x86 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+              platforms="${platforms}win32-x86,"
+          fi
+          input_val="${{ inputs.win32_arm64 || github.event.inputs.win32_arm64 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+              platforms="${platforms}win32-arm64,"
+          fi
+          input_val="${{ inputs.macos_x64 || github.event.inputs.macos_x64 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+            platforms="${platforms}macos-x64,"
+          fi
+          input_val="${{ inputs.macos_arm64 || github.event.inputs.macos_arm64 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+            platforms="${platforms}macos-arm64,"
+          fi
+          input_val="${{ inputs.linux_x64 || github.event.inputs.linux_x64 || '' }}"
+          if [[ "$input_val" == "true" || ( -z "$input_val" && "$GITHUB_EVENT_NAME" != "pull_request" ) ]]; then
+            platforms="${platforms}linux-x64,"
+          fi
+          platforms=${platforms%,}
+          echo "[DEBUG] 最终平台列表: $platforms"
           echo "release_version=$release_version" >> $GITHUB_OUTPUT
           echo "build_type=$build_type" >> $GITHUB_OUTPUT
           echo "build_time=$build_time" >> $GITHUB_OUTPUT
           echo "build_commit=$build_commit" >> $GITHUB_OUTPUT
           echo "build_branch=$build_branch" >> $GITHUB_OUTPUT
           echo "build_runid=$build_runid" >> $GITHUB_OUTPUT
+          echo "platforms=$platforms" >> $GITHUB_OUTPUT
+          platforms_array="[]"
+          if [[ -n "$platforms" ]]; then
+            IFS=',' read -ra ADDR <<< "$platforms"
+            platforms_array="["
+            for i in "${ADDR[@]}"; do
+              platforms_array="$platforms_array\"$i\","
+            done
+            platforms_array=${platforms_array%,}
+            platforms_array="$platforms_array]"
+          fi
+          echo "platforms_array=$platforms_array" >> $GITHUB_OUTPUT
+          matrix_json="{\"include\":[]}";
+          if [[ -n "$platforms" ]]; then
+            matrix_json="{\"include\":[";
+            for platform in "${ADDR[@]}"; do
+              case "$platform" in
+                "win32-x64")
+                  matrix_json="$matrix_json{\"os\":\"windows-latest\",\"arch\":\"x64\",\"platform\":\"windows-x64\",\"platform_id\":\"win32-x64\"},"
+                  ;;
+                "win32-x86")
+                  matrix_json="$matrix_json{\"os\":\"windows-latest\",\"arch\":\"x86\",\"platform\":\"windows-x86\",\"platform_id\":\"win32-x86\"},"
+                  ;;
+                "win32-arm64")
+                  matrix_json="$matrix_json{\"os\":\"windows-latest\",\"arch\":\"arm64\",\"platform\":\"windows-arm64\",\"platform_id\":\"win32-arm64\"},"
+                  ;;
+                "macos-x64")
+                  matrix_json="$matrix_json{\"os\":\"macos-15\",\"arch\":\"x64\",\"platform\":\"macos-x64\",\"platform_id\":\"macos-x64\"},"
+                  ;;
+                "macos-arm64")
+                  matrix_json="$matrix_json{\"os\":\"macos-15\",\"arch\":\"arm64\",\"platform\":\"macos-arm64\",\"platform_id\":\"macos-arm64\"},"
+                  ;;
+                "linux-x64")
+                  matrix_json="$matrix_json{\"os\":\"ubuntu-latest\",\"arch\":\"x64\",\"platform\":\"linux-x64\",\"platform_id\":\"linux-x64\"},"
+                  ;;
+              esac
+            done
+            matrix_json=${matrix_json%,}
+            matrix_json="$matrix_json]}";
+          fi
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
           {
             echo "## 📋 构建信息"
             echo "| 项目 | 值 |"
@@ -164,33 +293,18 @@ jobs:
             echo "| 🌿 分支 | $build_branch |"
             echo "| 🆔 运行 ID | $build_runid |"
             echo "| 🧪 构建类型 | $build_type |"
+            echo "| 🖥️ 构建平台 | $platforms |"
           } >> $GITHUB_STEP_SUMMARY
 
   build:
     needs: [prepare]
-    if: needs.prepare.result == 'success' && needs.prepare.outputs.skip_ci != 'true'
+    if: needs.prepare.result == 'success' && needs.prepare.outputs.skip_ci != 'true' && needs.prepare.outputs.matrix != '{"include":[]}'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
-      matrix:
-        include:
-          - os: windows-latest
-            arch: x64
-            platform: windows-x64
-          - os: windows-latest
-            arch: x86
-            platform: windows-x86
-          - os: macos-15
-            arch: x64
-            platform: macos-x64
-          - os: macos-15
-            arch: arm64
-            platform: macos-arm64
-          - os: ubuntu-latest
-            arch: x64
-            platform: linux-x64
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     env:
-      PYTHON_VERSION: ${{ startsWith(matrix.os, 'windows') && '3.8' || '3.11' }}
+      PYTHON_VERSION: ${{ (matrix.os == 'windows-latest' && matrix.arch != 'arm64') && '3.8' || '3.11' }}
       BUILD_TYPE: ${{ needs.prepare.outputs.build_type }}
       BUILD_TIME: ${{ needs.prepare.outputs.build_time }}
       BUILD_COMMIT: ${{ needs.prepare.outputs.build_commit }}
@@ -338,14 +452,17 @@ jobs:
           fi
           echo "BUILD_TYPE=$build_type" >> $GITHUB_ENV
 
+      - name: Cleanup .ts
+        shell: bash
+        run: |
+          find ui -name "*.ts" -delete
+          find view -name "*.ts" -delete
+        
       - name: Build Windows (pyinstaller)
         if: startsWith(matrix.os, 'windows')
         shell: bash
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
-          fi
-          find ui -name "*.ts" -delete
+          curl -o zip.exe -L http://www.stahlworks.com/dev/zip.exe
           uv run pyinstaller main.py \
             -w \
             -i ./img/favicon.ico \
@@ -371,7 +488,7 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
-          find ui -name "*.ts" -delete
+          export MACOSX_DEPLOYMENT_TARGET=11.0
           uv run pyinstaller main.py \
             -w \
             -i ./img/favicon.icns \
@@ -399,7 +516,6 @@ jobs:
         if: matrix.platform == 'linux-x64'
         shell: bash
         run: |
-          find ui -name "*.ts" -delete
           uv run pyinstaller main.py \
             -w \
             -i ./img/favicon.png \
@@ -430,11 +546,11 @@ jobs:
 
   sign:
     needs: [prepare, build]
-    if: needs.build.result == 'success' && needs.prepare.outputs.skip_ci != 'true' && (github.event.inputs.is_signing == 'true')
+    if: needs.build.result == 'success' && needs.prepare.outputs.skip_ci != 'true' && (inputs.is_signing == true || github.event.inputs.is_signing == 'true')
     runs-on: windows-latest
     strategy:
       matrix:
-        arch: [x64, x86]
+        arch: [x64, x86, arm64]
     steps:
       - name: Download Windows build artifacts
         id: download-artifact
@@ -515,9 +631,6 @@ jobs:
     env:
       BUILD_TYPE: ${{ needs.prepare.outputs.build_type }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
       - name: Download all build artifacts
         uses: actions/download-artifact@v5
         with:
@@ -529,7 +642,7 @@ jobs:
         run: |
           mkdir -p final-packages || { rm -rf final-packages; mkdir final-packages; }
           package_count=0
-          platforms=("windows-x64" "windows-x86" "macos-x64" "macos-arm64" "linux-x64")
+          platforms=("windows-x64" "windows-x86" "windows-arm64" "macos-x64" "macos-arm64" "linux-x64")
           declare -A artifact_cache
           for artifact_dir in ./all-artifacts/*/; do
             if [[ -d "$artifact_dir" ]]; then
