@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 import pygame
 import pygame.mixer
 from loguru import logger
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from basic_dirs import CW_HOME
 from file import config_center

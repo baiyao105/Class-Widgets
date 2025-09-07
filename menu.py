@@ -13,8 +13,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from loguru import logger
 from packaging.version import Version
-from PyQt5 import QtCore, uic
-from PyQt5.QtCore import (
+from PyQt6 import QtCore, uic
+from PyQt6.QtCore import (
     QDate,
     QLocale,
     QObject,
@@ -28,10 +28,10 @@ from PyQt5.QtCore import (
     pyqtSignal,
 )
 
-# from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import (
+# from PyQt6.QtPrintSupport import QPrinter
+from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
@@ -373,7 +373,7 @@ class I18nManager:
 import builtins
 import contextlib
 
-from PyQt5.QtCore import QCoreApplication
+from PyQt6.QtCore import QCoreApplication
 
 global_i18n_manager = None
 
@@ -1049,7 +1049,7 @@ class PluginCard(CardWidget):  # 插件卡片
                     content=QCoreApplication.translate(
                         'menu', '插件 “{title}” 已卸载。请重启 Class Widgets 以完全移除。'
                     ).format(title=self.title),
-                    orient=Qt.Horizontal,
+                    orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.BOTTOM_RIGHT,
                     duration=5000,
@@ -1062,7 +1062,7 @@ class PluginCard(CardWidget):  # 插件卡片
                     content=QCoreApplication.translate(
                         'menu', '卸载插件 “{title}” 时出错，请查看日志获取详细信息。'
                     ).format(title=self.title),
-                    orient=Qt.Horizontal,
+                    orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.BOTTOM_RIGHT,
                     duration=5000,
@@ -1326,7 +1326,9 @@ class SettingsMenu(FluentWindow):
     # 初始化界面
     def setup_plugin_mgr_interface(self):
         pm_scroll = self.findChild(SmoothScrollArea, 'pm_scroll')
-        QScroller.grabGesture(pm_scroll.viewport(), QScroller.LeftMouseButtonGesture)  # 触摸屏适配
+        QScroller.grabGesture(
+            pm_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )  # 触摸屏适配
 
         global plugin_dict, enabled_plugins
         enabled_plugins = conf.load_plugin_config()  # 加载启用的插件
@@ -1717,18 +1719,22 @@ class SettingsMenu(FluentWindow):
             final_size = QSize(final_width, final_height)
             high_res_size = final_size * 2
             pixmap = QPixmap(high_res_size)
-            pixmap.fill(Qt.transparent)
+            pixmap.fill(Qt.GlobalColor.transparent)
             painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.Antialiasing, True)
-            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-            painter.setRenderHint(QPainter.TextAntialiasing, True)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
             renderer.render(painter)
             painter.end()
-            scaled_pixmap = pixmap.scaled(final_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_pixmap = pixmap.scaled(
+                final_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
             if hasattr(self, 'weather_icon_label') and self.weather_icon_label:
                 self.weather_icon_label.setPixmap(scaled_pixmap)
                 self.weather_icon_label.setScaledContents(False)
-                self.weather_icon_label.setAlignment(Qt.AlignCenter)
+                self.weather_icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception as e:
             logger.error(f"SVG图标渲染失败: {e}")
             try:
@@ -2158,7 +2164,7 @@ class SettingsMenu(FluentWindow):
         InfoBar.success(
             title='刷新完成',
             content='插件列表已刷新',
-            orient=Qt.Horizontal,
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.BOTTOM_RIGHT,
             duration=3000,
@@ -2310,7 +2316,9 @@ class SettingsMenu(FluentWindow):
 
     def setup_sound_interface(self):
         sd_scroll = self.findChild(SmoothScrollArea, 'sd_scroll')  # 触摸屏适配
-        QScroller.grabGesture(sd_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            sd_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
         switch_enable_toast = self.findChild(SwitchButton, 'switch_enable_attend')
         switch_enable_toast.setChecked(int(config_center.read_conf('Toast', 'attend_class')))
@@ -3176,17 +3184,17 @@ class SettingsMenu(FluentWindow):
                 self.min_item_width = min_item_width
                 self.max_item_width = max_item_width
                 self.item_height = item_height
-                self.setResizeMode(ListWidget.Adjust)
-                self.setFlow(ListWidget.LeftToRight)
+                self.setResizeMode(ListWidget.ResizeMode.Adjust)
+                self.setFlow(ListWidget.Flow.LeftToRight)
                 self.setWrapping(True)
                 self.setSpacing(16)
                 self.setGridSize(QSize(self.min_item_width, self.item_height))
-                self.setItemDelegate(self.cfCustomDelegate(self))  # 使用自定义的 Delegate
-                self.setViewMode(ListWidget.ListMode)
+                self.setItemDelegate(self.cfCustomDelegate(self))  # 自定义 Delegate
+                self.setViewMode(ListWidget.ViewMode.ListMode)
                 self.setContentsMargins(0, 12, 0, 12)
                 self.setDragEnabled(False)
-                self.setDragDropMode(ListWidget.NoDragDrop)
-                self.setDefaultDropAction(Qt.IgnoreAction)
+                self.setDragDropMode(ListWidget.DragDropMode.NoDragDrop)
+                self.setDefaultDropAction(Qt.DropAction.IgnoreAction)
                 self._initial_layout_done = False
 
             def showEvent(self, event):
@@ -3222,7 +3230,9 @@ class SettingsMenu(FluentWindow):
 
     def setup_customization_interface(self):
         ct_scroll = self.findChild(SmoothScrollArea, 'ct_scroll')  # 触摸屏适配
-        QScroller.grabGesture(ct_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            ct_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
         self.ct_update_preview()
 
@@ -3313,7 +3323,9 @@ class SettingsMenu(FluentWindow):
 
     def setup_about_interface(self):
         ab_scroll = self.findChild(SmoothScrollArea, 'ab_scroll')  # 触摸屏适配
-        QScroller.grabGesture(ab_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            ab_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
         self.version = self.findChild(BodyLabel, 'version')
 
@@ -3382,7 +3394,9 @@ class SettingsMenu(FluentWindow):
 
     def setup_advance_interface(self):
         adv_scroll = self.adInterface.findChild(SmoothScrollArea, 'adv_scroll')  # 触摸屏适配
-        QScroller.grabGesture(adv_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            adv_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
         margin_spin = self.adInterface.findChild(SpinBox, 'margin_spin')
         margin_spin.setValue(int(config_center.read_conf('General', 'margin')))
@@ -4128,7 +4142,7 @@ class SettingsMenu(FluentWindow):
             flyout = Flyout.make(
                 flyout_view, target_widget, self, aniType=FlyoutAnimationType.PULL_UP
             )
-            flyout.setWindowFlags(flyout.windowFlags() | Qt.Tool)
+            flyout.setWindowFlags(flyout.windowFlags() | Qt.WindowType.Tool)
             flyout.setFocusPolicy(Qt.NoFocus)
 
             def custom_show_event(event):
@@ -4269,7 +4283,7 @@ class SettingsMenu(FluentWindow):
             InfoBar.info(
                 title=title,
                 content=message,
-                orient=Qt.Horizontal,
+                orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=3000,
@@ -4283,7 +4297,7 @@ class SettingsMenu(FluentWindow):
             InfoBar.success(
                 title=title,
                 content=message,
-                orient=Qt.Horizontal,
+                orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=3000,
@@ -4297,7 +4311,7 @@ class SettingsMenu(FluentWindow):
             InfoBar.warning(
                 title=title,
                 content=message,
-                orient=Qt.Horizontal,
+                orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=5000,
@@ -4311,7 +4325,7 @@ class SettingsMenu(FluentWindow):
             InfoBar.error(
                 title=title,
                 content=message,
-                orient=Qt.Horizontal,
+                orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=5000,
@@ -4349,7 +4363,7 @@ class SettingsMenu(FluentWindow):
         se_schedule_list.addItems(schedule_dict[str(current_week)])
         se_schedule_list.itemChanged.connect(self.se_upload_item)
         QScroller.grabGesture(
-            se_schedule_list.viewport(), QScroller.LeftMouseButtonGesture
+            se_schedule_list.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
         )  # 触摸屏适配
 
         se_save_button = self.findChild(PrimaryPushButton, 'save_schedule')
@@ -4467,9 +4481,11 @@ class SettingsMenu(FluentWindow):
 
         part_list = self.findChild(ListWidget, 'part_list')
         QScroller.grabGesture(
-            te_timeline_list.viewport(), QScroller.LeftMouseButtonGesture
+            te_timeline_list.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
         )  # 触摸屏适配
-        QScroller.grabGesture(part_list.viewport(), QScroller.LeftMouseButtonGesture)  # 触摸屏适配
+        QScroller.grabGesture(
+            part_list.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )  # 触摸屏适配
         self.te_detect_item()
         self.te_update_parts_name()
         self.te_check_parts_name()
@@ -4635,7 +4651,7 @@ class SettingsMenu(FluentWindow):
         schedule_view.verticalHeader().hide()
         schedule_view.setBorderRadius(8)
         QScroller.grabGesture(
-            schedule_view.viewport(), QScroller.LeftMouseButtonGesture
+            schedule_view.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
         )  # 触摸屏适配
         self.sp_fill_grid_row()
 

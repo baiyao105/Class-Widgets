@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import requests
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication, QEventLoop, QThread, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEventLoop, QThread, pyqtSignal
 
 from basic_dirs import CW_HOME
 from file import config_center

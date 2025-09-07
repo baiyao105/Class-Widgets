@@ -15,9 +15,9 @@ import ntplib
 import psutil
 import pytz
 from loguru import logger
-from PyQt5.QtCore import QDir, QLockFile, QObject, QTimer, pyqtSignal
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon
+from PyQt6.QtCore import QDir, QLockFile, QObject, QTimer, pyqtSignal
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
 
 from basic_dirs import CW_HOME
 from file import config_center

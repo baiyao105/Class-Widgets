@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Union
 
 from dateutil import parser
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication
+from PyQt6.QtCore import QCoreApplication
 
 import list_
 from basic_dirs import CONFIG_HOME, CW_HOME, PLUGIN_HOME, THEME_DIRS

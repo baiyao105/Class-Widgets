@@ -3,9 +3,9 @@ from shutil import copy
 from typing import List
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QScroller
+from PyQt6 import uic
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QScroller
 from qfluentwidgets import (
     ComboBox,
     FluentWindow,
@@ -71,7 +71,9 @@ class ExtraMenu(FluentWindow):
 
     def init_interface(self) -> None:
         ex_scroll = self.findChild(SmoothScrollArea, 'ex_scroll')
-        QScroller.grabGesture(ex_scroll, QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            ex_scroll, QScroller.ScrollerScrollerGestureType.LeftMouseButtonGesture
+        )
         select_temp_week = self.findChild(ComboBox, 'select_temp_week')  # 选择替换日期
         select_temp_week.addItems(list_.week)
         select_temp_week.setCurrentIndex(current_week)

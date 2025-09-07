@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import edge_tts
 import pyttsx3
 from loguru import logger
-from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QObject, pyqtSignal
 
 from basic_dirs import CACHE_HOME
 

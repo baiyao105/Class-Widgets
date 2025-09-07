@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from PyQt5.QtCore import QLocale, Qt, QTranslator
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtCore import QLocale, Qt, QTranslator
+from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator
 
 import utils
@@ -117,12 +117,14 @@ class I18nManager:
 
     def get_available_languages_QLocale(self, lang_code):
         locale_list = {
-            'zh_CN': QLocale(QLocale.Chinese, QLocale.China),
-            'zh_HK': QLocale(QLocale.Chinese, QLocale.HongKong),
-            'en_US': QLocale(QLocale.English, QLocale.UnitedStates),
-            'ja_JP': QLocale(QLocale.Japanese, QLocale.Japan),
+            'zh_CN': QLocale(QLocale.Language.Chinese, QLocale.Country.China),
+            'zh_HK': QLocale(QLocale.Language.Chinese, QLocale.Country.HongKong),
+            'en_US': QLocale(QLocale.Language.English, QLocale.Country.UnitedKingdom),
+            'ja_JP': QLocale(QLocale.Language.Japanese, QLocale.Country.Japan),
         }
-        return locale_list.get(lang_code, QLocale(QLocale.English, QLocale.UnitedStates))
+        return locale_list.get(
+            lang_code, QLocale(QLocale.Language.English, QLocale.Country.UnitedKingdom)
+        )
 
     def get_available_languages_view(self):
         """获取可用界面语言列表仅(完整翻译的语言)"""
@@ -269,8 +271,6 @@ class I18nManager:
 
 # 适配高DPI缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
 os.environ['QT_SCALE_FACTOR'] = config_center.read_conf('General', 'scale')
 

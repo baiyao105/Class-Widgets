@@ -3,8 +3,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PyQt6 import uic
+from PyQt6.QtCore import (
     QEasingCurve,
     QPoint,
     QPropertyAnimation,
@@ -14,8 +14,8 @@ from PyQt5.QtCore import (
     QTimer,
     pyqtProperty,
 )
-from PyQt5.QtGui import QBrush, QColor, QPainter, QPixmap
-from PyQt5.QtWidgets import QApplication, QFrame, QGraphicsBlurEffect, QLabel, QWidget
+from PyQt6.QtGui import QBrush, QColor, QPainter, QPixmap
+from PyQt6.QtWidgets import QApplication, QFrame, QGraphicsBlurEffect, QLabel, QWidget
 from qfluentwidgets import setThemeColor
 
 import conf
@@ -85,7 +85,7 @@ class tip_toast(QWidget):
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.FramelessWindowHint
-                | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(
@@ -364,13 +364,13 @@ class wave_Effect(QWidget):
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.FramelessWindowHint
-                | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(
                 Qt.WindowType.WindowStaysOnBottomHint
                 | Qt.WindowType.FramelessWindowHint
-                | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 

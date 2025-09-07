@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 import requests
 from loguru import logger
 from packaging.version import Version
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 import conf
 import list_

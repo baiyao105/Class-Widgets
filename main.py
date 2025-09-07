@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import psutil
 from loguru import logger
 from packaging.version import Version
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PyQt6 import uic
+from PyQt6.QtCore import (
     QCoreApplication,
     QEasingCurve,
     QParallelAnimationGroup,
@@ -28,7 +28,7 @@ from PyQt5.QtCore import (
     QTimer,
     QUrl,
 )
-from PyQt5.QtGui import (
+from PyQt6.QtGui import (
     QCloseEvent,
     QColor,
     QDesktopServices,
@@ -41,8 +41,8 @@ from PyQt5.QtGui import (
     QPixmap,
     QShowEvent,
 )
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import (
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
     QGraphicsBlurEffect,
@@ -835,7 +835,7 @@ class ErrorDialog(Dialog):  # 重大错误提示框
         self.close()
 
     def mousePressEvent(self, event: Any) -> None:
-        if event.button() == Qt.LeftButton and event.y() <= self.title_bar_height:
+        if event.button() == Qt.MouseButton.LeftButton and event.y() <= self.title_bar_height:
             self.is_dragging = True
             self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
 
@@ -844,7 +844,7 @@ class ErrorDialog(Dialog):  # 重大错误提示框
             self.move(event.globalPos() - self.drag_position)
 
     def mouseReleaseEvent(self, event: Any) -> None:
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
 
 
@@ -1230,9 +1230,9 @@ class openProgressDialog(QWidget):
         super().__init__()
         self.setWindowFlags(
             self.windowFlags()
-            | Qt.WindowStaysOnTopHint
+            | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.WindowDoesNotAcceptFocus
-            | Qt.Tool
+            | Qt.WindowType.Tool
         )
         time = int(config_center.read_conf('Plugin', 'aguto_delay'))
         self.action = action
@@ -1281,7 +1281,7 @@ class openProgressDialog(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+            | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -1356,9 +1356,9 @@ class FloatingWidget(QWidget):  # 浮窗
         super().__init__()
         self.setWindowFlags(
             self.windowFlags()
-            | Qt.WindowStaysOnTopHint
+            | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.WindowDoesNotAcceptFocus
-            | Qt.Tool
+            | Qt.WindowType.Tool
         )
         self.animation_rect = None
         self.animation = None
@@ -1379,7 +1379,7 @@ class FloatingWidget(QWidget):  # 浮窗
         self.countdown_progress_bar = self.findChild(ProgressRing, 'progressBar')
 
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
         # 动态获取屏幕尺寸
         screen_geometry = QApplication.primaryScreen().availableGeometry()
@@ -1539,14 +1539,14 @@ class FloatingWidget(QWidget):  # 浮窗
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.Widget
-                | Qt.BypassWindowManagerHint
+                | Qt.WindowType.BypassWindowManagerHint
             )
         else:
             flags = (
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.Tool
-                | Qt.BypassWindowManagerHint
+                | Qt.WindowType.BypassWindowManagerHint
             )
 
         self.setWindowFlags(flags)
@@ -1568,14 +1568,14 @@ class FloatingWidget(QWidget):  # 浮窗
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.Widget  # macOS 失焦时仍然显示
-                | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
         else:
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.Tool
-                | Qt.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
+                | Qt.WindowType.BypassWindowManagerHint  # 绕过窗口管理器以在全屏显示通知
             )
 
         backgnd = self.findChild(QFrame, 'backgnd')
@@ -1792,17 +1792,19 @@ class FloatingWidget(QWidget):  # 浮窗
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.m_flag = True
-            self.m_Position = event.globalPos() - self.pos()  # 获取鼠标相对窗口的位置
-            self.p_Position = event.globalPos()  # 获取鼠标相对屏幕的位置
+            self.m_Position = (
+                event.globalPosition().toPoint() - self.pos()
+            )  # 获取鼠标相对窗口的位置
+            self.p_Position = event.globalPosition().toPoint()  # 获取鼠标相对屏幕的位置
             event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if event.buttons() == Qt.MouseButton.LeftButton and self.m_flag:
-            self.move(event.globalPos() - self.m_Position)  # 更改窗口位置
+            self.move(event.globalPosition().toPoint() - self.m_Position)  # 更改窗口位置
             event.accept()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self.r_Position = event.globalPos()  # 获取鼠标相对窗口的位置
+        self.r_Position = event.globalPosition().toPoint()  # 获取鼠标相对窗口的位置
         self.m_flag = False
         # 保存位置到配置文件
         self.save_position()
@@ -1855,7 +1857,9 @@ class DesktopWidget(QWidget):  # 主要小组件
         widget_cnt: Optional[int] = None,
     ) -> None:
         super().__init__()
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowDoesNotAcceptFocus | Qt.Tool)
+        self.setWindowFlags(
+            self.windowFlags() | Qt.WindowType.WindowDoesNotAcceptFocus | Qt.WindowType.Tool
+        )
 
         self.cnt = cnt
         self.widget_cnt = widget_cnt
@@ -1953,7 +1957,7 @@ class DesktopWidget(QWidget):  # 主要小组件
 
             # 预警标签
             self.weather_alert_text = QLabel(self)
-            self.weather_alert_text.setAlignment(Qt.AlignCenter)
+            self.weather_alert_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.weather_alert_text.setStyleSheet(self.temperature.styleSheet())
             self.weather_alert_text.setFont(self.temperature.font())
             self.weather_alert_text.hide()
@@ -1968,20 +1972,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                 self.weather_alert_opacity, b"opacity"
             )
             self.weather_alert_animation.setDuration(700)
-            self.weather_alert_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.weather_alert_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.alert_icon_opacity = QGraphicsOpacityEffect(self)
             self.alert_icon_opacity.setOpacity(1.0)
             self.alert_icon.setGraphicsEffect(self.alert_icon_opacity)
             self.alert_icon_animation = QPropertyAnimation(self.alert_icon_opacity, b"opacity")
             self.alert_icon_animation.setDuration(700)
-            self.alert_icon_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.alert_icon_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
             self.showing_temperature = True  # 是否正在显示气温
             self.showing_alert = False  # 是否正在显示预警
 
             # 天气提醒标签
             self.weather_reminder_text = QLabel(self)
-            self.weather_reminder_text.setAlignment(Qt.AlignCenter)
+            self.weather_reminder_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.weather_reminder_text.setStyleSheet(self.temperature.styleSheet())
             self.weather_reminder_text.setFont(self.temperature.font())
             self.weather_reminder_text.setFixedWidth(138)
@@ -2096,7 +2100,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.fade_out_animation.setDuration(200)  # 淡出
             self.fade_out_animation.setStartValue(current_opacity)
             self.fade_out_animation.setEndValue(0.0)
-            self.fade_out_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.fade_out_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.state_animation_group.addAnimation(self.fade_out_animation)
 
         def apply_state_changes():
@@ -2106,24 +2110,24 @@ class DesktopWidget(QWidget):  # 主要小组件
                     Qt.WindowType.FramelessWindowHint
                     | Qt.WindowType.WindowStaysOnTopHint
                     | Qt.WindowType.WindowDoesNotAcceptFocus
-                    | Qt.BypassWindowManagerHint
-                    | Qt.Tool
+                    | Qt.WindowType.BypassWindowManagerHint
+                    | Qt.WindowType.Tool
                 )
             elif pin_on_top == '2':  # 置底
                 new_flags = (
                     Qt.WindowType.FramelessWindowHint
                     | Qt.WindowType.WindowStaysOnBottomHint
                     | Qt.WindowType.WindowDoesNotAcceptFocus
-                    | Qt.Tool
+                    | Qt.WindowType.Tool
                 )
             elif pin_on_top == '3':  # 置于次级底部
                 new_flags = (
                     Qt.WindowType.FramelessWindowHint
                     | Qt.WindowType.WindowDoesNotAcceptFocus
-                    | Qt.Tool
+                    | Qt.WindowType.Tool
                 )
             else:
-                new_flags = Qt.WindowType.FramelessWindowHint | Qt.Tool
+                new_flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool
             self.setWindowFlags(new_flags)
 
             QApplication.processEvents()
@@ -2156,7 +2160,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.fade_in_animation.setDuration(250)  # 淡入
             self.fade_in_animation.setStartValue(0.0)
             self.fade_in_animation.setEndValue(current_opacity)
-            self.fade_in_animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.fade_in_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
             self.fade_in_animation.start()
 
             if pin_on_top == '1':  # 置顶
@@ -3012,7 +3016,7 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.weather_alert_text.setFixedWidth(min(125, 76 + char_count * 8))
         self.weather_alert_text.setFont(font)
         self.weather_alert_text.setText(alert_text)
-        self.weather_alert_text.setAlignment(Qt.AlignCenter)
+        self.weather_alert_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         severity = current_alert.get('severity', 'unknown')
         if hasattr(self, 'alert_icon'):
             icon_path = db.get_alert_icon_by_severity(severity)

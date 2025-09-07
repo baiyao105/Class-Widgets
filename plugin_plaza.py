@@ -5,8 +5,8 @@ from random import shuffle
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from PyQt5 import uic
-from PyQt5.QtCore import (
+from PyQt6 import uic
+from PyQt6.QtCore import (
     QCoreApplication,
     QSize,
     QStringListModel,
@@ -16,8 +16,8 @@ from PyQt5.QtCore import (
     QUrl,
     pyqtSignal,
 )
-from PyQt5.QtGui import QDesktopServices, QIcon, QPixmap
-from PyQt5.QtWidgets import (
+from PyQt6.QtGui import QDesktopServices, QIcon, QPixmap
+from PyQt6.QtWidgets import (
     QCompleter,
     QGridLayout,
     QHBoxLayout,
@@ -174,7 +174,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
             icon=fIcon.DOWNLOAD,
             title='',
             content=f"正在下载 {name} (～￣▽￣)～)",
-            orient=Qt.Horizontal,
+            orient=Qt.Orientation.Horizontal,
             isClosable=False,
             position=InfoBarPosition.TOP,
             duration=-1,
@@ -235,7 +235,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         InfoBar.success(
             title='下载成功！',
             content=f"下载 {self.name} 成功！",
-            orient=Qt.Horizontal,
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=5000,
@@ -251,7 +251,7 @@ class downloadProgressBar(InfoBar):  # 下载进度条(创建下载进程)
         InfoBar.error(
             title='下载失败(っ °Д °;)っ',
             content=f"{error_info}",
-            orient=Qt.Horizontal,
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=5000,
@@ -591,7 +591,9 @@ class PluginPlaza(MSFluentWindow):
 
     def setup_latestInterface(self):  # 初始化最新更新
         latest_scroll = self.latestsInterface.findChild(SmoothScrollArea, 'latest_scroll')
-        QScroller.grabGesture(latest_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            latest_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
     def setup_searchInterface(self):  # 初始化搜索
         search_scroll = self.searchInterface.findChild(SmoothScrollArea, 'search_scroll')
@@ -669,12 +671,14 @@ class PluginPlaza(MSFluentWindow):
         self.search_completer = QCompleter(search_items, self.search_plugin)
         # 设置显示的选项数
         self.search_completer.setMaxVisibleItems(10)
-        self.search_completer.setFilterMode(Qt.MatchContains)  # 内容匹配
-        self.search_completer.setCaseSensitivity(Qt.CaseInsensitive)  # 不区分大小写
+        self.search_completer.setFilterMode(Qt.MatchFlag.MatchContains)  # 内容匹配
+        self.search_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)  # 不区分大小写
         self.search_completer.activated.connect(search_plugins)
         self.search_plugin.setCompleter(self.search_completer)
 
-        QScroller.grabGesture(search_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            search_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
     def setup_settingsInterface(self):  # 初始化设置
         # 选择代理
@@ -730,7 +734,9 @@ class PluginPlaza(MSFluentWindow):
                 self.auto_play_timer.start(2500),
             )
         )
-        QScroller.grabGesture(home_scroll.viewport(), QScroller.LeftMouseButtonGesture)
+        QScroller.grabGesture(
+            home_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture
+        )
 
     def open_banner_link(self):
         if not hasattr(self, 'img_list'):
@@ -890,7 +896,7 @@ class PluginPlaza(MSFluentWindow):
         w = InfoBar.info(
             title='需要重启',
             content='若要应用插件配置，需重启 Class Widgets',
-            orient=Qt.Horizontal,
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=-1,
