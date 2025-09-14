@@ -9,9 +9,10 @@ import signal
 import sys
 import threading
 import time
+import weakref
 from abc import ABC, abstractmethod
 from heapq import heapify, heappop, heappush
-from typing import Any, Callable, ClassVar, Dict, Optional, Tuple, Type, Union
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 if os.name == 'nt':
     import win32gui
@@ -24,6 +25,8 @@ from loguru import logger
 from PyQt5.QtCore import (
     QDir,
     QLockFile,
+    QMutex,
+    QMutexLocker,
     QObject,
     QTimer,
     QtMsgType,
@@ -88,6 +91,8 @@ LOGO_PATH = CW_HOME / "img" / "logo"
 
 _stop_in_progress = False
 update_timer: Optional['UnionUpdateTimer'] = None
+CallbackInfoType = Dict[str, Union[float, dt.datetime]]
+TaskHeapType = List[Tuple[dt.datetime, int, Callable[[], Any], float]]
 
 
 def _reset_signal_handlers() -> None:
@@ -216,9 +221,7 @@ class DarkModeWatcher(QObject):
     def __init__(self, interval: int = 500, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._isDarkMode: bool = bool(darkdetect.isDark())  # 初始状态
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._check_theme)
-        self._timer.start(interval)  # 轮询间隔(毫秒)
+        self._callback_id = update_timer.add_callback(self._check_theme, interval=interval / 1000)
 
     def _check_theme(self) -> None:
         current_mode: bool = bool(darkdetect.isDark())
@@ -232,13 +235,16 @@ class DarkModeWatcher(QObject):
 
     def stop(self) -> None:
         """停止监听"""
-        self._timer.stop()
+        if hasattr(self, '_callback_id') and self._callback_id:
+            update_timer.remove_callback(self._callback_id)
+            self._callback_id = None
 
     def start(self, interval: Optional[int] = None) -> None:
         """开始监听"""
-        if interval:
-            self._timer.setInterval(interval)
-        self._timer.start()
+        if hasattr(self, '_callback_id') and self._callback_id:
+            update_timer.remove_callback(self._callback_id)
+        interval_seconds = (interval / 1000) if interval else 0.5  # 默认0.5秒
+        self._callback_id = update_timer.add_callback(self._check_theme, interval=interval_seconds)
 
 
 class TrayIcon(QSystemTrayIcon):
@@ -284,13 +290,25 @@ class UnionUpdateTimer(QObject):
         super().__init__(parent)
         self.timer: QTimer = QTimer(self)
         self.timer.timeout.connect(self._on_timeout)
-        # 使用最小堆存储任务信息
-        self.task_heap = []  # [(next_run, id(callback), callback, interval), ...]
+        self.task_heap: TaskHeapType = []  # [(next_run, id(callback), callback, interval), ...]
         heapify(self.task_heap)
-        self.callback_info = {}  # {callback: interval}
+        self.callback_info: Dict[int, CallbackInfoType] = {}  # 使用id作为键
+        self._callback_refs: Dict[int, weakref.ReferenceType] = {}  # 弱引用存储
+        self._callback_hashes: Dict[int, int] = {}  # 回调函数哈希值验证
+        self._removed_callbacks: set = set()  # 惰性删除标记
+        self._callback_error_count: Dict[int, int] = {}  # 回调错误计数，使用id作为键
+        self._max_error_count: int = 10  # 最大错误次数, 超过自动移除
         self._is_running: bool = False
         self._base_interval: float = max(0.05, base_interval)  # 基础间隔,最小50ms
-        self._lock: threading.Lock = threading.RLock()
+        self._mutex: QMutex = QMutex()  # qt线程安全
+        self._next_check_time: Optional[dt.datetime] = None  # 下次检查时间
+        self._callback_timeout: float = 5.0  # 回调执行超时时间(秒)
+        self._timeout_timers: Dict[int, threading.Timer] = {}  # 超时定时器
+        self._cleanup_threshold: int = 50  # 触发清理的标记项数量阈值
+        self._cleanup_batch_size: int = 10  # 每次清理的最大项数
+        self._max_error_count: int = 3  # 最大错误次数
+        self._error_backoff_multiplier: float = 2.0  # 错误退避倍数
+        self._max_backoff_interval: float = 60.0  # 最大退避间隔(秒)
 
     def _on_timeout(self) -> None:
         app = QApplication.instance()
@@ -298,50 +316,230 @@ class UnionUpdateTimer(QObject):
             self._safe_stop_timer()
             return
 
-        current_time = TimeManagerFactory.get_instance().get_current_time()
+        try:
+            current_time = TimeManagerFactory.get_instance().get_current_time()
+        except Exception as e:
+            logger.error(f"获取当前时间失败: {e}")
+            raise RuntimeError("无法获得当前时间")
+        callbacks_to_run = []
         invalid_callbacks = []
 
-        with self._lock:
+        with QMutexLocker(self._mutex):
             if not self.task_heap:
                 self._is_running = False
                 self._safe_stop_timer()
                 return
-            # 处理所有到期的任务
+
+            expired_count = 0
             while self.task_heap and (self.task_heap[0][0] <= current_time):
-                _next_run, _, callback, interval = heappop(self.task_heap)
-
-                if callback not in self.callback_info:
+                _next_run, cb_id, callback, interval = heappop(self.task_heap)
+                expired_count += 1
+                if (
+                    cb_id in self._removed_callbacks
+                    or cb_id not in self._callback_refs
+                    or self._callback_refs[cb_id]() is None
+                ):
+                    self._cleanup_dead_callback(cb_id)
                     continue
-
-                try:
-                    callback()
-                    # 重新计算下次执行时间并加入堆
+                actual_callback = self._callback_refs[cb_id]()
+                if actual_callback is None or hash(actual_callback) != self._callback_hashes.get(
+                    cb_id
+                ):
+                    self._cleanup_dead_callback(cb_id)
+                    continue
+                if self._is_callback_in_backoff(cb_id):
                     next_time = current_time + dt.timedelta(seconds=interval)
-                    heappush(self.task_heap, (next_time, id(callback), callback, interval))
-                except RuntimeError as e:
-                    logger.error(f"回调调用错误 (可能对象已删除): {e}")
-                    invalid_callbacks.append(callback)
-                except TypeError as e:
-                    logger.error(f"回调函数类型错误: {e}")
-                    invalid_callbacks.append(callback)
-                except Exception as e:
-                    logger.error(f"执行回调时发生未知错误: {e}")
-                    # 其他异常可能是临时错误, 仍然重新加入堆
-                    next_time = current_time + dt.timedelta(seconds=interval)
-                    heappush(self.task_heap, (next_time, id(callback), callback, interval))
+                    self.callback_info[cb_id]['next_run'] = next_time
+                    heappush(self.task_heap, (next_time, cb_id, actual_callback, interval))
+                    continue
+                callbacks_to_run.append((actual_callback, interval, cb_id))
+                self.callback_info[cb_id]['last_run'] = current_time
+                next_time = current_time + dt.timedelta(seconds=interval)
+                self.callback_info[cb_id]['next_run'] = next_time
+                heappush(
+                    self.task_heap, (next_time, cb_id, actual_callback, interval)
+                )  # 重新加入堆
+            # if expired_count > 0:
+            #     logger.debug(f"处理 {expired_count} 个到期任务, 执行 {len(callbacks_to_run)} 个有效回调")
+        for callback, interval, cb_id in callbacks_to_run:  # 锁外执行
+            self._execute_callback_with_timeout(callback, cb_id, invalid_callbacks)
 
-            # 移除无效的回调
-            if invalid_callbacks:
-                for callback in invalid_callbacks:
-                    self.callback_info.pop(callback, None)
+        if invalid_callbacks:  # 清理无效回调
+            with QMutexLocker(self._mutex):
+                for cb_id in invalid_callbacks:
+                    self._remove_callback_from_heap(cb_id)
+                    self._cleanup_dead_callback(cb_id)
 
         if self._is_running:
             self._schedule_next()
 
     def _schedule_next(self) -> None:
-        """调度下一次执行"""
-        delay: int = int(self._base_interval * 1000)
-        self.timer.start(delay)
+        """调度器
+
+        Note: 须在已持锁的状态下调用
+        """
+        if not self.task_heap:
+            return
+
+        try:
+            current_time = TimeManagerFactory.get_instance().get_current_time()
+        except Exception as e:
+            logger.error(f"获取当前时间失败: {e}")
+            raise RuntimeError("无法获得当前时间")
+        next_task_time = self.task_heap[0][0]
+        delay_seconds = (next_task_time - current_time).total_seconds()
+        if delay_seconds <= 0:
+            delay_ms = 1  # 立即执行已到期任务
+        elif delay_seconds > 60.0:
+            delay_ms = 60000  # 最大60秒
+        else:
+            delay_ms = delay_seconds * 1000
+        delay = max(1, min(int(delay_ms), 60000))
+        self._next_check_time = current_time + dt.timedelta(milliseconds=delay)
+
+        try:
+            self.timer.start(delay)
+            # logger.debug(f"延迟={delay}ms, 全局任务数: {len(self.task_heap)}")
+        except Exception as e:
+            logger.error(f"启动定时器失败, 延迟={delay}ms: {e}")
+            fallback_delay = max(1, int(self._base_interval * 1000))
+            try:
+                self.timer.start(fallback_delay)
+                logger.debug(f"使用回退延迟={fallback_delay}ms")
+            except Exception as fallback_e:
+                logger.critical(f"回退定时器启动失败: {fallback_e}")
+                self._is_running = False
+                self._safe_stop_timer()
+                try:
+                    self.timer = QTimer(self)
+                    self.timer.timeout.connect(self._on_timeout)
+                except Exception as recreate_error:
+                    logger.critical(f"重新创建定时器失败: {recreate_error}")
+                    return
+
+    def _cleanup_dead_callback(self, cb_id: int) -> None:
+        """清理失效的回调函数"""
+        self.callback_info.pop(cb_id, None)
+        self._callback_refs.pop(cb_id, None)
+        self._callback_hashes.pop(cb_id, None)
+        self._callback_error_count.pop(cb_id, None)
+        if cb_id in self._timeout_timers:
+            timer = self._timeout_timers.pop(cb_id)
+            if timer.is_alive():
+                timer.cancel()
+
+    def _execute_callback_with_timeout(
+        self, callback: Callable[[], Any], cb_id: int, invalid_callbacks: List[int]
+    ) -> None:
+        """回调执行"""
+        callback_executed = threading.Event()
+        callback_exception = None
+
+        def timeout_handler():
+            if not callback_executed.is_set():
+                logger.warning(
+                    f"回调执行超时: {callback.__name__ if hasattr(callback, '__name__') else str(callback)}"
+                )
+                self._increment_error_count(cb_id)
+                if self._should_remove_callback(cb_id):
+                    invalid_callbacks.append(cb_id)
+
+        def execute_callback():
+            nonlocal callback_exception
+            try:
+                callback()
+                if cb_id in self._callback_error_count:
+                    with QMutexLocker(self._mutex):
+                        self._reset_error_count(cb_id)
+            except RuntimeError as e:
+                callback_exception = e
+                logger.error(
+                    f"回调调用错误 (可能对象已删除): {e}, 回调: {callback.__name__ if hasattr(callback, '__name__') else str(callback)}"
+                )
+                invalid_callbacks.append(cb_id)
+            except TypeError as e:
+                callback_exception = e
+                logger.error(
+                    f"回调函数类型错误: {e}, 回调: {callback.__name__ if hasattr(callback, '__name__') else str(callback)}"
+                )
+                invalid_callbacks.append(cb_id)
+            except Exception as e:
+                callback_exception = e
+                logger.error(
+                    f"执行回调时发生未知错误: {e}, 回调: {callback.__name__ if hasattr(callback, '__name__') else str(callback)}"
+                )
+                self._increment_error_count(cb_id)
+                if self._should_remove_callback(cb_id):
+                    invalid_callbacks.append(cb_id)
+            finally:
+                callback_executed.set()
+
+        timeout_timer = threading.Timer(self._callback_timeout, timeout_handler)
+        self._timeout_timers[cb_id] = timeout_timer
+        timeout_timer.start()
+        try:
+            execute_callback()
+        finally:
+            if cb_id in self._timeout_timers:
+                timer = self._timeout_timers.pop(cb_id)
+                if timer.is_alive():
+                    timer.cancel()
+
+    def _remove_callback_from_heap(self, cb_id: int) -> None:
+        """移除回调"""
+        self._removed_callbacks.add(cb_id)
+        removed_count = len(self._removed_callbacks)
+        heap_size = len(self.task_heap)
+        # 当移除数量超过堆大小的1/3或移除数量超过10个时触发清理
+        if removed_count > max(heap_size // 3, 10) or removed_count > 50:
+            self._cleanup_heap()
+
+    def _cleanup_heap(self) -> None:
+        """批量清理"""
+        if len(self._removed_callbacks) < self._cleanup_threshold:
+            return
+        new_heap = []
+        cleaned_count = 0
+        for next_run, cb_id, callback, interval in self.task_heap:
+            if cb_id in self._removed_callbacks and cleaned_count < self._cleanup_batch_size:
+                cleaned_count += 1
+                self._removed_callbacks.discard(cb_id)
+            else:
+                new_heap.append((next_run, cb_id, callback, interval))
+
+        self.task_heap = new_heap
+        heapify(self.task_heap)
+
+    def _increment_error_count(self, cb_id: int) -> None:
+        """增加回调错误计数"""
+        error_info = self._callback_error_count.get(cb_id, {'count': 0, 'backoff_until': None})
+        error_info['count'] += 1
+        if error_info['count'] > 1:
+            backoff_seconds = min(
+                self._error_backoff_multiplier ** (error_info['count'] - 1),
+                self._max_backoff_interval,
+            )
+            current_time = TimeManagerFactory.get_instance().get_current_time()
+            error_info['backoff_until'] = current_time + dt.timedelta(seconds=backoff_seconds)
+        self._callback_error_count[cb_id] = error_info
+
+    def _should_remove_callback(self, cb_id: int) -> bool:
+        """判断是否应该移除回调"""
+        error_info = self._callback_error_count.get(cb_id, {'count': 0})
+        return error_info['count'] >= self._max_error_count
+
+    def _is_callback_in_backoff(self, cb_id: int) -> bool:
+        """检查回调是否处于退避状态"""
+        error_info = self._callback_error_count.get(cb_id, {})
+        backoff_until = error_info.get('backoff_until')
+        if backoff_until is None:
+            return False
+        current_time = TimeManagerFactory.get_instance().get_current_time()
+        return current_time < backoff_until
+
+    def _reset_error_count(self, cb_id: int) -> None:
+        """重置回调错误计数"""
+        self._callback_error_count.pop(cb_id, None)
 
     def _safe_stop_timer(self) -> None:
         """安全停止定时器"""
@@ -354,99 +552,156 @@ class UnionUpdateTimer(QObject):
                 logger.error(f"停止 QTimer 时发生未知错误: {e}")
 
     def add_callback(self, callback: Callable[[], Any], interval: float = 1.0) -> None:
-        """添加回调函数
+        """添加回调函数到定时器
 
         Args:
-            callback: 回调函数
-            interval: 刷新间隔(s),默认1秒
+            callback: 要执行的回调函数
+            interval: 执行间隔(秒), 默认1秒, 最小0.1秒
+
+        Raises:
+            TypeError: 当callback不是可调用对象时
         """
         if not callable(callback):
             raise TypeError("回调必须是可调用对象")
+        try:
+            callback_hash = hash(callback)
+        except TypeError:
+            raise TypeError("回调函数必须是可哈希的")
+        # logger.debug(f"添加回调: {callback.__name__ if hasattr(callback, '__name__') else str(callback)}, 间隔: {interval}秒")
         interval = max(0.1, interval)
         current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
         next_run = current_time + dt.timedelta(seconds=interval)
-        with self._lock:
-            if callback not in self.callback_info:
-                self.callback_info[callback] = interval
-                heappush(self.task_heap, (next_run, id(callback), callback, interval))
-                should_start = not self._is_running
-            else:
-                # 更新间隔
-                self.callback_info[callback] = interval
-                self.task_heap = [
-                    (t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback
-                ]
-                heapify(self.task_heap)
-                heappush(self.task_heap, (next_run, id(callback), callback, interval))
-                should_start = False
+        cb_id = id(callback)
+
+        with QMutexLocker(self._mutex):
+            if cb_id in self.callback_info:
+                self._removed_callbacks.add(cb_id)
+                if cb_id in self._timeout_timers:
+                    timer = self._timeout_timers.pop(cb_id)
+                    if timer.is_alive():
+                        timer.cancel()
+            self.callback_info[cb_id] = {
+                'interval': interval,
+                'last_run': current_time,
+                'next_run': next_run,
+            }
+
+            def cleanup_callback(ref):
+                with QMutexLocker(self._mutex):
+                    self._cleanup_dead_callback(cb_id)
+
+            self._callback_refs[cb_id] = weakref.ref(callback, cleanup_callback)
+            self._callback_hashes[cb_id] = callback_hash
+            heappush(self.task_heap, (next_run, cb_id, callback, interval))
+            should_start = not self._is_running
 
         if should_start:
             self.start()
 
     def remove_callback(self, callback: Callable[[], Any]) -> None:
-        """移除回调函数"""
-        with self._lock:
-            if callback in self.callback_info:
-                self.task_heap = [
-                    (t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback
-                ]
-                heapify(self.task_heap)
-                if not self.task_heap:
+        """移除回调函数
+
+        Args:
+            callback: 要移除的回调函数
+        """
+        cb_id = id(callback)
+        with QMutexLocker(self._mutex):
+            if cb_id in self.callback_info:
+                self._remove_callback_from_heap(cb_id)
+                self._cleanup_dead_callback(cb_id)
+                if not self.task_heap:  # 如果没有任务, 停止定时器
                     self._is_running = False
                     self._safe_stop_timer()
 
     def remove_all_callbacks(self) -> None:
-        """移除所有回调函数"""
-        with self._lock:
+        """移除所有已注册的回调函数"""
+        with QMutexLocker(self._mutex):
             self.callback_info.clear()
+            self._callback_refs.clear()
+            self._callback_hashes.clear()
             self.task_heap.clear()
+            self._removed_callbacks.clear()
+            self._callback_error_count.clear()
             self._is_running = False
             self._safe_stop_timer()
 
     def start(self) -> None:
-        """启动定时器"""
-        with self._lock:
-            if not self._is_running and self.task_heap:
-                logger.debug("启动 UnionUpdateTimer...")
-                self._is_running = True
-                self._schedule_next()
-            elif not self.task_heap:
-                logger.warning("没有回调函数")
+        """启动定时器
+
+        Note:
+            已在运行时无效
+        """
+        with QMutexLocker(self._mutex):
+            if self._is_running:
+                # logger.waring("定时器已在运行")
+                return
+            if not self.task_heap:
+                logger.debug("任务堆为空")
+                return
+            # logger.debug(f"当前任务数: {len(self.task_heap)}")
+            self._is_running = True
+            logger.debug("启动 UnionUpdateTimer...")
+            self._schedule_next()
 
     def stop(self) -> None:
         """停止定时器"""
-        with self._lock:
-            self._is_running = False
+        with QMutexLocker(self._mutex):
+            if self._is_running:
+                # logger.debug(f"当前任务数: {len(self.task_heap)}")
+                self._is_running = False
+            else:
+                logger.debug("定时器未运行")
         self._safe_stop_timer()
         logger.debug("UnionUpdateTimer 已停止")
 
     def set_callback_interval(self, callback: Callable[[], Any], interval: float) -> bool:
-        """设置特定回调函数的间隔(s)"""
+        """设置特定回调函数的执行间隔(s)
+
+        Args:
+            callback: 目标回调函数
+            interval: 新的执行间隔(秒), 最小0.1秒
+
+        Returns:
+            bool: 成功True, 不存在False
+        """
         interval = max(0.1, interval)
         current_time = TimeManagerFactory.get_instance().get_current_time()
         next_run = current_time + dt.timedelta(seconds=interval)
-        with self._lock:
-            if callback in self.callback_info:
-                # 更新间隔重新加入堆
-                self.callback_info[callback] = interval
-                self.task_heap = [
-                    (t, cb_id, cb, i) for t, cb_id, cb, i in self.task_heap if cb != callback
-                ]
-                heapify(self.task_heap)
-                heappush(self.task_heap, (next_run, id(callback), callback, interval))
+        cb_id = id(callback)
+
+        with QMutexLocker(self._mutex):
+            if cb_id in self.callback_info:
+                self.callback_info[cb_id]['interval'] = interval
+                self.callback_info[cb_id]['next_run'] = next_run
+                self._remove_callback_from_heap(cb_id)
+                heappush(self.task_heap, (next_run, cb_id, callback, interval))
                 return True
             return False
 
     def get_callback_interval(self, callback: Callable[[], Any]) -> Optional[float]:
-        """获取特定回调函数的间隔"""
-        with self._lock:
-            return self.callback_info.get(callback)
+        """获取特定回调函数的执行间隔(s)
+
+        Args:
+            callback: 目标回调函数
+
+        Returns:
+            Optional[float]: 回调间隔(秒), 不存在则返回None
+        """
+        cb_id = id(callback)
+        with QMutexLocker(self._mutex):
+            if cb_id in self.callback_info:
+                interval = self.callback_info[cb_id]['interval']
+                return float(interval) if isinstance(interval, (int, float)) else None
+            return None
 
     def set_base_interval(self, interval: float) -> None:
-        """设置基础检查时间(s)"""
-        # 意义不明x3
+        """设置基础检查间隔时间(s)
+
+        Args:
+            interval: 新的基础间隔时间, 最小值为0.05秒
+        """
         new_interval: float = max(0.05, interval)
-        with self._lock:
+        with QMutexLocker(self._mutex):
             self._base_interval = new_interval
             was_running: bool = self._is_running
         if was_running:
@@ -458,27 +713,55 @@ class UnionUpdateTimer(QObject):
         return self._base_interval
 
     def get_callback_count(self) -> int:
-        """获取当前回调函数数量"""
-        with self._lock:
+        """获取当前已注册的回调函数数量
+
+        Returns:
+            int: 回调函数的总数
+        """
+        with QMutexLocker(self._mutex):
             return len(self.callback_info)
 
-    def get_callback_info(self) -> Dict[Callable[[], Any], Dict[str, Union[float, dt.datetime]]]:
-        """获取所有回调函数的详细信息"""
-        with self._lock:
-            info: Dict[Callable[[], Any], Dict[str, Union[float, dt.datetime]]] = {}
+    def get_callback_info(self) -> Dict[Callable[[], Any], CallbackInfoType]:
+        """获取所有回调函数的详细信息
+
+        Returns:
+            Dict: 回调函数到其信息的映射，包含间隔时间和下次执行时间
+        """
+        with QMutexLocker(self._mutex):
+            info: Dict[Callable[[], Any], CallbackInfoType] = {}
             current_time: dt.datetime = TimeManagerFactory.get_instance().get_current_time()
-            for callback, data in self.callback_info.items():
-                info[callback] = {
-                    'interval': data['interval'],
-                    'last_run': data['last_run'],
-                    'next_run': data['next_run'],
-                    'time_until_next': (
-                        (data['next_run'] - current_time).total_seconds()
-                        if isinstance(data['next_run'], dt.datetime)
-                        else 0.0
-                    ),
-                }
+            for cb_id, data in self.callback_info.items():
+                if cb_id in self._callback_refs:
+                    callback = self._callback_refs[cb_id]()
+                    if callback is not None:
+                        callback_info: CallbackInfoType = {
+                            'interval': data['interval'],
+                            'last_run': data['last_run'],
+                            'next_run': data['next_run'],
+                            'time_until_next': (
+                                (data['next_run'] - current_time).total_seconds()
+                                if isinstance(data['next_run'], dt.datetime)
+                                else 0.0
+                            ),
+                        }
+                        info[callback] = callback_info
             return info
+
+    def get_next_check_time(self) -> Optional[dt.datetime]:
+        """获取下次检查时间"""
+        return self._next_check_time
+
+    def get_heap_size(self) -> int:
+        """获取当前任务堆中的任务数量
+
+        Returns:
+            int: 堆中待执行任务的数量
+
+        Note:
+            可能包含已标记删除的任务
+        """
+        with QMutexLocker(self._mutex):
+            return len(self.task_heap)
 
     def is_running(self) -> bool:
         """检查定时器是否正在运行"""
@@ -873,7 +1156,7 @@ class SingleInstanceGuard:
         self.lock_file = QLockFile(lock_path)
         self.lock_acquired = False
 
-    def try_acquire(self, timeout=100):
+    def try_acquire(self, timeout: int = 100):
         self.lock_acquired = self.lock_file.tryLock(timeout)
         return self.lock_acquired
 
@@ -906,10 +1189,7 @@ class PreviousWindowFocusManager(QObject):
         self.restore_requested.connect(self.restore)
         self.ignore.connect(self.ignore_hwnds.add)
         self.remove_ignore.connect(self.ignore_hwnds.discard)
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self.store)
-        self._timer.setInterval(200)
-        self._timer.start()
+        self._callback_id = update_timer.add_callback(self.store, interval=0.2)
 
     def store(self):
         """记录当前前台窗口句柄"""
@@ -922,7 +1202,9 @@ class PreviousWindowFocusManager(QObject):
     def restore(self, delay_ms=0):
         """
         恢复焦点到上一个窗口
-        delay_ms: 延迟执行毫秒数 (部分系统需要延迟才能成功)
+
+        Args:
+            delay_ms: 延迟执行毫秒数 (部分系统需要延迟才能成功)
         """
         # logger.debug(f"请求恢复焦点,延迟 {delay_ms} ms")
         QTimer.singleShot(delay_ms, self._do_restore)
@@ -940,7 +1222,9 @@ class PreviousWindowFocusManager(QObject):
 
     def stop(self):
         """停止焦点管理器"""
-        self._timer.stop()
+        if hasattr(self, '_callback_id') and self._callback_id:
+            update_timer.remove_callback(self._callback_id)
+            self._callback_id = None
         self._last_hwnd = None
 
 

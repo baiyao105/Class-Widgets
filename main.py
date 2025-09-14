@@ -2034,11 +2034,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             self.current_reminder_index = 0  # 当前提醒索引
             self.showing_reminder = False  # 是否正在显示提醒
 
-            self.weather_timer = QTimer(self)
             refresh_interval = int(config_center.read_conf('Weather', 'refresh_interval'))
-            self.weather_timer.setInterval(refresh_interval * 60 * 1000)  # 从配置读取间隔
-            self.weather_timer.timeout.connect(self.get_weather_data)
-            self.weather_timer.start()
+            self.weather_callback_id = update_timer.add_callback(
+                self.get_weather_data, interval=refresh_interval * 60  # 转换为秒
+            )
             self.get_weather_data()
             update_timer.add_callback(self.detect_weather_code_changed)
 
@@ -3315,11 +3314,11 @@ class DesktopWidget(QWidget):  # 主要小组件
     def update_weather_timer_interval(self, minutes: int) -> None:
         """更新天气定时器间隔"""
         try:
-            if hasattr(self, 'weather_timer') and self.weather_timer:
-                self.weather_timer.stop()
-                new_interval = minutes * 60 * 1000
-                self.weather_timer.setInterval(new_interval)
-                self.weather_timer.start()
+            if hasattr(self, 'weather_callback_id') and self.weather_callback_id:
+                update_timer.remove_callback(self.weather_callback_id)
+                self.weather_callback_id = update_timer.add_callback(
+                    self.get_weather_data, interval=minutes * 60  # 转换为秒
+                )
                 # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
                 if settings and hasattr(settings, 'weather_refresh_picker'):
                     if settings.weather_refresh_picker:
