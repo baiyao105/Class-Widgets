@@ -551,12 +551,15 @@ class UnionUpdateTimer(QObject):
             except Exception as e:
                 logger.error(f"停止 QTimer 时发生未知错误: {e}")
 
-    def add_callback(self, callback: Callable[[], Any], interval: float = 1.0) -> None:
+    def add_callback(self, callback: Callable[[], Any], interval: float = 1.0) -> int:
         """添加回调函数到定时器
 
         Args:
             callback: 要执行的回调函数
             interval: 执行间隔(秒), 默认1秒, 最小0.1秒
+
+        Returns:
+            int: 回调函数的唯一ID
 
         Raises:
             TypeError: 当callback不是可调用对象时
@@ -598,6 +601,8 @@ class UnionUpdateTimer(QObject):
         if should_start:
             self.start()
 
+        return cb_id
+
     def remove_callback(self, callback: Callable[[], Any]) -> None:
         """移除回调函数
 
@@ -605,10 +610,18 @@ class UnionUpdateTimer(QObject):
             callback: 要移除的回调函数
         """
         cb_id = id(callback)
+        self.remove_callback_by_id(cb_id)
+
+    def remove_callback_by_id(self, callback_id: int) -> None:
+        """通过回调ID移除回调函数
+
+        Args:
+            callback_id: 回调函数的ID
+        """
         with QMutexLocker(self._mutex):
-            if cb_id in self.callback_info:
-                self._remove_callback_from_heap(cb_id)
-                self._cleanup_dead_callback(cb_id)
+            if callback_id in self.callback_info:
+                self._remove_callback_from_heap(callback_id)
+                self._cleanup_dead_callback(callback_id)
                 if not self.task_heap:  # 如果没有任务, 停止定时器
                     self._is_running = False
                     self._safe_stop_timer()

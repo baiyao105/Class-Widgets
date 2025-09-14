@@ -3315,14 +3315,11 @@ class DesktopWidget(QWidget):  # 主要小组件
         """更新天气定时器间隔"""
         try:
             if hasattr(self, 'weather_callback_id') and self.weather_callback_id:
-                update_timer.remove_callback(self.weather_callback_id)
-                self.weather_callback_id = update_timer.add_callback(
-                    self.get_weather_data, interval=minutes * 60  # 转换为秒
-                )
-                # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
-                if settings and hasattr(settings, 'weather_refresh_picker'):
-                    if settings.weather_refresh_picker:
-                        settings.weather_refresh_picker.setValue(minutes)
+                update_timer.remove_callback_by_id(self.weather_callback_id)
+            self.weather_callback_id = update_timer.add_callback(
+                self.get_weather_data, interval=minutes * 60  # 转换为秒
+            )
+            # logger.debug(f'天气定时器间隔已更新为 {minutes} 分钟')
         except Exception as e:
             logger.error(f'更新天气定时器间隔失败: {e}')
 
