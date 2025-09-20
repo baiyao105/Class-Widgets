@@ -544,7 +544,7 @@ jobs:
           cd dist && mv ClassWidgets "${zip_name}" && zip -r -q "../packages/${zip_name}.zip" "${zip_name}"/* && cd ..
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-build
           path: ./packages
@@ -585,7 +585,7 @@ jobs:
 
       - name: Upload exe for signing
         id: upload-for-signing
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-exe-unsigned
           path: ./exe-only
@@ -621,7 +621,7 @@ jobs:
           }
 
       - name: Upload signed application
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-signed
           path: ./signed-packages
@@ -733,7 +733,7 @@ jobs:
           fi
 
       - name: Upload final packages
-        uses: actions/upload-artifact@4
+        uses: actions/upload-artifact@v4
         with:
           name: ClassWidgets-Packages
           path: final-packages
