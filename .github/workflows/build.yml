@@ -437,7 +437,7 @@ jobs:
           uv sync --group package --no-dev
           uv python upgrade ${{ env.PYTHON_VERSION }} || true
           echo "[DEBUG] $(uvx python --version) | $(python --version)" || true
-          echo "[DEBUG] uv python list --only-installed" || true
+          echo "[DEBUG] $(uv python list --only-installed)" || true
 
       - name: Prepare output directory
         run: |
