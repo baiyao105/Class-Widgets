@@ -436,6 +436,7 @@ jobs:
         run: |
           uv sync --group package --no-dev
           uv python upgrade ${{ env.PYTHON_VERSION }} || true
+          uv python update-shell || true
           echo "::group::Python-Version"
           echo "uvx-python: $(uvx python --version) | system-python: $(python --version)" || true
           echo "已安装的Python包:"
