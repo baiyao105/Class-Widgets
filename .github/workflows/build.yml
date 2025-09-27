@@ -568,7 +568,7 @@ jobs:
       matrix:
         arch: [x64, x86]
     steps:
-      - name: Checkout repository 
+      - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -600,7 +600,7 @@ jobs:
           fi
 
       - name: Update WiX Version and ProductCode
-        if:  needs.prepare.outputs.build_type == 'Release'
+        if: needs.prepare.outputs.build_type == 'Release'
         shell: bash
         run: |
           VERSION="${{ needs.prepare.outputs.release_version }}"
@@ -741,7 +741,7 @@ jobs:
             ["macos-arm64"]="macos"
             ["linux-x64"]="linux"
           )
-          
+
           declare -A artifact_cache
           for artifact_dir in ./all-artifacts/*/; do
             if [[ -d "$artifact_dir" ]]; then
@@ -749,7 +749,7 @@ jobs:
               artifact_cache["$dir_name"]="$artifact_dir"
             fi
           done
-          
+
           process_file() {
             local source_file=$1
             local target_name=$2
@@ -773,7 +773,7 @@ jobs:
           }
           for platform in "${!platforms[@]}"; do
             platform_type="${platforms[$platform]}"
-            
+
             if [[ "$platform_type" == "windows" ]]; then
               # Windows 平台：优先使用签名版本
               build_signed_key="${platform}-build-signed"
@@ -837,12 +837,12 @@ jobs:
               fi
             fi
           done
-          
+
           echo "package-count=$package_count" >> $GITHUB_OUTPUT
           if [[ $package_count -eq 0 ]]; then
             echo "[DEBUG] 没有找到任何包文件"
           fi
-          
+
           echo "[DEBUG] 最终包列表:"
           ls -la final-packages/ || true
 
