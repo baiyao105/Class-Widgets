@@ -89,20 +89,22 @@ if config_center.read_conf("Other", "do_not_log") == "0":
 else:
     logger.info("已禁用日志输出功能, 若需保存日志, 请在“设置”->“高级选项”中关闭禁用日志功能")
 
-LOGO_PATH = CW_HOME / "img" / "logo"
-
-update_timer: Optional['UnionUpdateTimer'] = None
-
 
 def run_once(func: Callable) -> Callable:
-    """装饰器: 确保函数只执行一次"""
+    """装饰器: 只执行一次"""
+
     def wrapper(*args, **kwargs):
         if not wrapper.has_run:
             wrapper.has_run = True
             return func(*args, **kwargs)
         return None
+
     wrapper.has_run = False
     return wrapper
+
+
+update_timer: Optional['UnionUpdateTimer'] = None
+LOGO_PATH = CW_HOME / "img" / "logo"
 CallbackInfoType = Dict[str, Union[float, dt.datetime]]
 TaskHeapType = List[Tuple[dt.datetime, int, Callable[[], Any], float]]
 
@@ -1163,6 +1165,8 @@ class TimeManagerFactory:
             # Note: 不再修改其他模块的引用
             globals()['time_manager'] = cls._instance
 
+        return cls._instance
+
 
 main_mgr = None
 
@@ -1245,7 +1249,12 @@ class PreviousWindowFocusManager(QObject):
         self._last_hwnd = None
 
 
-def _create_shortcut(target_path: str, shortcut_path: Path, icon_path: Optional[str] = None, description: str = "Class Widgets") -> bool:
+def _create_shortcut(
+    target_path: str,
+    shortcut_path: Path,
+    icon_path: Optional[str] = None,
+    description: str = "Class Widgets",
+) -> bool:
     """创建快捷方式"""
     if os.name != 'nt':
         logger.error("仅支持 Windows")
@@ -1272,6 +1281,7 @@ def _create_shortcut(target_path: str, shortcut_path: Path, icon_path: Optional[
         logger.error(f"创建快捷方式失败: {e}")
     return False
 
+
 def add_shortcut(exe_name: str, icon_path: Optional[str] = None) -> bool:
     """添加桌面快捷方式"""
     if os.name != 'nt':
@@ -1288,7 +1298,9 @@ def add_shortcut_to_startmenu(exe_path: str, icon_path: Optional[str] = None) ->
     if os.name != 'nt':
         logger.error("仅支持 Windows")
         return False
-    start_menu_path = Path(os.environ['APPDATA']) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
+    start_menu_path = (
+        Path(os.environ['APPDATA']) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
+    )
     shortcut_path = start_menu_path / 'Class Widgets.lnk'
     return _create_shortcut(exe_path, shortcut_path, icon_path)
 
@@ -1298,7 +1310,14 @@ def add_to_startup() -> bool:
     if os.name != 'nt':
         logger.error("仅支持 Windows")
         return False
-    startup_path = Path(os.environ['APPDATA']) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
+    startup_path = (
+        Path(os.environ['APPDATA'])
+        / 'Microsoft'
+        / 'Windows'
+        / 'Start Menu'
+        / 'Programs'
+        / 'Startup'
+    )
     shortcut_path = startup_path / 'Class Widgets.lnk'
     target_path = str(CW_HOME / 'ClassWidgets.exe')
     icon_path = str(CW_HOME / 'img' / 'favicon.ico')
@@ -1311,7 +1330,14 @@ def remove_from_startup() -> bool:
         logger.error("仅支持 Windows")
         return False
     try:
-        startup_path = Path(os.environ['APPDATA']) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
+        startup_path = (
+            Path(os.environ['APPDATA'])
+            / 'Microsoft'
+            / 'Windows'
+            / 'Start Menu'
+            / 'Programs'
+            / 'Startup'
+        )
         shortcut_path = startup_path / 'Class Widgets.lnk'
         if shortcut_path.exists():
             shortcut_path.unlink()

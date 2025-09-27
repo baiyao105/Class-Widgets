@@ -24,6 +24,11 @@ on:
         required: false
         default: false
         type: boolean
+      build_msi:
+        description: "构建MSI安装包"
+        required: false
+        default: true
+        type: boolean
       win32_x64:
         description: "win32-x64"
         required: false
@@ -69,6 +74,11 @@ on:
         description: "是否签名"
         required: false
         default: false
+        type: boolean
+      build_msi:
+        description: "构建MSI安装包"
+        required: false
+        default: true
         type: boolean
       win32_x64:
         description: "win32-x64"
@@ -495,6 +505,27 @@ jobs:
             zip_name="Windows-${{ matrix.arch }}_debug-${GITHUB_RUN_ID}"
           fi
           cd dist && mv ClassWidgets "${zip_name}" && ../zip.exe -r -q "../packages/${zip_name}.zip" "${zip_name}"/* && cd ..
+
+      - name: Update WiX version
+        if: startsWith(matrix.os, 'windows') && needs.prepare.outputs.is_signing == 'true' && needs.prepare.outputs.build_type == 'Release'
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare.outputs.release_version }}"
+          if [[ -z "$VERSION" ]]; then
+            VERSION="1.0.0.0"
+          fi
+          # 更新 WiX 文件中的版本号
+          sed -i "s/Version=\"[^\"]*\"/Version=\"$VERSION\"/g" installer/ClassWidgets.wxs
+          echo "[DEBUG] Updated WiX version to: $VERSION"
+
+      - name: Build Windows MSI
+        if: startsWith(matrix.os, 'windows') && needs.prepare.outputs.is_signing == 'true' && needs.prepare.outputs.build_type == 'Release'
+        uses: utilitywarehouse/ghaction-wix@main
+        with:
+          wix-project-file: installer/ClassWidgets.wxs
+          wix-project-directory: dist/ClassWidgets
+          output-directory: packages
+          output-name: ClassWidgets-Windows-${{ matrix.arch }}.msi
 
       - name: Build macOS (pyinstaller)
         if: startsWith(matrix.os, 'macos')

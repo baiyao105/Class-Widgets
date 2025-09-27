@@ -15,9 +15,6 @@ from data_model import ThemeConfig, ThemeInfo
 from file import config_center
 from utils import TimeManagerFactory
 
-if os.name == 'nt':
-    from win32com.client import Dispatch
-
 conf = config.ConfigParser()
 name = 'Class Widgets'
 
