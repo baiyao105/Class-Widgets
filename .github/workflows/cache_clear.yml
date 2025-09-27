@@ -16,10 +16,9 @@ on:
         required: false
         type: string
       cache_key_pattern:
-        description: "缓存键匹配模式(支持通配符*)"
+        description: "缓存键匹配"
         required: false
         type: string
-        default: ""
       max_delete_count:
         description: "最大删除条数(可选,默认全部)"
         required: false
@@ -33,7 +32,7 @@ on:
         required: true
         type: string
       cache_key_pattern:
-        description: "缓存键匹配模式(支持通配符*)"
+        description: "缓存键匹配"
         required: false
         type: string
 
