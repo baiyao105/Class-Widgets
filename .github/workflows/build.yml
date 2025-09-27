@@ -24,11 +24,6 @@ on:
         required: false
         default: false
         type: boolean
-      build_msi:
-        description: "构建MSI安装包"
-        required: false
-        default: true
-        type: boolean
       win32_x64:
         description: "win32-x64"
         required: false
@@ -74,11 +69,6 @@ on:
         description: "是否签名"
         required: false
         default: false
-        type: boolean
-      build_msi:
-        description: "构建MSI安装包"
-        required: false
-        default: true
         type: boolean
       win32_x64:
         description: "win32-x64"
@@ -506,7 +496,7 @@ jobs:
           fi
           cd dist && mv ClassWidgets "${zip_name}" && ../zip.exe -r -q "../packages/${zip_name}.zip" "${zip_name}"/* && cd ..
 
-      - name: Update WiX version
+      - name: Update WiX Version and ProductCode
         if: startsWith(matrix.os, 'windows') && needs.prepare.outputs.is_signing == 'true' && needs.prepare.outputs.build_type == 'Release'
         shell: bash
         run: |
@@ -514,9 +504,12 @@ jobs:
           if [[ -z "$VERSION" ]]; then
             VERSION="1.0.0.0"
           fi
-          # 更新 WiX 文件中的版本号
+          PRODUCT_CODE=$(echo -n "$VERSION" | md5sum | awk '{print $1}')
+          PRODUCT_CODE="${PRODUCT_CODE:0:8}-${PRODUCT_CODE:8:4}-${PRODUCT_CODE:12:4}-${PRODUCT_CODE:16:4}-${PRODUCT_CODE:20:12}"
+          sed -i "0,/<Product/ s/Id=\"[^\"]*\"/Id=\"$PRODUCT_CODE\"/" installer/ClassWidgets.wxs
           sed -i "s/Version=\"[^\"]*\"/Version=\"$VERSION\"/g" installer/ClassWidgets.wxs
           echo "[DEBUG] Updated WiX version to: $VERSION"
+          echo "[DEBUG] Updated ProductCode to: $PRODUCT_CODE"
 
       - name: Build Windows MSI
         if: startsWith(matrix.os, 'windows') && needs.prepare.outputs.is_signing == 'true' && needs.prepare.outputs.build_type == 'Release'

@@ -5,14 +5,17 @@
            Language="1033"
            Version="1.0.0.0"
            Manufacturer="Class Widgets"
-           UpgradeCode="12345678-1234-1234-1234-123456789012">
+           UpgradeCode="abe5d8e8-35c1-4375-8650-40638580aa50">
 
     <Package InstallerVersion="200"
              Compressed="yes"
              InstallScope="perMachine"
              Description="Class Widgets 1 - 桌面课程表" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="检测到已安装更新版本的 [ProductName]。"
+                  Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="yes"
+                  AllowDowngrades="no" />
 
     <MediaTemplate EmbedCab="yes" />
 
