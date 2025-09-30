@@ -327,13 +327,11 @@ class UnionUpdateTimer(QObject):
         executed_count = 0
         while self.task_heap and (self.task_heap[0][0] <= current_time):
             _next_run, cb_id, callback, interval = heappop(self.task_heap)
-            if (cb_id not in self._callback_refs or
-                self._callback_refs[cb_id]() is None):
+            if cb_id not in self._callback_refs or self._callback_refs[cb_id]() is None:
                 self._cleanup_dead_callback(cb_id)
                 continue
             actual_callback = self._callback_refs[cb_id]()
-            if (actual_callback is None or
-                hash(actual_callback) != self._callback_hashes.get(cb_id)):
+            if actual_callback is None or hash(actual_callback) != self._callback_hashes.get(cb_id):
                 self._cleanup_dead_callback(cb_id)
                 continue
             try:
@@ -342,7 +340,9 @@ class UnionUpdateTimer(QObject):
                     del self._callback_error_count[cb_id]
                 executed_count += 1
             except Exception as e:
-                logger.error(f"回调执行失败: {e}, 回调: {actual_callback.__name__ if hasattr(actual_callback, '__name__') else str(actual_callback)}")
+                logger.error(
+                    f"回调执行失败: {e}, 回调: {actual_callback.__name__ if hasattr(actual_callback, '__name__') else str(actual_callback)}"
+                )
                 self._increment_error_count(cb_id)
                 if self._should_remove_callback(cb_id):
                     self._cleanup_dead_callback(cb_id)
