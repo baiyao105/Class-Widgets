@@ -337,14 +337,6 @@ jobs:
             brew link --overwrite --force gettext || true
           fi
 
-      - name: Setup Python & uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          activate-environment: true
-          enable-cache: true
-          prune-cache: false
-
       - name: Cache Python
         uses: actions/cache@v4
         with:
@@ -352,6 +344,14 @@ jobs:
             ~\AppData\Roaming\uv\python
             ~.local/share/uv/python
           key: ${{ runner.os }}-${{ matrix.arch }}-python${{ env.PYTHON_VERSION }}
+
+      - name: Setup Python & uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: true
+          enable-cache: true
+          prune-cache: false
 
       - name: Python Syntax Check
         id: syntax_check
