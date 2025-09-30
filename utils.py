@@ -103,7 +103,6 @@ def run_once(func: Callable) -> Callable:
     return wrapper
 
 
-update_timer: Optional['UnionUpdateTimer'] = None
 LOGO_PATH = CW_HOME / "img" / "logo"
 CallbackInfoType = Dict[str, Union[float, dt.datetime]]
 TaskHeapType = List[Tuple[dt.datetime, int, Callable[[], Any], float]]
@@ -1007,7 +1006,7 @@ class NTPTimeManager(TimeManagerInterface):
                 self._ntp_reference_time = ntp_time_local
                 self._ntp_reference_timestamp = time.time()
             logger.debug(
-                f"NTP同步成功: 服务器={ntp_server},时间={ntp_time_local}({timezone_setting}),延迟={response.delay:.3f}秒"
+                f"NTP同步成功: 服务器={ntp_server},时间={ntp_time_local}(local),延迟={response.delay:.3f}秒"
             )
             return True
         except Exception as e:
@@ -1017,10 +1016,13 @@ class NTPTimeManager(TimeManagerInterface):
     def _convert_to_local_time(self, utc_time: dt.datetime, timezone_setting: str) -> dt.datetime:
         """将UTC时间转换为本地时间"""
         if not timezone_setting or timezone_setting == 'local':
-            local_offset = -time.timezone
-            if time.daylight and time.localtime().tm_isdst:
-                local_offset = -time.altzone
-            return utc_time.replace(tzinfo=None) + dt.timedelta(seconds=local_offset)
+            local_tz = dt.datetime.now().astimezone().tzinfo
+            if utc_time.tzinfo is None:
+                utc_time_with_tz = utc_time.replace(tzinfo=dt.timezone.utc)
+            else:
+                utc_time_with_tz = utc_time
+            local_time = utc_time_with_tz.astimezone(local_tz)
+            return local_time.replace(tzinfo=None)
         try:
             utc_tz = pytz.UTC
             target_tz = pytz.timezone(timezone_setting)
@@ -1030,10 +1032,13 @@ class NTPTimeManager(TimeManagerInterface):
             return local_time.replace(tzinfo=None)
         except Exception as e:
             logger.warning(f"时区转换失败,回退系统时区: {e}")
-            local_offset = -time.timezone
-            if time.daylight and time.localtime().tm_isdst:
-                local_offset = -time.altzone
-            return utc_time.replace(tzinfo=None) + dt.timedelta(seconds=local_offset)
+            local_tz = dt.datetime.now().astimezone().tzinfo
+            if utc_time.tzinfo is None:
+                utc_time_with_tz = utc_time.replace(tzinfo=dt.timezone.utc)
+            else:
+                utc_time_with_tz = utc_time
+            local_time = utc_time_with_tz.astimezone(local_tz)
+            return local_time.replace(tzinfo=None)
 
     def get_real_time(self) -> dt.datetime:
         """获取真实当前时间"""
