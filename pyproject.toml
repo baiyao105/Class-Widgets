@@ -27,7 +27,7 @@ dependencies = [
   "psutil~=7.0.0",
   "pycses",
   "pydantic-core==2.27.2",
-  "pydantic==2.10.6",
+  "pydantic==2.11.9",
   "pygame~=2.6.1",
   "pygetwindow~=0.0.9",
   "pyqt-fluent-widgets~=1.8.1",
