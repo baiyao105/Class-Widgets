@@ -44,7 +44,7 @@ dependencies = [
   "pytz~=2025.2",
   "pywin32==311 ; sys_platform == 'win32'",
   "requests==2.32.4",
-  "typing-extensions==4.13.2",
+  "typing-extensions==4.15.0",
   "urllib3==2.2.3",
   "win32-setctime~=1.2.0"
 ]
