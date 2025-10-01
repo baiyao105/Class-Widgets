@@ -333,8 +333,8 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: |
           if ! brew list gettext &>/dev/null; then
-            brew install gettext qt@5
-            brew link --overwrite --force gettext qt@5 || true
+            brew install gettext
+            brew link --overwrite --force gettext || true
           fi
 
       - name: Cache Python
