@@ -706,7 +706,7 @@ requires-dist = [
     { name = "configparser", specifier = "~=7.1.0" },
     { name = "darkdetect", specifier = "==0.8.0" },
     { name = "distro", marker = "sys_platform == 'linux'", specifier = "~=1.8.0" },
-    { name = "edge-tts", specifier = "~=7.0.0" },
+    { name = "edge-tts", specifier = "~=7.2.3" },
     { name = "idna", specifier = "==3.10" },
     { name = "loguru", specifier = "~=0.7.2" },
     { name = "markdown", specifier = "~=3.7" },
@@ -851,19 +851,18 @@ wheels = [
 
 [[package]]
 name = "edge-tts"
-version = "7.0.2"
+version = "7.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp", version = "3.10.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "aiohttp", version = "3.12.15", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "certifi" },
-    { name = "srt" },
     { name = "tabulate" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/12/32554080d0d03ca0b874677fc4548ea9042ddfeb0b3f38cd107c760aff28/edge_tts-7.0.2.tar.gz", hash = "sha256:1374f493c170e6fe432d04012061c279e518c495524fa51b1b9da7368cc6b21b", size = 23581, upload-time = "2025-05-03T10:34:17.179Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/d0/db9a841ac29f119ca8e3d2a22325849997c571a4f31f728042c5fdbdff33/edge_tts-7.2.3.tar.gz", hash = "sha256:b85e271181cd52656934069237bfc3853335a17f7e51a4f7116e2936d32e62d2", size = 27308, upload-time = "2025-08-28T21:13:53.376Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/21/6ebbc7fc6a4e58bcd49130273a072f7c2e4e6dc03735e078895b47148e30/edge_tts-7.0.2-py3-none-any.whl", hash = "sha256:effc554c249f02bd5013f28cd1faa22802e0757b031a7759be5960084ccb8d76", size = 26274, upload-time = "2025-05-03T10:34:15.872Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/c6/9387c3f9decdd9780dfe21b7d9c0831aafd5d6813baf4f17b50afc7b7d77/edge_tts-7.2.3-py3-none-any.whl", hash = "sha256:62c87df25dedb6cd565cbdf87c639e01c466095b1e8f48ab8fa9efbb2123f53c", size = 30349, upload-time = "2025-08-28T21:13:52.145Z" },
 ]
 
 [[package]]
@@ -9748,12 +9747,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
-
-[[package]]
-name = "srt"
-version = "3.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/66/b7/4a1bc231e0681ebf339337b0cd05b91dc6a0d701fa852bb812e244b7a030/srt-3.5.3.tar.gz", hash = "sha256:4884315043a4f0740fd1f878ed6caa376ac06d70e135f306a6dc44632eed0cc0", size = 28296, upload-time = "2023-03-28T02:35:44.007Z" }
 
 [[package]]
 name = "tabulate"
