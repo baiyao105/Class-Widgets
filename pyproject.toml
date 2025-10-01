@@ -26,7 +26,7 @@ dependencies = [
   "packaging~=25.0",
   "psutil~=7.0.0",
   "pycses",
-  "pydantic-core==2.27.2",
+  "pydantic-core==2.39.0",
   "pydantic==2.10.6",
   "pygame~=2.6.1",
   "pygetwindow~=0.0.9",
