@@ -45,7 +45,7 @@ dependencies = [
   "pywin32==311 ; sys_platform == 'win32'",
   "requests==2.32.4",
   "typing-extensions==4.13.2",
-  "urllib3==2.2.3",
+  "urllib3==2.5.0",
   "win32-setctime~=1.2.0"
 ]
 description = ""
