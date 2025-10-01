@@ -4,11 +4,11 @@ dev = [
   "mypy>=1.14.1",
   "pre-commit>=3.5.0",
   "pylint>=3.2.7",
-  "pyqt5-stubs~=5.15.6",
+  "pyqt5-stubs~=5.15.6.0",
   "pyright>=1.1.405",
   "ruff>=0.13.2"
 ]
-package = ["pyinstaller>=6.15.0"]
+package = ["pyinstaller>=6.16.0"]
 
 [project]
 dependencies = [
@@ -17,7 +17,6 @@ dependencies = [
   "distro~=1.9.0; sys_platform == 'linux'",
   "edge-tts~=7.2.3",
   "loguru~=0.7.2",
-  "markdown~=3.7",
   "ntplib~=0.4.0",
   "psutil~=7.1.0",
   "pycses",
@@ -25,14 +24,13 @@ dependencies = [
   "pygame~=2.6.1",
   "pygetwindow~=0.0.9",
   "pyqt-fluent-widgets~=1.9.0",
-  "pyqt5-frameless-window~=0.7.3",
+  "pyqt5-qt5==5.15.2; sys_platform == 'win32'",
+  "pyqt5-qt5",
   "pyqt5~=5.15.11",
-  "pyqtwebengine~=5.15.2",
   "python-dateutil~=2.9.0",
   "pyttsx3~=2.99",
   "pytz~=2025.2",
-  "requests~=2.32.4",
-  "win32-setctime~=1.2.0 ; sys_platform == 'win32'"
+  "requests~=2.32.4"
 ]
 description = ""
 name = "class_widgets"
@@ -140,6 +138,9 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "**/migrations/*" = ["E501"]
 "__init__.py" = ["F401"]
+
+[tool.tomlsort.overrides."project.dependencies"]
+inline_arrays = false
 
 [tool.uv.sources]
 pycses = {git = "https://github.com/SmartTeachCN/pycses.git"}
