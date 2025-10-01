@@ -30,7 +30,7 @@ dependencies = [
   "pydantic==2.10.6",
   "pygame~=2.6.1",
   "pygetwindow~=0.0.9",
-  "pyqt-fluent-widgets~=1.8.1",
+  "pyqt-fluent-widgets~=1.9.0",
   "pyqt5-frameless-window~=0.7.3",
   "pyqt5-qt5",
   "pyqt5-qt5==5.15.2 ; sys_platform == 'win32'",
