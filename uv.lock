@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.8"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'win32'",
@@ -718,7 +718,7 @@ requires-dist = [
     { name = "pydantic-core", specifier = "==2.27.2" },
     { name = "pygame", specifier = "~=2.6.1" },
     { name = "pygetwindow", specifier = "~=0.0.9" },
-    { name = "pyqt-fluent-widgets", specifier = "~=1.8.1" },
+    { name = "pyqt-fluent-widgets", specifier = "~=1.9.0" },
     { name = "pyqt5", specifier = "~=5.15.11" },
     { name = "pyqt5-frameless-window", specifier = "~=0.7.3" },
     { name = "pyqt5-qt5" },
@@ -9345,16 +9345,16 @@ wheels = [
 
 [[package]]
 name = "pyqt-fluent-widgets"
-version = "1.8.6"
+version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "darkdetect" },
     { name = "pyqt5" },
     { name = "pyqt5-frameless-window" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/d3/e9fccd97133d7ee9ff47e1c9cbb42b3497445e5401bace00e0c2de94ac1a/pyqt_fluent_widgets-1.8.6.tar.gz", hash = "sha256:a6a0fe551c663cee3498f90e14df4346f9661a965d8eefc3848589fae85606b9", size = 1584470, upload-time = "2025-08-04T14:46:43.305Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/06/c273f1a2026a8c570931dd6c90ba7f1e2da0713bdd4ebb085646b197d963/pyqt_fluent_widgets-1.9.0.tar.gz", hash = "sha256:0ebc90b3773be49bb5863dcfaccbef5b4dc55a4fa5939956c0a00030e5b0225d", size = 1583677, upload-time = "2025-09-28T11:56:24.711Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/93/fbcbb003f9e3b52e7f7a72ea070d3273f005d1bb1feffa504a6d61e74a19/pyqt_fluent_widgets-1.8.6-py3-none-any.whl", hash = "sha256:fc877d4cb3deaffd6b9f73ac258581fe883a08b4495f78c363e65322afc96280", size = 1741828, upload-time = "2025-08-04T14:46:41.875Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/24/137db88088e4cf45035825adac301a86563254ee37e254dac23d80c60010/pyqt_fluent_widgets-1.9.0-py3-none-any.whl", hash = "sha256:ad10d70be37bd9c36a25acf1c5b04facb4119d9661d20c219aed1e391fbac23f", size = 1741038, upload-time = "2025-09-28T11:56:22.736Z" },
 ]
 
 [[package]]
