@@ -5,7 +5,8 @@ dev = [
   "pre-commit>=3.5.0",
   "pylint>=3.2.7",
   "pyright>=1.1.403",
-  "ruff>=0.12.8"
+  "ruff>=0.12.8",
+  "pyqt5-stubs~=5.15.6"
 ]
 package = ["pyinstaller>=6.15.0"]
 
@@ -20,20 +21,18 @@ dependencies = [
   "ntplib~=0.4.0",
   "psutil~=7.1.0",
   "pycses",
-  "pydantic==2.10.6",
+  "pydantic==2.11.9",
   "pygame~=2.6.1",
   "pygetwindow~=0.0.9",
   "pyqt-fluent-widgets~=1.9.0",
   "pyqt5-frameless-window~=0.7.3",
-  "pyqt5-stubs==5.15.6.0",
   "pyqt5~=5.15.11",
   "pyqtwebengine~=5.15.2",
   "python-dateutil~=2.9.0",
   "pyttsx3~=2.99",
   "pytz~=2025.2",
-  "pywin32==311 ; sys_platform == 'win32'",
-  "requests==2.32.4",
-  "win32-setctime~=1.2.0"
+  "requests~=2.32.4",
+  "win32-setctime~=1.2.0 ; sys_platform == 'win32'"
 ]
 description = ""
 name = "class_widgets"
