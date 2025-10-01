@@ -34,7 +34,7 @@ dependencies = [
   "pyqt5-frameless-window~=0.7.3",
   "pyqt5-qt5",
   "pyqt5-qt5==5.15.2 ; sys_platform == 'win32'",
-  "pyqt5-sip==12.15.0",
+  "pyqt5-sip==12.17.0",
   "pyqt5-stubs==5.15.6.0",
   "pyqt5~=5.15.11",
   "pyqtwebengine",
