@@ -13,7 +13,7 @@ package = ["pyinstaller>=6.15.0"]
 dependencies = [
   "annotated-types==0.7.0",
   "certifi==2025.8.3",
-  "charset-normalizer==3.4.2",
+  "charset-normalizer==3.4.3",
   "colorama==0.4.6",
   "configparser~=7.1.0",
   "darkdetect==0.8.0",
