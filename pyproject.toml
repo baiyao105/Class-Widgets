@@ -24,7 +24,7 @@ dependencies = [
   "markdown~=3.7",
   "ntplib~=0.4.0",
   "packaging~=25.0",
-  "psutil~=7.0.0",
+  "psutil~=7.1.0",
   "pycses",
   "pydantic-core==2.27.2",
   "pydantic==2.10.6",
