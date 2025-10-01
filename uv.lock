@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.8"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'win32'",
@@ -668,8 +668,7 @@ dependencies = [
     { name = "pyqt5-qt5", version = "5.15.17", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'win32'" },
     { name = "pyqt5-sip" },
     { name = "pyqt5-stubs" },
-    { name = "pyqtwebengine", version = "5.15.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'win32'" },
-    { name = "pyqtwebengine", version = "5.15.7", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'win32'" },
+    { name = "pyqtwebengine" },
     { name = "python-dateutil" },
     { name = "pyttsx3" },
     { name = "pytz" },
@@ -726,7 +725,7 @@ requires-dist = [
     { name = "pyqt5-sip", specifier = "==12.15.0" },
     { name = "pyqt5-stubs", specifier = "==5.15.6.0" },
     { name = "pyqtwebengine" },
-    { name = "pyqtwebengine", marker = "sys_platform == 'win32'", specifier = "==5.15.2" },
+    { name = "pyqtwebengine", marker = "sys_platform == 'win32'", specifier = "==5.15.7" },
     { name = "python-dateutil", specifier = "~=2.9.0" },
     { name = "pyttsx3", specifier = "~=2.99" },
     { name = "pytz", specifier = "~=2025.2" },
@@ -9463,46 +9462,20 @@ wheels = [
 
 [[package]]
 name = "pyqtwebengine"
-version = "5.15.2"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'win32'",
-    "python_full_version == '3.10.*' and sys_platform == 'win32'",
-    "python_full_version == '3.9.*' and sys_platform == 'win32'",
-    "python_full_version < '3.9' and sys_platform == 'win32'",
-]
-dependencies = [
-    { name = "pyqt5", marker = "sys_platform == 'win32'" },
-    { name = "pyqt5-sip", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/36/43/bd66139dc1b3abeaf4c79ee19de9eed9376f394113525de00494086a3773/PyQtWebEngine-5.15.2.tar.gz", hash = "sha256:4d72fea774071ce6f76e341a3d2c5d595886c9906a9b9493239c841cce54a634", size = 48608, upload-time = "2020-11-24T10:37:43.706Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/90/16/4e1c08f31b996db3545a8047dbf6f54ef27480bd197f6798377dd9aba6e3/PyQtWebEngine-5.15.2-5.15.2-cp35.cp36.cp37.cp38.cp39-none-win32.whl", hash = "sha256:fe5a02d4cf2327b6a930f8146589842b7664ac703cfddf1f83172423a32e3164", size = 50334492, upload-time = "2020-11-24T10:37:23.373Z" },
-    { url = "https://files.pythonhosted.org/packages/67/84/afcf3a4e2b090c52cc81f3083eed21832ea1ecb47649f7783105328b00a4/PyQtWebEngine-5.15.2-5.15.2-cp35.cp36.cp37.cp38.cp39-none-win_amd64.whl", hash = "sha256:8ba247d0873bbeaee70f273cafbfa985a93947b2b8df23059607ec3595fee128", size = 60166934, upload-time = "2020-11-24T10:37:40.437Z" },
-]
-
-[[package]]
-name = "pyqtwebengine"
 version = "5.15.7"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and sys_platform != 'win32'",
-    "python_full_version == '3.10.*' and sys_platform != 'win32'",
-    "python_full_version == '3.9.*' and sys_platform != 'win32'",
-    "python_full_version < '3.9' and sys_platform != 'win32'",
-]
 dependencies = [
-    { name = "pyqt5", marker = "sys_platform != 'win32'" },
-    { name = "pyqt5-sip", marker = "sys_platform != 'win32'" },
-    { name = "pyqtwebengine-qt5", marker = "sys_platform != 'win32'" },
+    { name = "pyqt5" },
+    { name = "pyqt5-sip" },
+    { name = "pyqtwebengine-qt5" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/18/e8/19a00646866e950307f8cd73841575cdb92800ae14837d5821bcbb91392c/PyQtWebEngine-5.15.7.tar.gz", hash = "sha256:f121ac6e4a2f96ac289619bcfc37f64e68362f24a346553f5d6c42efa4228a4d", size = 32223, upload-time = "2024-07-19T08:44:48.6Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/3d/8961b3bb00c0979280a1a160c745e1d543b4d5823f8a71dfa370898b5699/PyQtWebEngine-5.15.7-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:e17187d9a3db3bab041f31385ed72832312557fefc5bd63ae4692df306dc1572", size = 181029, upload-time = "2024-07-19T08:44:31.266Z" },
     { url = "https://files.pythonhosted.org/packages/8e/c7/82bdc50b44f505a87e6a9d7f4a4d017c8e2f06b9f3ab8f661adff00b95c6/PyQtWebEngine-5.15.7-cp38-abi3-macosx_11_0_x86_64.whl", hash = "sha256:021814af1ff7d8be447c5314891cd4ddc931deae393dc2d38a816569aa0eb8cd", size = 187313, upload-time = "2024-07-19T08:44:43.002Z" },
     { url = "https://files.pythonhosted.org/packages/ea/a0/b36e7d6f0cd69b7dd58f0d733188e100115c5fce1c0606ad84bf35ef7ceb/PyQtWebEngine-5.15.7-cp38-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:965461ca0cf414e03bd510a9a0e2ea36dc21deaa7fc4a631be4a1f2aa0327179", size = 227640, upload-time = "2024-07-19T08:44:44.236Z" },
+    { url = "https://files.pythonhosted.org/packages/54/b9/0e68e30cec6a02d8d27c7663de77460156c5342848e2f72424e577c66eaf/PyQtWebEngine-5.15.7-cp38-abi3-win32.whl", hash = "sha256:c0680527b1af3e0145ce5e0f2ba2156ff0b4b38844392cf0ddd37ede6a9edeab", size = 160980, upload-time = "2024-07-19T08:44:45.482Z" },
+    { url = "https://files.pythonhosted.org/packages/39/67/0dead50889d905fc99f40e61e5ab7f73746605ce8f74c4fa7fb3fc1d6c5e/PyQtWebEngine-5.15.7-cp38-abi3-win_amd64.whl", hash = "sha256:bd5e8c426d6f6b352cd15800d64a89b2a4a11e098460b818c7bdcf5e5612e44f", size = 184657, upload-time = "2024-07-19T08:44:47.066Z" },
 ]
 
 [[package]]

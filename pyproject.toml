@@ -38,7 +38,7 @@ dependencies = [
   "pyqt5-stubs==5.15.6.0",
   "pyqt5~=5.15.11",
   "pyqtwebengine",
-  "pyqtwebengine==5.15.2 ; sys_platform == 'win32'",
+  "pyqtwebengine==5.15.7; sys_platform == 'win32'",
   "python-dateutil~=2.9.0",
   "pyttsx3~=2.99",
   "pytz~=2025.2",
