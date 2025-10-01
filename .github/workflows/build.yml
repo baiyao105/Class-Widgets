@@ -843,9 +843,6 @@ jobs:
             echo "[DEBUG] 没有找到任何包文件"
           fi
 
-          echo "[DEBUG] 最终包列表:"
-          ls -la final-packages/ || true
-
       - name: Generate package provenance
         uses: actions/attest-build-provenance@v3
         id: generate-provenance
@@ -866,8 +863,8 @@ jobs:
             echo ""
             echo '<div style="overflow-x: auto; white-space: nowrap;">'
             echo ""
-            echo "| 文件名 | 大小(MB) | 大小(字节) | MD5 |"
-            echo "|--------|----------|------------|-----|"
+            echo "| 文件名 | 大小(MB) | MD5 |"
+            echo "|--------|----------|-----|"
           } > final-packages/file-info.md
           shopt -s nullglob
           files=(final-packages/*.zip final-packages/*.msi)
@@ -880,7 +877,7 @@ jobs:
                 file_size=$(stat -c%s "$package_file" 2>/dev/null || wc -c < "$package_file" 2>/dev/null || echo "未知")
                 file_md5=$(md5sum "$package_file" 2>/dev/null | cut -d' ' -f1 || echo "未知")
                 file_size_mb=$(awk "BEGIN {printf \"%.2f\", $file_size / 1024 / 1024}" 2>/dev/null || echo "未知")
-                echo "| $filename | $file_size_mb | $file_size | \`$file_md5\` |" >> final-packages/file-info.md
+                echo "| $filename | $file_size_mb | \`$file_md5\` |" >> final-packages/file-info.md
               fi
             done
           fi
@@ -888,7 +885,9 @@ jobs:
           echo "</div>" >> final-packages/file-info.md
           echo "" >> final-packages/file-info.md
           cat final-packages/file-info.md >> $GITHUB_STEP_SUMMARY
-          cp -af "${{ steps.generate-provenance.outputs.bundle-path }}" final-packages/
+          cp -af "${{ steps.generate-provenance.outputs.bundle-path }}" final-packages/file_provenance.json
+          echo "[DEBUG] 最终包列表:"
+          ls -la final-packages/ || true
 
       - name: Upload final packages
         uses: actions/upload-artifact@v4
