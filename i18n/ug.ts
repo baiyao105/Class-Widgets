@@ -1770,17 +1770,17 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
 <context>
     <name>PluginCard_Horizontal</name>
     <message>
-        <location filename="../plugin_plaza.py" line="480"/>
+        <location filename="../plugin_plaza.py" line="479"/>
         <source>安装</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="487"/>
+        <location filename="../plugin_plaza.py" line="486"/>
         <source>已安装</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="493"/>
+        <location filename="../plugin_plaza.py" line="492"/>
         <source>更新</source>
         <translation type="unfinished">yangilanma</translation>
     </message>
@@ -1788,33 +1788,33 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
 <context>
     <name>PluginDetailPage</name>
     <message>
-        <location filename="../plugin_plaza.py" line="352"/>
+        <location filename="../plugin_plaza.py" line="351"/>
         <source>  安装  </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="357"/>
-        <location filename="../plugin_plaza.py" line="390"/>
+        <location filename="../plugin_plaza.py" line="356"/>
+        <location filename="../plugin_plaza.py" line="389"/>
         <source>  安装中  </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="360"/>
+        <location filename="../plugin_plaza.py" line="359"/>
         <source>  已安装  </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="366"/>
+        <location filename="../plugin_plaza.py" line="365"/>
         <source>更新</source>
         <translation type="unfinished">yangilanma</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="373"/>
+        <location filename="../plugin_plaza.py" line="372"/>
         <source>为 Class Widgets 安装</source>
         <translation type="unfinished">Class Widgets</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="376"/>
+        <location filename="../plugin_plaza.py" line="375"/>
         <source>下载到本地</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1822,12 +1822,12 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
 <context>
     <name>PluginPlaza</name>
     <message>
-        <location filename="../plugin_plaza.py" line="705"/>
+        <location filename="../plugin_plaza.py" line="704"/>
         <source>{month}月{day}日 {weekday}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="855"/>
+        <location filename="../plugin_plaza.py" line="854"/>
         <source>错误原因：{error_info}</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2591,17 +2591,17 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6360"/>
+        <location filename="../menu.py" line="6353"/>
         <source>界面语言切换时出错: {e}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6362"/>
+        <location filename="../menu.py" line="6355"/>
         <source>界面语言切换出错 (＃°Д°)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6363"/>
+        <location filename="../menu.py" line="6356"/>
         <source>切换界面语言时发生错误: {e}</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3066,35 +3066,35 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6237"/>
+        <location filename="../menu.py" line="6230"/>
         <source>Class Widgets - 设置</source>
         <translation type="unfinished">Class Widgets</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6320"/>
+        <location filename="../menu.py" line="6313"/>
         <source>界面语言切换成功 ♪(´▽｀)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6322"/>
+        <location filename="../menu.py" line="6315"/>
         <source>界面语言已切换为 {selected_lang_name}
 新语言将在重启程序后完全生效</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6352"/>
+        <location filename="../menu.py" line="6345"/>
         <source>界面语言切换失败 (＃°Д°)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6353"/>
+        <location filename="../menu.py" line="6346"/>
         <source>无法加载选定的界面语言包，请检查翻译文件是否存在</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../menu.py" line="1897"/>
-        <location filename="../menu.py" line="6356"/>
-        <location filename="../menu.py" line="6366"/>
+        <location filename="../menu.py" line="6349"/>
+        <location filename="../menu.py" line="6359"/>
         <source>确定</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3587,7 +3587,7 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
 <context>
     <name>downloadProgressBar</name>
     <message>
-        <location filename="../plugin_plaza.py" line="188"/>
+        <location filename="../plugin_plaza.py" line="187"/>
         <source>取消</source>
         <translation type="unfinished">Békar qilis</translation>
     </message>
@@ -4429,18 +4429,18 @@ Siz sistem bexatliridin ta yana köp avaaz qoshaliysiz (*≧▽≦)</translation
 <context>
     <name>plugin_plaza</name>
     <message>
-        <location filename="../plugin_plaza.py" line="272"/>
+        <location filename="../plugin_plaza.py" line="271"/>
         <source>此插件版本（{plugin_ver}）高于当前设备中 Class Widgets 兼容的插件版本（{SELF_PLUGIN_VERSION}）；
 请更新 Class Widgets 后再尝试安装此插件。</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="284"/>
+        <location filename="../plugin_plaza.py" line="283"/>
         <source>取消安装</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="285"/>
+        <location filename="../plugin_plaza.py" line="284"/>
         <source>强制安装（不建议）</source>
         <translation type="unfinished"></translation>
     </message>

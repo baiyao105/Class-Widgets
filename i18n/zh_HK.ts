@@ -1885,17 +1885,17 @@
 <context>
     <name>PluginCard_Horizontal</name>
     <message>
-        <location filename="../plugin_plaza.py" line="480"/>
+        <location filename="../plugin_plaza.py" line="479"/>
         <source>安装</source>
         <translation>安裝</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="487"/>
+        <location filename="../plugin_plaza.py" line="486"/>
         <source>已安装</source>
         <translation>已安裝</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="493"/>
+        <location filename="../plugin_plaza.py" line="492"/>
         <source>更新</source>
         <translation>更新</translation>
     </message>
@@ -1903,33 +1903,33 @@
 <context>
     <name>PluginDetailPage</name>
     <message>
-        <location filename="../plugin_plaza.py" line="352"/>
+        <location filename="../plugin_plaza.py" line="351"/>
         <source>  安装  </source>
         <translation>  安裝  </translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="357"/>
-        <location filename="../plugin_plaza.py" line="390"/>
+        <location filename="../plugin_plaza.py" line="356"/>
+        <location filename="../plugin_plaza.py" line="389"/>
         <source>  安装中  </source>
         <translation>  安裝中  </translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="360"/>
+        <location filename="../plugin_plaza.py" line="359"/>
         <source>  已安装  </source>
         <translation>  已安裝  </translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="366"/>
+        <location filename="../plugin_plaza.py" line="365"/>
         <source>更新</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="373"/>
+        <location filename="../plugin_plaza.py" line="372"/>
         <source>为 Class Widgets 安装</source>
         <translation>為 Class Widgets 安裝</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="376"/>
+        <location filename="../plugin_plaza.py" line="375"/>
         <source>下载到本地</source>
         <translation>下載到本機</translation>
     </message>
@@ -1937,12 +1937,12 @@
 <context>
     <name>PluginPlaza</name>
     <message>
-        <location filename="../plugin_plaza.py" line="705"/>
+        <location filename="../plugin_plaza.py" line="704"/>
         <source>{month}月{day}日 {weekday}</source>
         <translation>{month}月{day}日 {weekday}</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="855"/>
+        <location filename="../plugin_plaza.py" line="854"/>
         <source>错误原因：{error_info}</source>
         <translation>錯誤原因：{error_info}</translation>
     </message>
@@ -2974,14 +2974,14 @@ https://classwidgets.rinlit.cn/docs-user/</translation>
         <translation>天氣</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6322"/>
+        <location filename="../menu.py" line="6315"/>
         <source>界面语言已切换为 {selected_lang_name}
 新语言将在重启程序后完全生效</source>
         <translation>介面語言已切換為 {selected_lang_name}
 新語言將會在重啟後完全生效</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6360"/>
+        <location filename="../menu.py" line="6353"/>
         <source>界面语言切换时出错: {e}</source>
         <translation>介面語言切換時出現錯誤: {e}</translation>
     </message>
@@ -3396,12 +3396,12 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
         <translation>關於本產品</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6237"/>
+        <location filename="../menu.py" line="6230"/>
         <source>Class Widgets - 设置</source>
         <translation>Class Widgets - 設定</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6320"/>
+        <location filename="../menu.py" line="6313"/>
         <source>界面语言切换成功 ♪(´▽｀)</source>
         <translation>介面語言切換成功 ♪(´▽｀)</translation>
     </message>
@@ -3414,19 +3414,19 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
 新語言將於重啟程式後完全生效</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6352"/>
+        <location filename="../menu.py" line="6345"/>
         <source>界面语言切换失败 (＃°Д°)</source>
         <translation>介面語言切換失敗 (＃°Д°)</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6353"/>
+        <location filename="../menu.py" line="6346"/>
         <source>无法加载选定的界面语言包，请检查翻译文件是否存在</source>
         <translation>無法載入所選的介面語言包，請檢查翻譯檔案是否存在</translation>
     </message>
     <message>
         <location filename="../menu.py" line="1897"/>
-        <location filename="../menu.py" line="6356"/>
-        <location filename="../menu.py" line="6366"/>
+        <location filename="../menu.py" line="6349"/>
+        <location filename="../menu.py" line="6359"/>
         <source>确定</source>
         <translation>確定</translation>
     </message>
@@ -3437,12 +3437,12 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
 介面語言切換時出錯：{e}</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6362"/>
+        <location filename="../menu.py" line="6355"/>
         <source>界面语言切换出错 (＃°Д°)</source>
         <translation>介面語言切換出錯 (＃°Д°)</translation>
     </message>
     <message>
-        <location filename="../menu.py" line="6363"/>
+        <location filename="../menu.py" line="6356"/>
         <source>切换界面语言时发生错误: {e}</source>
         <translation>切換介面語言時出現錯誤: {e}</translation>
     </message>
@@ -4014,7 +4014,7 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
 <context>
     <name>downloadProgressBar</name>
     <message>
-        <location filename="../plugin_plaza.py" line="188"/>
+        <location filename="../plugin_plaza.py" line="187"/>
         <source>取消</source>
         <translation>取消</translation>
     </message>
@@ -5303,19 +5303,19 @@ CSES 通用課程時間表交換文件(*.yaml)</translation>
 <context>
     <name>plugin_plaza</name>
     <message>
-        <location filename="../plugin_plaza.py" line="272"/>
+        <location filename="../plugin_plaza.py" line="271"/>
         <source>此插件版本（{plugin_ver}）高于当前设备中 Class Widgets 兼容的插件版本（{SELF_PLUGIN_VERSION}）；
 请更新 Class Widgets 后再尝试安装此插件。</source>
         <translation>本插件版本（{plugin_ver}）高於目前裝置中 Class Widgets 所支援的插件版本（{SELF_PLUGIN_VERSION}）；
 請先更新 Class Widgets，然後再次嘗試安裝本插件。</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="284"/>
+        <location filename="../plugin_plaza.py" line="283"/>
         <source>取消安装</source>
         <translation>取消安裝</translation>
     </message>
     <message>
-        <location filename="../plugin_plaza.py" line="285"/>
+        <location filename="../plugin_plaza.py" line="284"/>
         <source>强制安装（不建议）</source>
         <translation>強制安裝（不建議）</translation>
     </message>
