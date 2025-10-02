@@ -486,7 +486,7 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --hidden-import darkdetect \
+            --debug=all \
             --strip \
             --optimize 2
 
@@ -515,7 +515,7 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --hidden-import darkdetect \
+            --debug=all \
             --strip \
             --optimize 2
 
@@ -544,7 +544,7 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --hidden-import darkdetect \
+            --debug=all \
             --strip \
             --optimize 2
 
@@ -559,28 +559,66 @@ jobs:
         shell: bash
         run: |
           export QT_QPA_PLATFORM=offscreen
+          export DISPLAY=:99
           ls -la packages/
           ls -la dist/
           echo ""
+          TIMEOUT_CMD=""
+          if command -v timeout >/dev/null 2>&1; then
+            TIMEOUT_CMD="timeout 10s"
+          elif command -v gtimeout >/dev/null 2>&1; then
+            TIMEOUT_CMD="gtimeout 10s"
+          else
+            TIMEOUT_CMD=""
+          fi
           if [[ "${{ matrix.platform }}" == "windows-x64" ]] || [[ "${{ matrix.platform }}" == "windows-x86" ]]; then
-            if [ -d "dist/ClassWidgets" ]; then
-              ls -la dist/ClassWidgets/
-              timeout 10s dist/ClassWidgets/ClassWidgets.exe --version || echo "n"
+            if [ -d "dist" ]; then
+              win_dir=$(find dist/ -maxdepth 1 -type d -name "*Windows*" -o -name "*debug*" | head -1)
+              if [ -n "$win_dir" ]; then
+                ls -la "$win_dir/"
+                exe_file=$(find "$win_dir" -name "*.exe" | head -1)
+                if [ -n "$exe_file" ]; then
+                  if [ -n "$TIMEOUT_CMD" ]; then
+                    $TIMEOUT_CMD "$exe_file" || echo "y"
+                  else
+                    echo "found: $exe_file"
+                  fi
+                fi
+              else
+                echo "n-found"
+              fi
             fi
           elif [[ "${{ matrix.platform }}" == "macos-x64" ]] || [[ "${{ matrix.platform }}" == "macos-arm64" ]]; then
             if [ -d "Class Widgets.app" ]; then
               ls -la "Class Widgets.app/Contents/MacOS/"
-              timeout 10s "Class Widgets.app/Contents/MacOS/Class Widgets" --version || echo "n"
+              exe_path="Class Widgets.app/Contents/MacOS/Class Widgets"
+              if [ -f "$exe_path" ]; then
+                echo "尝试运行程序: $exe_path"
+                if [ -n "$TIMEOUT_CMD" ]; then
+                  $TIMEOUT_CMD "$exe_path" || echo "done"
+                else
+                  echo "found: $exe_path"
+                fi
+              else
+                echo "n-fonud-1"
+              fi
+            else
+              echo "n-found"
             fi
           elif [[ "${{ matrix.platform }}" == "linux-x64" ]]; then
             if [ -d "dist" ]; then
               executable=$(find dist/ -name "ClassWidgets*" -type f -executable | head -1)
               if [ -n "$executable" ]; then
-                echo "$executable"
-                timeout 10s "$executable" --version || echo "n"
+                if [ -n "$TIMEOUT_CMD" ]; then
+                  $TIMEOUT_CMD "$executable" || echo "y"
+                else
+                  echo "found: $executable"
+                fi
               else
-                echo "未找到可执行文件"
+                echo "no-found"
               fi
+            else
+              echo "no-fonund dist "
             fi
           fi
 
