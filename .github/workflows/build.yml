@@ -339,15 +339,21 @@ jobs:
             brew link --overwrite --force gettext || true
           fi
 
-      - name: Cache Python
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~\AppData\Roaming\uv\python
-            ~/.local/share/uv/python
-          key: ${{ runner.os }}-${{ matrix.arch }}-python${{ env.PYTHON_VERSION }}
+      # - name: Cache Python
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~\AppData\Roaming\uv\python
+      #       ~/.local/share/uv/python
+      #     key: ${{ runner.os }}-${{ matrix.arch }}-python${{ env.PYTHON_VERSION }}
 
-      - name: Setup Python & uv
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Setup uv
         uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -359,7 +365,6 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          uv python install ${{ env.PYTHON_VERSION }}
           uv python upgrade ${{ env.PYTHON_VERSION }}
           uv python update-shell
           echo "$HOME/.local/bin:$PATH" >> $GITHUB_PATH || true
