@@ -191,6 +191,7 @@ jobs:
           PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}:${{ github.event.pull_request.head.ref || github.ref_name }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
+          echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
           build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
           build_commit="${GITHUB_SHA:0:7}"
@@ -486,7 +487,6 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --debug=all \
             --strip \
             --optimize 2
 
@@ -515,7 +515,6 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --debug=all \
             --strip \
             --optimize 2
 
@@ -544,7 +543,6 @@ jobs:
             --add-data "view:view" \
             --add-data "i18n/*.qm:i18n" \
             --add-data "LICENSE:." \
-            --debug=all \
             --strip \
             --optimize 2
 
@@ -554,74 +552,6 @@ jobs:
             zip_name="Linux-x64_debug-${GITHUB_RUN_ID}"
           fi
           cd dist && mv ClassWidgets "${zip_name}" && zip -r -q "../packages/${zip_name}.zip" "${zip_name}"/* && cd ..
-
-      - name: Test build artifacts
-        shell: bash
-        run: |
-          export QT_QPA_PLATFORM=offscreen
-          export DISPLAY=:99
-          ls -la packages/
-          ls -la dist/
-          echo ""
-          TIMEOUT_CMD=""
-          if command -v timeout >/dev/null 2>&1; then
-            TIMEOUT_CMD="timeout 10s"
-          elif command -v gtimeout >/dev/null 2>&1; then
-            TIMEOUT_CMD="gtimeout 10s"
-          else
-            TIMEOUT_CMD=""
-          fi
-          if [[ "${{ matrix.platform }}" == "windows-x64" ]] || [[ "${{ matrix.platform }}" == "windows-x86" ]]; then
-            if [ -d "dist" ]; then
-              win_dir=$(find dist/ -maxdepth 1 -type d -name "*Windows*" -o -name "*debug*" | head -1)
-              if [ -n "$win_dir" ]; then
-                ls -la "$win_dir/"
-                exe_file=$(find "$win_dir" -name "*.exe" | head -1)
-                if [ -n "$exe_file" ]; then
-                  if [ -n "$TIMEOUT_CMD" ]; then
-                    $TIMEOUT_CMD "$exe_file" || echo "y"
-                  else
-                    echo "found: $exe_file"
-                  fi
-                fi
-              else
-                echo "n-found"
-              fi
-            fi
-          elif [[ "${{ matrix.platform }}" == "macos-x64" ]] || [[ "${{ matrix.platform }}" == "macos-arm64" ]]; then
-            if [ -d "Class Widgets.app" ]; then
-              ls -la "Class Widgets.app/Contents/MacOS/"
-              exe_path="Class Widgets.app/Contents/MacOS/Class Widgets"
-              if [ -f "$exe_path" ]; then
-                echo "尝试运行程序: $exe_path"
-                if [ -n "$TIMEOUT_CMD" ]; then
-                  $TIMEOUT_CMD "$exe_path" || echo "done"
-                else
-                  echo "found: $exe_path"
-                fi
-              else
-                echo "n-fonud-1"
-              fi
-            else
-              echo "n-found"
-            fi
-          elif [[ "${{ matrix.platform }}" == "linux-x64" ]]; then
-            if [ -d "dist" ]; then
-              executable=$(find dist/ -name "ClassWidgets*" -type f -executable | head -1)
-              if [ -n "$executable" ]; then
-                if [ -n "$TIMEOUT_CMD" ]; then
-                  $TIMEOUT_CMD "$executable" || echo "y"
-                else
-                  echo "found: $executable"
-                fi
-              else
-                echo "no-found"
-              fi
-            else
-              echo "no-fonund dist "
-            fi
-          fi
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
