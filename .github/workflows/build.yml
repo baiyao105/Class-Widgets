@@ -191,6 +191,7 @@ jobs:
           PR_BRANCH: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}:${{ github.event.pull_request.head.ref || github.ref_name }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
+          echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
           build_time=$(date -u -d "+8 hours" +"%Y-%m-%d %H:%M")
           build_commit="${GITHUB_SHA:0:7}"
           build_branch="${GITHUB_REF_NAME}"
@@ -553,6 +554,35 @@ jobs:
             zip_name="Linux-x64_debug-${GITHUB_RUN_ID}"
           fi
           cd dist && mv ClassWidgets "${zip_name}" && zip -r -q "../packages/${zip_name}.zip" "${zip_name}"/* && cd ..
+
+      - name: Test build artifacts
+        shell: bash
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          ls -la packages/
+          ls -la dist/
+          echo ""
+          if [[ "${{ matrix.platform }}" == "windows-x64" ]] || [[ "${{ matrix.platform }}" == "windows-x86" ]]; then
+            if [ -d "dist/ClassWidgets" ]; then
+              ls -la dist/ClassWidgets/
+              timeout 10s dist/ClassWidgets/ClassWidgets.exe --version || echo "n"
+            fi
+          elif [[ "${{ matrix.platform }}" == "macos-x64" ]] || [[ "${{ matrix.platform }}" == "macos-arm64" ]]; then
+            if [ -d "Class Widgets.app" ]; then
+              ls -la "Class Widgets.app/Contents/MacOS/"
+              timeout 10s "Class Widgets.app/Contents/MacOS/Class Widgets" --version || echo "n"
+            fi
+          elif [[ "${{ matrix.platform }}" == "linux-x64" ]]; then
+            if [ -d "dist" ]; then
+              executable=$(find dist/ -name "ClassWidgets*" -type f -executable | head -1)
+              if [ -n "$executable" ]; then
+                echo "$executable"
+                timeout 10s "$executable" --version || echo "n"
+              else
+                echo "未找到可执行文件"
+              fi
+            fi
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
