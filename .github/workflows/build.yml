@@ -356,7 +356,6 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
           enable-cache: true
           prune-cache: false
@@ -365,14 +364,10 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          uv python upgrade ${{ env.PYTHON_VERSION }}
-          uv python update-shell
-          echo "$HOME/.local/bin:$PATH" >> $GITHUB_PATH || true
-          export PATH="$HOME/.local/bin:$PATH" || true
           echo "::group::Python-Version"
           echo "[DEBUG] uvx-python: $(uvx python --version) | system-python: $(python --version)" || true
-          # echo "[DEBUG] 已安装的Python:"
-          # uv python list --only-installed || true
+          echo "[DEBUG] 已安装的Python:"
+          uv python list --only-installed || true
           echo "::endgroup::"
 
       - name: Python Syntax Check
