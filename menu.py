@@ -118,7 +118,7 @@ from generate_speech import (
     get_tts_service,
     get_voice_name_by_id_sync,
 )
-from network_thread import VersionThread, proxies, scheduleThread
+from network_thread import VersionThread, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
 
@@ -666,48 +666,13 @@ class selectCity(MessageBoxBase):  # 选择城市
             self.error_text.setText(f"{e}")
             self.error_text.show()
 
-    class getCoordinatesInternet(QThread):
-        coordinates = pyqtSignal(float, float)
-        error = pyqtSignal(str)
-
-        def __init__(self, url: str = 'http://ip-api.com/json/?fields=status,lat,lon'):
-            super().__init__()
-            self.download_url = url
-
-        def run(self) -> None:
-            try:
-                coordinates_data = self.get_coordinates()
-                if coordinates_data:
-                    self.coordinates.emit(coordinates_data[0], coordinates_data[1])
-
-            except Exception as e:
-                logger.error(f"获取坐标失败: {e}")
-                self.error.emit(str(e))
-
-        def get_coordinates(self) -> Tuple[float, float]:
-            import requests
-
-            try:
-                req = requests.get(self.download_url, proxies=proxies)
-                if req.status_code == 200:
-                    data = req.json()
-                    if data['status'] == 'success':
-                        logger.info(f"获取坐标成功：{data['lat']}, {data['lon']}")
-                        return (data['lat'], data['lon'])
-                    logger.error(f"获取坐标失败：{data['message']}")
-                    raise ValueError(f"获取坐标失败：{data['message']}")
-                logger.error(f"获取坐标失败：{req.status_code}")
-                raise ValueError(f"获取坐标失败：{req.status_code}")
-            except Exception as e:
-                logger.error(f"获取坐标失败：{e}")
-                raise ValueError(f"获取坐标失败：{e}")
-
     def get_coordinates_from_internet(self):
         """通过网络获取经纬度"""
         self._lock_input()
-        self.coordinates_thread = self.getCoordinatesInternet()
-        self.coordinates_thread.coordinates.connect(self.set_coordinates)
-        self.coordinates_thread.error.connect(self._catch_error)
+        from network_thread import getCity
+        self.coordinates_thread = getCity(mode='coordinates_only')
+        self.coordinates_thread.coordinates_signal.connect(self.set_coordinates)
+        self.coordinates_thread.error_signal.connect(self._catch_error)
         self.coordinates_thread.start()
 
     def set_coordinates(self, latitude, longitude):
@@ -1607,10 +1572,26 @@ class SettingsMenu(FluentWindow):
                 city_name = '未知城市'
             else:
                 city_name = wd.weather_database.search_city_by_code(city_code)
-                if city_name == 'coordinates' and ',' in city_code:
+                if city_name == 'coordinates' or ',' in city_code:
                     try:
                         lon, lat = city_code.split(',')
                         city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
+                        try:
+                            from network_thread import getCity
+                            city_thread = getCity('city_from_coordinates')
+                            city_thread.set_coordinates(float(lat), float(lon))
+                            def on_city_info_received(city_name_xiaomi, city_key):
+                                if city_name_xiaomi:
+                                    if hasattr(self, 'city_location_label') and self.city_location_label:
+                                        self.city_location_label.setText(
+                                            self.tr("{city_name} · 当前天气").format(city_name=city_name_xiaomi)
+                                        )
+
+                            city_thread.city_info_signal.connect(on_city_info_received)
+                            city_thread.start()
+                        except Exception as e:
+                            pass
+
                     except (ValueError, IndexError):
                         city_name = ''
             if self.city_location_label:
@@ -1957,7 +1938,7 @@ class SettingsMenu(FluentWindow):
             else:
                 error_text = "获取天气数据失败"  # 不存在但向后保底
             if hasattr(self, 'current_temperature') and self.current_temperature:
-                self.current_temperature.setText("-- °C")
+                self.current_temperature.setText("-- ℃")
             if hasattr(self, 'weather_description') and self.weather_description:
                 self.weather_description.setText(error_text)
             if hasattr(self, 'city_location_label') and self.city_location_label:
@@ -4593,10 +4574,10 @@ class SettingsMenu(FluentWindow):
         provider = wd.weather_manager.get_current_provider()
         method = provider.config.get("method", "location_key")
 
-        if current_api == 'qweather':
+        if current_api in {'qweather', 'xiaomi_weather'}:
             choice_dialog = MessageBox(
                 title=self.tr('选择位置输入方式'),
-                content=self.tr('和风天气支持城市ID和经纬度两种方式，请选择您偏好的输入方式：'),
+                content=self.tr('支持城市ID和经纬度两种方式, 请选择您偏好的方式:'),
                 parent=self,
             )
             choice_dialog.yesButton.setText(self.tr('城市搜索'))
@@ -4612,10 +4593,20 @@ class SettingsMenu(FluentWindow):
             if search_city_dialog.method == 'location_key':
                 selected_city = search_city_dialog.city_list.selectedItems()
                 if selected_city:
-                    config_center.write_conf(
-                        'Weather', 'city', wd.search_code_by_name((selected_city[0].text(), ''))
-                    )
+                    city_key = wd.search_code_by_name((selected_city[0].text(), ''))
+                    if current_api == 'xiaomi_weather':
+                        city_key = f"weathercn:{city_key}"
+                    config_center.write_conf('Weather', 'city', city_key)
                     city_changed = True
+                    Flyout.create(
+                        icon=InfoBarIcon.SUCCESS,
+                        title=self.tr('城市已设置'),
+                        content=self.tr(f'已将城市设置为 {selected_city[0].text()} ({city_key})'),
+                        target=search_city_dialog,
+                        parent=self,
+                        isClosable=True,
+                        aniType=FlyoutAnimationType.PULL_UP,
+                    )
             else:  # coordinates
                 lon = search_city_dialog.longitude_edit.text()
                 lat = search_city_dialog.latitude_edit.text()

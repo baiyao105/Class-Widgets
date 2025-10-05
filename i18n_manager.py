@@ -36,6 +36,21 @@ def load_theme_config(theme: str) -> ThemeInfo:
         return ThemeInfo(path=default_path.parent, config=__load_json(default_path))
 
 
+def get_language_code() -> str:
+    """
+    获得语言代码
+    """
+    try:
+        lang_code = config_center.read_conf('General', 'language_view', 'system')
+        if lang_code == 'system':
+            locale = QLocale.system()
+            lang_code = locale.name()
+        return lang_code.lower().replace('-', '_')
+    except Exception as e:
+        logger.error(f"获取语言代码时出错: {e}")
+        return "zh_cn"
+
+
 class I18nManager:
     """i18n"""
 
@@ -267,12 +282,10 @@ class I18nManager:
             self.load_language_view('zh_CN')
 
 
-# 适配高DPI缩放
+os.environ['QT_SCALE_FACTOR'] = config_center.read_conf('General', 'scale')
 QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
-os.environ['QT_SCALE_FACTOR'] = config_center.read_conf('General', 'scale')
 
 app = QApplication(sys.argv)
 global_i18n_manager = I18nManager()
