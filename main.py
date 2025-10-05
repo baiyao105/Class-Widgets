@@ -3335,20 +3335,11 @@ class DesktopWidget(QWidget):  # 主要小组件
                     if current_city:
                         city_name = db.search_by_num(config_center.read_conf('Weather', 'city'))
                         if city_name != 'coordinates':
-                            font_metrics = current_city.fontMetrics()
-                            max_width = 120
-                            if font_metrics.horizontalAdvance(city_name) > max_width:
-                                current_city.setText(self.tr("未知"))
-                            else:
-                                current_city.setText(
-                                    self.tr("{city} · 未知").format(city=city_name)
-                                )
+                            current_city.setText(self.tr("{city} · 未知").format(city=city_name))
                         else:
                             current_city.setText(self.tr("未知"))
                     if hasattr(self, 'backgnd'):
-                        path = db.get_weather_stylesheet('99', db.get_current_api()).replace(
-                            '\\', '/'
-                        )
+                        path = db.get_weather_stylesheet('99').replace('\\', '/')
                         update_stylesheet = re.sub(
                             r'border-image: url\([^)]*\);',
                             f"border-image: url({path});",

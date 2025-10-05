@@ -1,6 +1,5 @@
 import datetime
 import json
-import os
 import re
 import sqlite3
 import time
@@ -433,10 +432,10 @@ class WeatherManager:
         """获取位置值"""
         location_key = config_center.read_conf('Weather', 'city')
         if location_key == '0' or not location_key:
-            location_key = self._get_auto_location()
+            location_key = self.get_auto_location()
         return location_key
 
-    def _get_auto_location(self) -> str:
+    def get_auto_location(self) -> str:
         """自动获取位置"""
         try:
             method = self.get_current_provider().config['method']
@@ -2938,11 +2937,11 @@ class WeatherDataProcessor:
 
         if weather_code in ('0', '1', '3', '99', '900'):  # 晴、多云、阵雨、未知
             if 6 <= current_time.hour < 18:  # 日间
-                return os.path.join('img', 'weather', 'bkg', 'day.png')
+                return str(ICON_DIR / 'bkg' / 'day.png')
             # 夜间
-            return os.path.join('img', 'weather', 'bkg', 'night.png')
+            return str(ICON_DIR / 'bkg' / 'night.png')
 
-        return os.path.join('img', 'weather', 'bkg', 'rain.png')
+        return str(ICON_DIR / 'bkg' / 'rain.png')
 
     def get_weather_code_by_description(
         self, description: str, api_name: Optional[str] = None
@@ -3584,6 +3583,9 @@ def on_weather_api_changed(new_api: str):
     global weather_manager, weather_processor
     weather_manager.on_api_changed(new_api)
     weather_processor.clear_cache()
+    location = weather_manager.get_auto_location()
+    if location:
+        config_center.write_conf('Weather', 'city', location)
 
 
 # 兼容性用

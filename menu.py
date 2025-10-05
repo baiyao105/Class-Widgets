@@ -4603,7 +4603,7 @@ class SettingsMenu(FluentWindow):
         if current_api in {'qweather', 'xiaomi_weather'}:
             choice_dialog = MessageBox(
                 title=self.tr('选择位置输入方式'),
-                content=self.tr('支持城市ID和经纬度两种方式, 请选择您偏好的方式:'),
+                content=self.tr('当前支持城市ID和经纬度两种方式, 请选择您偏好的方式:'),
                 parent=self,
             )
             choice_dialog.yesButton.setText(self.tr('城市搜索'))

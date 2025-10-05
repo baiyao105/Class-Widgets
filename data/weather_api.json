@@ -111,7 +111,7 @@
       },
       "database": "xiaomi_weather.db",
       "return_desc": false,
-      "method": "location_key",
+      "method": "coordinates",
       "supports_coordinates": true,
       "hourly_forecast": {
         "url": "https://weatherapi.market.xiaomi.com/wtr-v3/weather/all?latitude={latitude}&longitude={longitude}&locationKey={location_key}&appKey=weather20151024&sign=zUFJoAR2ZVrDy1vF3D07&isGlobal=false&locale={locale}&days=1",
