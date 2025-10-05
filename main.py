@@ -3263,7 +3263,14 @@ class DesktopWidget(QWidget):  # 主要小组件
                 location_key = config_center.read_conf('Weather', 'city')
                 city_name = db.search_by_num(location_key)
                 if city_name != 'coordinates':
-                    current_city.setText(f"{city_name} · " f"{weather_name}")
+                    font_metrics = current_city.fontMetrics()
+                    text_full = f"{city_name} · {weather_name}"
+                    full_width = font_metrics.horizontalAdvance(text_full)
+                    max_width = current_city.width()
+                    if full_width > max_width:
+                        current_city.setText(weather_name)
+                    else:
+                        current_city.setText(text_full)
                 else:
                     current_city.setText(f'{weather_name}')
                     if ',' in location_key:
@@ -3277,7 +3284,14 @@ class DesktopWidget(QWidget):  # 主要小组件
 
                                 def update_city_name(name, key):
                                     if name:
-                                        current_city.setText(f"{name} · {weather_name}")
+                                        font_metrics = current_city.fontMetrics()
+                                        text_full = f"{name} · {weather_name}"
+                                        full_width = font_metrics.horizontalAdvance(text_full)
+                                        max_width = current_city.width()
+                                        if full_width > max_width:
+                                            current_city.setText(weather_name)
+                                        else:
+                                            current_city.setText(text_full)
 
                                 def cleanup_thread():
                                     if (
@@ -3292,9 +3306,8 @@ class DesktopWidget(QWidget):  # 主要小组件
                                 self._city_threads.append(city_thread)
                         except Exception as e:
                             logger.error(f"获取城市名称失败: {e}")
-                path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace(
-                    '\\', '/'
-                )
+                icon_code = db.get_weather_data('icon', weather_data)
+                path = db.get_weather_stylesheet(icon_code).replace('\\', '/')
                 update_stylesheet = re.sub(
                     r'border-image: url\([^)]*\);',
                     f"border-image: url({path});",
@@ -3322,11 +3335,20 @@ class DesktopWidget(QWidget):  # 主要小组件
                     if current_city:
                         city_name = db.search_by_num(config_center.read_conf('Weather', 'city'))
                         if city_name != 'coordinates':
-                            current_city.setText(self.tr("{city} · 未知").format(city=city_name))
+                            font_metrics = current_city.fontMetrics()
+                            max_width = 120
+                            if font_metrics.horizontalAdvance(city_name) > max_width:
+                                current_city.setText(self.tr("未知"))
+                            else:
+                                current_city.setText(
+                                    self.tr("{city} · 未知").format(city=city_name)
+                                )
                         else:
                             current_city.setText(self.tr("未知"))
                     if hasattr(self, 'backgnd'):
-                        path = db.get_weather_stylesheet('99').replace('\\', '/')
+                        path = db.get_weather_stylesheet('99', db.get_current_api()).replace(
+                            '\\', '/'
+                        )
                         update_stylesheet = re.sub(
                             r'border-image: url\([^)]*\);',
                             f"border-image: url({path});",

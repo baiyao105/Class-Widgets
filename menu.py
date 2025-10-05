@@ -118,7 +118,7 @@ from generate_speech import (
     get_tts_service,
     get_voice_name_by_id_sync,
 )
-from network_thread import VersionThread, scheduleThread
+from network_thread import VersionThread, getCity, scheduleThread
 from plugin import p_loader
 from plugin_plaza import PluginPlaza
 
@@ -669,12 +669,22 @@ class selectCity(MessageBoxBase):  # 选择城市
     def get_coordinates_from_internet(self):
         """通过网络获取经纬度"""
         self._lock_input()
-        from network_thread import getCity
+        if not hasattr(self, '_coordinates_threads'):
+            self._coordinates_threads = []
 
         self.coordinates_thread = getCity(mode='coordinates_only')
         self.coordinates_thread.coordinates_signal.connect(self.set_coordinates)
         self.coordinates_thread.error_signal.connect(self._catch_error)
+        self.coordinates_thread.finished_signal.connect(
+            lambda: self._cleanup_coordinates_thread(self.coordinates_thread)
+        )
         self.coordinates_thread.start()
+        self._coordinates_threads.append(self.coordinates_thread)
+
+    def _cleanup_coordinates_thread(self, thread):
+        """清理已完成的线程引用"""
+        if hasattr(self, '_coordinates_threads') and thread in self._coordinates_threads:
+            self._coordinates_threads.remove(thread)
 
     def set_coordinates(self, latitude, longitude):
         """设置经纬度到输入框"""
@@ -1578,8 +1588,8 @@ class SettingsMenu(FluentWindow):
                         lon, lat = city_code.split(',')
                         city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
                         try:
-                            from network_thread import getCity
-
+                            if not hasattr(self, '_city_threads'):
+                                self._city_threads = []
                             city_thread = getCity('city_from_coordinates')
                             city_thread.set_coordinates(float(lat), float(lon))
 
@@ -1594,8 +1604,17 @@ class SettingsMenu(FluentWindow):
                                         )
                                     )
 
+                            def cleanup_thread():
+                                if (
+                                    hasattr(self, '_city_threads')
+                                    and city_thread in self._city_threads
+                                ):
+                                    self._city_threads.remove(city_thread)
+
                             city_thread.city_info_signal.connect(on_city_info_received)
+                            city_thread.finished_signal.connect(cleanup_thread)
                             city_thread.start()
+                            self._city_threads.append(city_thread)
                         except Exception as e:
                             pass
 

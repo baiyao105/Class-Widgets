@@ -2777,9 +2777,17 @@ class WeatherDataProcessor:
         self.weather_manager = weather_manager
         self._status_cache = {}
 
+    def _clear_all_lru_cache(self):
+        """清掉类所有lru方法缓存"""
+        for attr_name in dir(self):
+            attr = getattr(self, attr_name)
+            if hasattr(attr, 'cache_clear'):
+                attr.cache_clear()
+
     def clear_cache(self):
         """清理所有缓存"""
         self._status_cache.clear()
+        self._clear_all_lru_cache()
 
     def clear_api_cache(self, api_name: str):
         """清理指定api的缓存"""
@@ -2865,8 +2873,8 @@ class WeatherDataProcessor:
         self, weather_status: Dict[str, Any], code: str, api_name: Optional[str]
     ) -> Optional[str]:
         """查找代码"""
-        if code is None or str(code).strip() == '' or str(code) == 'None':
-            logger.error(f'天气代码为空或无效({api_name}): {code}')
+        if code is None or str(code).strip() == '' or str(code).lower() == 'none':
+            logger.warning(f'天气代码为空或无效({api_name}): {code}')
             return None
 
         if not weather_status or 'weatherinfo' not in weather_status:
@@ -2878,10 +2886,12 @@ class WeatherDataProcessor:
             if weather_code is not None and str(weather_code) == str(code):
                 original_code = weather.get('original_code')
                 if original_code is not None:
+                    # logger.debug(f'找到天气代码映射: {code} -> {original_code} ({api_name})')
                     return str(original_code)
+                # logger.debug(f'找到天气代码: {code} ({api_name})')
                 return str(weather.get('code'))
 
-        logger.error(f'未找到天气代码({api_name}) {code}')
+        logger.warning(f'未找到天气代码({api_name}): {code}')
         return None
 
     def _get_default_weather_icon(self) -> str:
@@ -2912,6 +2922,9 @@ class WeatherDataProcessor:
     def get_weather_stylesheet(self, code: str, api_name: Optional[str] = None) -> str:
         """获取天气背景样式"""
         current_time = datetime.datetime.now()
+        if code is None or str(code).lower() == 'none' or str(code).strip() == '':
+            logger.warning(f'天气代码无效: {code}')
+            code = '99'
         weather_status = self._load_weather_status(api_name)
         weather_code = '99'
 
