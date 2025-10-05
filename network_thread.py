@@ -3,6 +3,7 @@ import os
 import shutil
 import zipfile  # 解压插件zip
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -15,6 +16,7 @@ import list_
 import utils
 from basic_dirs import CACHE_HOME, CW_HOME
 from file import config_center
+from i18n_manager import get_language_code
 
 headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache"}  # 设置请求头
 """
@@ -208,69 +210,176 @@ class getReadme(QThread):  # 获取README
 
 
 class getCity(QThread):
+    coordinates_signal = pyqtSignal(float, float)  # 经纬度信号
+    city_signal = pyqtSignal(str)  # 城市信息信号
+    city_info_signal = pyqtSignal(str, str)  # 城市信息信号 (城市名, 城市key)
+    error_signal = pyqtSignal(str)  # 错误信号
+    finished_signal = pyqtSignal()  # 完成信号
 
-    def __init__(self, url: str = 'https://qifu-api.baidubce.com/ip/local/geo/v1/district') -> None:
+    def __init__(
+        self, mode: str = 'auto', write_config: bool = True, auto_type: str = 'coordinates'
+    ) -> None:
+        """
+        城市获取线程
+
+        Args:
+            mode: 模式选择
+                - 'auto': 自动获取城市信息(根据auto_type决定使用经纬度或cityid)
+                - 'coordinates_only': 仅获取经纬度并发送信号
+                - 'city_from_coordinates': 根据给定经纬度获取城市信息
+            write_config: 是否将获取的信息写入配置
+            auto_type: auto模式的类型
+                - 'coordinates': 使用经纬度自动获取城市信息
+                - 'cityid': 使用城市ID自动获取城市信息
+        """
         super().__init__()
-        self.download_url = url
+        self.mode = mode
+        self.write_config = write_config
+        self.auto_type = auto_type
+        self.target_lat = None
+        self.target_lon = None
+        self.city_id = None
+        self._load_api_config()
+
+    def _load_api_config(self):
+        """加载 API 配置"""
+        try:
+            config_path = Path(__file__).parent / 'data' / 'weather_api.json'
+            with open(config_path, encoding='utf-8') as f:
+                self.api_config = json.load(f)
+        except Exception as e:
+            logger.critical(f"加载 API 配置失败: {e}")
+
+    def set_coordinates(self, latitude: float, longitude: float):
+        """设置目标经纬度(city_from_coordinates)"""
+        self.target_lat = latitude
+        self.target_lon = longitude
+
+    def set_city_id(self, city_id: str):
+        """设置目标城市ID"""
+        self.city_id = city_id
 
     def run(self) -> None:
         try:
-            import weather as db
+            if self.mode == 'coordinates_only':
+                coordinates = self.get_coordinates()
+                if coordinates:
+                    self.coordinates_signal.emit(coordinates[0], coordinates[1])
 
-            city_data = self.get_city()
-            config_center.write_conf('Weather', 'city', db.search_code_by_name(city_data))
+            elif self.mode == 'city_from_coordinates':
+                if self.target_lat is not None and self.target_lon is not None:
+                    city_data = self.get_city_by_coordinates(self.target_lat, self.target_lon)
+                    if city_data:
+                        city_key = city_data['key']
+                        if city_data['key'].startswith('weathercn:'):
+                            if config_center.read_conf('Weather', 'api') != 'xiaomi_weather':
+                                city_key = city_data['key'].replace('weathercn:', '')
+                        self.city_signal.emit(city_key)
+                        self.city_info_signal.emit(city_data['name'], city_key)
+                else:
+                    raise ValueError("未设置目标经纬度")
+            elif self.mode == 'auto':
+                if self.auto_type == 'coordinates':
+                    coordinates = self.get_coordinates()
+                    if coordinates:
+                        city_data = self.get_city_by_coordinates(coordinates[0], coordinates[1])
+                        if city_data:
+                            city_key = city_data['locationKey']  # 初始化 city_key
+                            if city_data['locationKey'].startswith('weathercn:'):
+                                if config_center.read_conf('Weather', 'api') != 'xiaomi_weather':
+                                    city_key = city_data['locationKey'].replace('weathercn:', '')
+                            self.city_signal.emit(city_key)
+                            self.city_info_signal.emit(city_data['name'], city_key)
+                            if self.write_config:
+                                config_center.write_conf('Weather', 'city', city_key)
+                                # logger.success(f"成功设置城市信息: {city_key}")
+                elif self.city_id:
+                    self.city_signal.emit(self.city_id)
+                    if self.write_config:
+                        config_center.write_conf('Weather', 'city', self.city_id)
+                        # logger.success(f"成功设置城市信息: {self.city_id}")
+                else:
+                    raise ValueError("未设置城市ID")
+
+            self.finished_signal.emit()
+
         except Exception as e:
             logger.error(f"获取城市失败: {e}")
-
-    def get_city(self) -> Tuple[str, str]:
-        try:
-            req = requests.get(self.download_url, proxies=proxies)
-            if req.status_code == 200:
-                data = req.json()
-                # {"code":"Success","data":{"continent":"","country":"中国","zipcode":"","owner":"","isp":"","adcode":"","prov":"","city":"","district":""},"ip":"45.192.96.246"}
-                if data['code'] == 'Success':
-                    data = data['data']
-                    logger.info(f"获取城市成功：{data['city']}, {data['district']}")
-                    return (data['city'], data['district'])
-                logger.error(f"获取城市失败：{data['message']}")
-                raise ValueError(f"获取城市失败：{data['message']}")
-            logger.error(f"获取城市失败：{req.status_code}")
-            raise ValueError(f"获取城市失败：{req.status_code}")
-
-        except Exception as e:
-            logger.error(f"获取城市失败：{e}")
-            raise ValueError(f"获取城市失败：{e}")
-
-
-class getCoordinates(QThread):
-    def __init__(self, url: str = 'http://ip-api.com/json/?fields=status,lat,lon'):
-        super().__init__()
-        self.download_url = url
-
-    def run(self) -> None:
-        try:
-            coordinates_data = self.get_coordinates()
-            config_center.write_conf(
-                'Weather', 'city', f"{coordinates_data[1]},{coordinates_data[0]}"
-            )
-        except Exception as e:
-            logger.error(f"获取坐标失败: {e}")
+            self.error_signal.emit(str(e))
 
     def get_coordinates(self) -> Tuple[float, float]:
+        """获取当前位置的经纬度"""
         try:
-            req = requests.get(self.download_url, proxies=proxies)
+            api_config = self.api_config['location_api']['ip_geolocation']
+            url = api_config['url']
+            timeout = api_config.get('timeout', 10)
+            params = api_config.get('params', {})
+            response_format = api_config['response_format']
+
+            req = requests.get(url, params=params, proxies=proxies, timeout=timeout)
             if req.status_code == 200:
                 data = req.json()
-                if data['status'] == 'success':
-                    logger.info(f"获取坐标成功：{data['lat']}, {data['lon']}")
-                    return (data['lat'], data['lon'])
-                logger.error(f"获取坐标失败：{data['message']}")
-                raise ValueError(f"获取坐标失败：{data['message']}")
-            logger.error(f"获取坐标失败：{req.status_code}")
-            raise ValueError(f"获取坐标失败：{req.status_code}")
+                success_field = response_format['success_field']
+                success_value = response_format['success_value']
+
+                if data.get(success_field) == success_value:
+                    lat_field = response_format['latitude_field']
+                    lon_field = response_format['longitude_field']
+                    lat, lon = data[lat_field], data[lon_field]
+                    # logger.success(f"获取坐标成功: 纬度 {lat}, 经度 {lon}")
+                    return (lat, lon)
+
+                error_field = response_format.get('error_field', 'message')
+                error_msg = data.get(error_field, '未知错误')
+                logger.error(f"获取坐标失败：{error_msg}")
+                raise ValueError(f"获取坐标失败：{error_msg}")
+
+            logger.error(f"获取坐标失败: HTTP {req.status_code}")
+            raise ValueError(f"获取坐标失败: HTTP {req.status_code}")
+
         except Exception as e:
-            logger.error(f"获取坐标失败：{e}")
-            raise ValueError(f"获取坐标失败：{e}")
+            logger.error(f"获取坐标异常: {e}")
+            raise ValueError(f"获取坐标异常: {e}")
+
+    def get_city_by_coordinates(self, latitude: float, longitude: float) -> dict:
+        """根据经纬度获取城市信息"""
+        try:
+            api_config = self.api_config['city_api']['xiaomi_location']
+            url = api_config['url']
+            timeout = api_config.get('timeout', 10)
+            params = api_config['params'].copy()
+            response_format = api_config['response_format']
+            params['latitude'] = latitude
+            params['longitude'] = longitude
+            current_locale = get_language_code()
+            params['locale'] = current_locale
+
+            req = requests.get(url, params=params, proxies=proxies, timeout=timeout)
+            if req.status_code == 200:
+                data = req.json()
+                if data and len(data) > 0:
+                    data_path = response_format.get('data_path', '0')
+                    city_info = data[0] if data_path == '0' else data
+                    city_key = city_info.get(response_format['location_key_field'], '')
+                    city_name = city_info.get(response_format['city_name_field'], '')
+                    affiliation = city_info.get(response_format['affiliation_field'], '')
+                    # logger.success(f"获取城市成功: {city_name} ({affiliation}), key: {city_key}")
+                    return {
+                        'affiliation': affiliation,
+                        'key': city_key,
+                        'name': city_name,
+                        'locationKey': city_key,
+                    }
+
+                logger.error("空数据")
+                raise ValueError("空数据")
+
+            logger.error(f"请求失败: HTTP {req.status_code}")
+            raise ValueError(f"请求失败: HTTP {req.status_code}")
+
+        except Exception as e:
+            logger.error(f"获取城市失败: {e}")
+            raise ValueError(f"获取城市失败: {e}")
 
 
 class VersionThread(QThread):  # 获取最新版本号

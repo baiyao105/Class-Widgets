@@ -1,6 +1,5 @@
 import datetime
 import json
-import os
 import re
 import sqlite3
 import time
@@ -15,7 +14,7 @@ from PyQt5.QtCore import QCoreApplication, QEventLoop, QThread, pyqtSignal
 
 from basic_dirs import CW_HOME
 from file import config_center
-from network_thread import proxies
+from network_thread import getCity, proxies
 
 ICON_DIR = CW_HOME / "img" / "weather"
 
@@ -297,7 +296,11 @@ class WeatherManager:
     def _create_single_provider(self, api_name: str) -> Optional[WeatherapiProvider]:
         """创建提供者"""
         api_params = self.api_config.get('weather_api_parameters', {}).get(api_name, {})
-        weather_api_url = self.api_config.get('weather_api', {}).get(api_name, '')
+        weather_api_config = self.api_config.get('weather_api', {}).get(api_name, {})
+        if isinstance(weather_api_config, dict):
+            weather_api_url = weather_api_config.get('url', '')
+        else:
+            weather_api_url = weather_api_config or ''
 
         config = self._build_provider_config(api_params, weather_api_url)
         provider_class = self._get_provider_class(api_name)
@@ -429,20 +432,19 @@ class WeatherManager:
         """获取位置值"""
         location_key = config_center.read_conf('Weather', 'city')
         if location_key == '0' or not location_key:
-            location_key = self._get_auto_location()
+            location_key = self.get_auto_location()
         return location_key
 
-    def _get_auto_location(self) -> str:
+    def get_auto_location(self) -> str:
         """自动获取位置"""
         try:
             method = self.get_current_provider().config['method']
             if method == 'coordinates':
                 return self._get_coordinates_location()
-            from network_thread import getCity
-
-            city_thread = getCity()
+            city_thread = getCity(mode='auto', auto_type='cityid')
+            self._city_thread = city_thread
             loop = QEventLoop()
-            city_thread.finished.connect(loop.quit)
+            city_thread.finished_signal.connect(loop.quit)
             city_thread.start()
             loop.exec_()  # 阻塞到完成
             location_key = config_center.read_conf('Weather', 'city')
@@ -456,11 +458,10 @@ class WeatherManager:
     def _get_coordinates_location(self) -> str:
         """获取坐标位置"""
         try:
-            from network_thread import getCoordinates
-
-            coordinates_thread = getCoordinates()
+            coordinates_thread = getCity(mode='auto', auto_type='coordinates')
+            self._coordinates_thread = coordinates_thread
             loop = QEventLoop()
-            coordinates_thread.finished.connect(loop.quit)
+            coordinates_thread.finished_signal.connect(loop.quit)
             coordinates_thread.start()
             loop.exec_()  # 阻塞到完成
             coordinates_data = config_center.read_conf('Weather', 'city')
@@ -1066,6 +1067,38 @@ class GenericWeatherProvider(WeatherapiProvider):
 
 class XiaomiWeatherProvider(GenericWeatherProvider):
     """小米天气api获得"""
+
+    @retry_on_failure(max_retries=2, delay=0.5)
+    def fetch_current_weather(self, location_key: str, api_key: str) -> Dict[str, Any]:
+        """获取当前天气数据"""
+        if not location_key:
+            raise ValueError(f'{self.api_name}: location_key 参数不能为空')
+        try:
+            url_template = self.base_url
+            params = {
+                'location_key': location_key,
+                'days': 1,
+                'key': api_key,
+                'locale': getattr(self, 'locale', 'zh_cn'),
+            }
+            if ',' in location_key:
+                try:
+                    lon, lat = location_key.split(',')
+                    params['latitude'] = lat
+                    params['longitude'] = lon
+                except Exception:
+                    params['latitude'] = '0'
+                    params['longitude'] = '0'
+            else:
+                params['latitude'] = '0'
+                params['longitude'] = '0'
+            url = url_template.format(**params)
+            response = requests.get(url, proxies=proxies, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f'{self.api_name} 获取天气数据失败: {e}')
+            raise
 
     def parse_temperature(self, data: Dict[str, Any]) -> Optional[str]:
         """解析小米天气温度"""
@@ -2237,7 +2270,7 @@ class OpenMeteoProvider(GenericWeatherProvider):
             current = data.get('current', {})
             temp = current.get('temperature_2m')
             current_units = data.get('current_units', {})
-            unit = current_units.get('temperature_2m', '°C')
+            unit = current_units.get('temperature_2m', '℃')
             if temp is not None:
                 return f"{temp}{unit}"
             return None
@@ -2300,7 +2333,7 @@ class OpenMeteoProvider(GenericWeatherProvider):
             current = data.get('current', {})
             feels_like = current.get('apparent_temperature')
             current_units = data.get('current_units', {})
-            unit = current_units.get('apparent_temperature', '°C')
+            unit = current_units.get('apparent_temperature', '℃')
             if feels_like is not None:
                 return f"{feels_like}{unit}"
             return None
@@ -2531,7 +2564,7 @@ class OpenMeteoProvider(GenericWeatherProvider):
                 hour_data = {
                     'time': times[i] if i < len(times) else None,
                     'temperature': (
-                        f"{temperatures[i]}{hourly_units.get('temperature_2m', '°C')}"
+                        f"{temperatures[i]}{hourly_units.get('temperature_2m', '℃')}"
                         if i < len(temperatures) and temperatures[i] is not None
                         else None
                     ),
@@ -2541,7 +2574,7 @@ class OpenMeteoProvider(GenericWeatherProvider):
                         else None
                     ),
                     'apparent_temperature': (
-                        f"{apparent_temps[i]}{hourly_units.get('apparent_temperature', '°C')}"
+                        f"{apparent_temps[i]}{hourly_units.get('apparent_temperature', '℃')}"
                         if i < len(apparent_temps) and apparent_temps[i] is not None
                         else None
                     ),
@@ -2594,12 +2627,12 @@ class OpenMeteoProvider(GenericWeatherProvider):
                 day_data = {
                     'date': times[i] if i < len(times) else None,
                     'temp_max': (
-                        f"{temp_max[i]}{daily_units.get('temperature_2m_max', '°C')}"
+                        f"{temp_max[i]}{daily_units.get('temperature_2m_max', '℃')}"
                         if i < len(temp_max) and temp_max[i] is not None
                         else None
                     ),
                     'temp_min': (
-                        f"{temp_min[i]}{daily_units.get('temperature_2m_min', '°C')}"
+                        f"{temp_min[i]}{daily_units.get('temperature_2m_min', '℃')}"
                         if i < len(temp_min) and temp_min[i] is not None
                         else None
                     ),
@@ -2719,6 +2752,8 @@ class WeatherDatabase:
             return 'coordinates'
         self._update_db_path()
         try:
+            if city_code.startswith('weathercn:'):
+                city_code = city_code.replace('weathercn:', '')
             with self._get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -2727,7 +2762,7 @@ class WeatherDatabase:
                 cities_results = cursor.fetchall()
                 if cities_results:
                     return cities_results[0][2]
-                return '北京'  # 默认城市
+                return 'coordinates'
 
         except Exception as e:
             logger.error(f'根据代码搜索城市失败: {e}')
@@ -2741,9 +2776,17 @@ class WeatherDataProcessor:
         self.weather_manager = weather_manager
         self._status_cache = {}
 
+    def _clear_all_lru_cache(self):
+        """清掉类所有lru方法缓存"""
+        for attr_name in dir(self):
+            attr = getattr(self, attr_name)
+            if hasattr(attr, 'cache_clear'):
+                attr.cache_clear()
+
     def clear_cache(self):
         """清理所有缓存"""
         self._status_cache.clear()
+        self._clear_all_lru_cache()
 
     def clear_api_cache(self, api_name: str):
         """清理指定api的缓存"""
@@ -2765,7 +2808,7 @@ class WeatherDataProcessor:
             is_celsius = (
                 not current_unit_raw  # 无单位默认摄氏度
                 or current_unit_raw == '℃'
-                or current_unit_lower in ['°c', 'c']
+                or current_unit_lower in ['℃', 'c']
                 or '℃' in temp_str
             )
             is_fahrenheit = (
@@ -2829,8 +2872,8 @@ class WeatherDataProcessor:
         self, weather_status: Dict[str, Any], code: str, api_name: Optional[str]
     ) -> Optional[str]:
         """查找代码"""
-        if code is None or str(code).strip() == '' or str(code) == 'None':
-            logger.error(f'天气代码为空或无效({api_name}): {code}')
+        if code is None or str(code).strip() == '' or str(code).lower() == 'none':
+            logger.warning(f'天气代码为空或无效({api_name}): {code}')
             return None
 
         if not weather_status or 'weatherinfo' not in weather_status:
@@ -2842,10 +2885,12 @@ class WeatherDataProcessor:
             if weather_code is not None and str(weather_code) == str(code):
                 original_code = weather.get('original_code')
                 if original_code is not None:
+                    # logger.debug(f'找到天气代码映射: {code} -> {original_code} ({api_name})')
                     return str(original_code)
+                # logger.debug(f'找到天气代码: {code} ({api_name})')
                 return str(weather.get('code'))
 
-        logger.error(f'未找到天气代码({api_name}) {code}')
+        logger.warning(f'未找到天气代码({api_name}): {code}')
         return None
 
     def _get_default_weather_icon(self) -> str:
@@ -2876,6 +2921,9 @@ class WeatherDataProcessor:
     def get_weather_stylesheet(self, code: str, api_name: Optional[str] = None) -> str:
         """获取天气背景样式"""
         current_time = datetime.datetime.now()
+        if code is None or str(code).lower() == 'none' or str(code).strip() == '':
+            logger.warning(f'天气代码无效: {code}')
+            code = '99'
         weather_status = self._load_weather_status(api_name)
         weather_code = '99'
 
@@ -2889,11 +2937,11 @@ class WeatherDataProcessor:
 
         if weather_code in ('0', '1', '3', '99', '900'):  # 晴、多云、阵雨、未知
             if 6 <= current_time.hour < 18:  # 日间
-                return os.path.join('img', 'weather', 'bkg', 'day.png')
+                return str(ICON_DIR / 'bkg' / 'day.png')
             # 夜间
-            return os.path.join('img', 'weather', 'bkg', 'night.png')
+            return str(ICON_DIR / 'bkg' / 'night.png')
 
-        return os.path.join('img', 'weather', 'bkg', 'rain.png')
+        return str(ICON_DIR / 'bkg' / 'rain.png')
 
     def get_weather_code_by_description(
         self, description: str, api_name: Optional[str] = None
@@ -2930,7 +2978,6 @@ class WeatherDataProcessor:
     def extract_weather_data(self, key: str, weather_data: Dict[str, Any]) -> Optional[str]:
         """从天气数据中提取指定字段的值(兼容旧接口)"""
         if not weather_data:
-            logger.error('weather_data is None!')
             return None
 
         provider = self.weather_manager.get_current_provider()
@@ -3536,6 +3583,9 @@ def on_weather_api_changed(new_api: str):
     global weather_manager, weather_processor
     weather_manager.on_api_changed(new_api)
     weather_processor.clear_cache()
+    location = weather_manager.get_auto_location()
+    if location:
+        config_center.write_conf('Weather', 'city', location)
 
 
 # 兼容性用
@@ -3923,7 +3973,7 @@ if __name__ == '__main__':
                 weather_desc = get_weather_by_code(str(hour["weather_code"]))
                 precip_status = "有降水" if hour["precipitation"] else "无降水"
                 print(
-                    f"{hour['hour']}小时后: {hour['temperature']}°C, {weather_desc} ({precip_status})"
+                    f"{hour['hour']}小时后: {hour['temperature']}℃, {weather_desc} ({precip_status})"
                 )
 
             if precipitation_time:
@@ -3952,7 +4002,7 @@ if __name__ == '__main__':
                 precip_status = "降水日" if day["precipitation_day"] else "非降水日"
                 day_precip_status = "白天有降水" if day["day_precipitation"] else "白天无降水"
 
-                print(f"第 {day['day']+1} 天: {day['temp_high']} - {day['temp_low']}°C")
+                print(f"第 {day['day']+1} 天: {day['temp_high']} - {day['temp_low']}℃")
                 print(f"  白天: {day_weather}, 夜间: {night_weather}")
                 print(f"  状态: {precip_status}, {day_precip_status}")
 

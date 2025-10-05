@@ -96,7 +96,7 @@ from file import config_center, schedule_center
 from generate_speech import generate_speech_sync
 from i18n_manager import app, global_i18n_manager
 from menu import open_plaza
-from network_thread import check_update
+from network_thread import check_update, getCity
 from plugin import p_loader
 from tip_toast import active_windows
 from utils import DarkModeWatcher, TimeManagerFactory, restart, stop, update_timer
@@ -3260,14 +3260,54 @@ class DesktopWidget(QWidget):  # 主要小组件
                     self.temperature.setText(converted_temp)
                 else:
                     self.temperature.setText(f'--{get_default_temperature_unit()}')
-                city_name = db.search_by_num(config_center.read_conf('Weather', 'city'))
+                location_key = config_center.read_conf('Weather', 'city')
+                city_name = db.search_by_num(location_key)
                 if city_name != 'coordinates':
-                    current_city.setText(f"{city_name} · " f"{weather_name}")
+                    font_metrics = current_city.fontMetrics()
+                    text_full = f"{city_name} · {weather_name}"
+                    full_width = font_metrics.horizontalAdvance(text_full)
+                    max_width = current_city.width()
+                    if full_width > max_width:
+                        current_city.setText(weather_name)
+                    else:
+                        current_city.setText(text_full)
                 else:
                     current_city.setText(f'{weather_name}')
-                path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace(
-                    '\\', '/'
-                )
+                    if ',' in location_key:
+                        try:
+                            lon, lat = location_key.split(',')
+                            if lat and lon:
+                                if not hasattr(self, '_city_threads'):
+                                    self._city_threads = []
+                                city_thread = getCity('city_from_coordinates')
+                                city_thread.set_coordinates(lat, lon)
+
+                                def update_city_name(name, key):
+                                    if name:
+                                        font_metrics = current_city.fontMetrics()
+                                        text_full = f"{name} · {weather_name}"
+                                        full_width = font_metrics.horizontalAdvance(text_full)
+                                        max_width = current_city.width()
+                                        if full_width > max_width:
+                                            current_city.setText(weather_name)
+                                        else:
+                                            current_city.setText(text_full)
+
+                                def cleanup_thread():
+                                    if (
+                                        hasattr(self, '_city_threads')
+                                        and city_thread in self._city_threads
+                                    ):
+                                        self._city_threads.remove(city_thread)
+
+                                city_thread.city_info_signal.connect(update_city_name)
+                                city_thread.finished_signal.connect(cleanup_thread)
+                                city_thread.start()
+                                self._city_threads.append(city_thread)
+                        except Exception as e:
+                            logger.error(f"获取城市名称失败: {e}")
+                icon_code = db.get_weather_data('icon', weather_data)
+                path = db.get_weather_stylesheet(icon_code).replace('\\', '/')
                 update_stylesheet = re.sub(
                     r'border-image: url\([^)]*\);',
                     f"border-image: url({path});",
