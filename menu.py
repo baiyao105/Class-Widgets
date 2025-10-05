@@ -670,6 +670,7 @@ class selectCity(MessageBoxBase):  # 选择城市
         """通过网络获取经纬度"""
         self._lock_input()
         from network_thread import getCity
+
         self.coordinates_thread = getCity(mode='coordinates_only')
         self.coordinates_thread.coordinates_signal.connect(self.set_coordinates)
         self.coordinates_thread.error_signal.connect(self._catch_error)
@@ -1578,14 +1579,20 @@ class SettingsMenu(FluentWindow):
                         city_name = f"{abs(float(lat)):.2f}°{'N' if float(lat) >= 0 else 'S'}, {abs(float(lon)):.2f}°{'E' if float(lon) >= 0 else 'W'}"
                         try:
                             from network_thread import getCity
+
                             city_thread = getCity('city_from_coordinates')
                             city_thread.set_coordinates(float(lat), float(lon))
+
                             def on_city_info_received(city_name_xiaomi, city_key):
-                                if city_name_xiaomi:
-                                    if hasattr(self, 'city_location_label') and self.city_location_label:
-                                        self.city_location_label.setText(
-                                            self.tr("{city_name} · 当前天气").format(city_name=city_name_xiaomi)
+                                if city_name_xiaomi and (
+                                    hasattr(self, 'city_location_label')
+                                    and self.city_location_label
+                                ):
+                                    self.city_location_label.setText(
+                                        self.tr("{city_name} · 当前天气").format(
+                                            city_name=city_name_xiaomi
                                         )
+                                    )
 
                             city_thread.city_info_signal.connect(on_city_info_received)
                             city_thread.start()
@@ -4598,15 +4605,6 @@ class SettingsMenu(FluentWindow):
                         city_key = f"weathercn:{city_key}"
                     config_center.write_conf('Weather', 'city', city_key)
                     city_changed = True
-                    Flyout.create(
-                        icon=InfoBarIcon.SUCCESS,
-                        title=self.tr('城市已设置'),
-                        content=self.tr(f'已将城市设置为 {selected_city[0].text()} ({city_key})'),
-                        target=search_city_dialog,
-                        parent=self,
-                        isClosable=True,
-                        aniType=FlyoutAnimationType.PULL_UP,
-                    )
             else:  # coordinates
                 lon = search_city_dialog.longitude_edit.text()
                 lat = search_city_dialog.latitude_edit.text()

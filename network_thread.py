@@ -216,7 +216,9 @@ class getCity(QThread):
     error_signal = pyqtSignal(str)  # 错误信号
     finished_signal = pyqtSignal()  # 完成信号
 
-    def __init__(self, mode: str = 'auto', write_config: bool = True, auto_type: str = 'coordinates') -> None:
+    def __init__(
+        self, mode: str = 'auto', write_config: bool = True, auto_type: str = 'coordinates'
+    ) -> None:
         """
         城市获取线程
 
@@ -290,15 +292,14 @@ class getCity(QThread):
                             self.city_info_signal.emit(city_data['name'], city_key)
                             if self.write_config:
                                 config_center.write_conf('Weather', 'city', city_key)
-                                logger.info(f"成功设置城市信息: {city_key}")
-                else:  # auto_type == 'cityid'
-                    if self.city_id:
-                        self.city_signal.emit(self.city_id)
-                        if self.write_config:
-                            config_center.write_conf('Weather', 'city', self.city_id)
-                            logger.info(f"成功设置城市信息: {self.city_id}")
-                    else:
-                        raise ValueError("未设置城市ID")
+                                # logger.success(f"成功设置城市信息: {city_key}")
+                elif self.city_id:
+                    self.city_signal.emit(self.city_id)
+                    if self.write_config:
+                        config_center.write_conf('Weather', 'city', self.city_id)
+                        # logger.success(f"成功设置城市信息: {self.city_id}")
+                else:
+                    raise ValueError("未设置城市ID")
 
             self.finished_signal.emit()
 
@@ -325,7 +326,7 @@ class getCity(QThread):
                     lat_field = response_format['latitude_field']
                     lon_field = response_format['longitude_field']
                     lat, lon = data[lat_field], data[lon_field]
-                    logger.info(f"获取坐标成功: 纬度 {lat}, 经度 {lon}")
+                    # logger.success(f"获取坐标成功: 纬度 {lat}, 经度 {lon}")
                     return (lat, lon)
 
                 error_field = response_format.get('error_field', 'message')
@@ -367,7 +368,7 @@ class getCity(QThread):
                         'affiliation': affiliation,
                         'key': city_key,
                         'name': city_name,
-                        'locationKey': city_key
+                        'locationKey': city_key,
                     }
 
                 logger.error("空数据")

@@ -96,7 +96,7 @@ from file import config_center, schedule_center
 from generate_speech import generate_speech_sync
 from i18n_manager import app, global_i18n_manager
 from menu import open_plaza
-from network_thread import getCity, check_update
+from network_thread import check_update, getCity
 from plugin import p_loader
 from tip_toast import active_windows
 from utils import DarkModeWatcher, TimeManagerFactory, restart, stop, update_timer
@@ -3270,13 +3270,26 @@ class DesktopWidget(QWidget):  # 主要小组件
                         try:
                             lon, lat = location_key.split(',')
                             if lat and lon:
+                                if not hasattr(self, '_city_threads'):
+                                    self._city_threads = []
                                 city_thread = getCity('city_from_coordinates')
                                 city_thread.set_coordinates(lat, lon)
+
                                 def update_city_name(name, key):
                                     if name:
-                                       current_city.setText(f"{name} · {weather_name}")
+                                        current_city.setText(f"{name} · {weather_name}")
+
+                                def cleanup_thread():
+                                    if (
+                                        hasattr(self, '_city_threads')
+                                        and city_thread in self._city_threads
+                                    ):
+                                        self._city_threads.remove(city_thread)
+
                                 city_thread.city_info_signal.connect(update_city_name)
+                                city_thread.finished_signal.connect(cleanup_thread)
                                 city_thread.start()
+                                self._city_threads.append(city_thread)
                         except Exception as e:
                             logger.error(f"获取城市名称失败: {e}")
                 path = db.get_weather_stylesheet(db.get_weather_data('icon', weather_data)).replace(

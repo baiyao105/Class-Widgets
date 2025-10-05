@@ -442,9 +442,10 @@ class WeatherManager:
             method = self.get_current_provider().config['method']
             if method == 'coordinates':
                 return self._get_coordinates_location()
-            city_thread = getCity()
+            city_thread = getCity(mode='auto', auto_type='cityid')
+            self._city_thread = city_thread
             loop = QEventLoop()
-            city_thread.finished.connect(loop.quit)
+            city_thread.finished_signal.connect(loop.quit)
             city_thread.start()
             loop.exec_()  # 阻塞到完成
             location_key = config_center.read_conf('Weather', 'city')
@@ -458,7 +459,8 @@ class WeatherManager:
     def _get_coordinates_location(self) -> str:
         """获取坐标位置"""
         try:
-            coordinates_thread = getCity(mode='auto')
+            coordinates_thread = getCity(mode='auto', auto_type='coordinates')
+            self._coordinates_thread = coordinates_thread
             loop = QEventLoop()
             coordinates_thread.finished_signal.connect(loop.quit)
             coordinates_thread.start()
@@ -1078,7 +1080,7 @@ class XiaomiWeatherProvider(GenericWeatherProvider):
                 'location_key': location_key,
                 'days': 1,
                 'key': api_key,
-                'locale': getattr(self, 'locale', 'zh_cn')
+                'locale': getattr(self, 'locale', 'zh_cn'),
             }
             if ',' in location_key:
                 try:
