@@ -1448,8 +1448,8 @@ class SettingsMenu(FluentWindow):
                 self.weather_refresh_picker.valueChanged.connect(self._on_refresh_interval_changed)
             if self.weather_temperat_unit:
                 self.weather_temperat_unit.addItems(list_.temperature_units)
-                current_unit = config_center.read_conf('Weather', 'temperature_unit')
-                if current_unit == 'fahrenheit':
+                current_unit = config_center.read_conf('Weather', 'temperature_unit', '℃')
+                if current_unit == '℉':
                     self.weather_temperat_unit.setCurrentIndex(1)  # 华氏度
                 else:
                     self.weather_temperat_unit.setCurrentIndex(0)  # 摄氏度
@@ -1557,9 +1557,9 @@ class SettingsMenu(FluentWindow):
         """温度单位改变事件"""
         try:
             if index == 1:
-                unit = 'fahrenheit'  # 华氏度
+                unit = '℉'  # 华氏度
             else:
-                unit = 'celsius'  # 摄氏度
+                unit = '℃'  # 摄氏度
             config_center.write_conf('Weather', 'temperature_unit', unit)
             self._on_refresh_clicked()
             # logger.info(f'温度单位已更新为 {unit}')
@@ -1657,7 +1657,8 @@ class SettingsMenu(FluentWindow):
             if self.current_temperature and temp_data and temp_data.lower() != 'none':
                 self.current_temperature.setText(temp_data)
             elif self.current_temperature:
-                self.current_temperature.setText('--°')
+                default_unit = config_center.read_conf('Weather', 'temperature_unit', '℃')
+                self.current_temperature.setText(f'--{default_unit}')
             icon_code = wd.get_weather_data('icon', weather_data)
             if icon_code:
                 description = wd.get_weather_by_code(icon_code)
@@ -1673,7 +1674,8 @@ class SettingsMenu(FluentWindow):
                     self.tr("体感温度: {feels_like_data}").format(feels_like_data=feels_like_data)
                 )
             elif self.feels_like_temperature:
-                self.feels_like_temperature.setText(self.tr("体感温度: --°"))
+                default_unit = config_center.read_conf('Weather', 'temperature_unit', '℃')
+                self.feels_like_temperature.setText(self.tr(f"体感温度: --{default_unit}"))
             if self.weather_icon_label and icon_code:
                 icon_data = wd.get_weather_icon_by_code(icon_code)
                 self._update_weather_icon(icon_data)

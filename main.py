@@ -3243,9 +3243,9 @@ class DesktopWidget(QWidget):  # 主要小组件
             weather_name = db.get_weather_by_code(db.get_weather_data('icon', weather_data))
             temp_data = db.get_weather_data('temp', weather_data)
             if temp_data and temp_data.lower() != 'none':
-                temperature = db.weather_processor._convert_temperature_unit(temp_data)
+                temperature = db.weather_processor.convert_temperature_unit(temp_data)
             else:
-                temperature = '--°'
+                temperature = f'--{get_default_temperature_unit()}'
             current_city = self.findChild(QLabel, 'current_city')
             try:
                 path = db.get_weather_icon_by_code(db.get_weather_data('icon', weather_data))
@@ -3256,10 +3256,10 @@ class DesktopWidget(QWidget):  # 主要小组件
 
                 temp_data = db.get_weather_data('temp', weather_data)
                 if temp_data and temp_data.lower() != 'none':
-                    converted_temp = db.weather_processor._convert_temperature_unit(temp_data)
+                    converted_temp = db.weather_processor.convert_temperature_unit(temp_data)
                     self.temperature.setText(converted_temp)
                 else:
-                    self.temperature.setText('--°')
+                    self.temperature.setText(f'--{get_default_temperature_unit()}')
                 city_name = db.search_by_num(config_center.read_conf('Weather', 'city'))
                 if city_name != 'coordinates':
                     current_city.setText(f"{city_name} · " f"{weather_name}")
@@ -3280,10 +3280,10 @@ class DesktopWidget(QWidget):  # 主要小组件
             logger.error(f'获取天气数据出错：{weather_data}')
             try:
                 if hasattr(self, 'weather_icon'):
-                    self.weather_icon.setIcon(QIcon(CW_HOME / 'img/weather/99.svg'))
+                    self.weather_icon.setIcon(QIcon(f'{CW_HOME / "img/weather/99.svg"}'))
                     self.alert_icon.hide()
                     self.weather_alert_text.hide()
-                    self.temperature.setText('--°')
+                    self.temperature.setText(f'--{get_default_temperature_unit()}')
                     self.current_alerts = []
                     self.current_alert_index = 0
                     self.current_reminders = []
@@ -3624,6 +3624,11 @@ def check_windows_maximize() -> bool:
             continue
 
     return False
+
+
+def get_default_temperature_unit() -> str:
+    """获取配置的温度单位"""
+    return config_center.read_conf('Weather', 'temperature_unit', '℃')
 
 
 def init_config() -> None:  # 重设配置文件

@@ -65,8 +65,8 @@ non_nt_hide_mode = [
     QCoreApplication.translate("list_", '上课时自动隐藏'),
 ]
 temperature_units = [
-    QCoreApplication.translate("list_", '摄氏度 (°C)'),
-    QCoreApplication.translate("list_", '华氏度 (°F)'),
+    QCoreApplication.translate("list_", '摄氏度 (℃)'),
+    QCoreApplication.translate("list_", '华氏度 (℉)'),
 ]
 version_channel = [
     QCoreApplication.translate("list_", '正式版 (Release)'),

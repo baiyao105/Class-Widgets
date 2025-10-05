@@ -2750,32 +2750,41 @@ class WeatherDataProcessor:
         if api_name in self._status_cache:
             del self._status_cache[api_name]
 
-    def _convert_temperature_unit(self, temp_str: str) -> str:
+    def convert_temperature_unit(self, temp_str: str) -> str:
         """根据配置转换温度单位"""
         if not temp_str:
             return temp_str
         try:
-            target_unit = config_center.read_conf('Weather', 'temperature_unit', 'celsius')
+            target_unit = config_center.read_conf('Weather', 'temperature_unit', '℃')
             match = re.match(r'([+-]?\d+(?:\.\d+)?)\s*([°℃℉CF]?)', temp_str.strip())
             if not match:
                 return temp_str
             temp_value = float(match.group(1))
-            current_unit = match.group(2).lower() if match.group(2) else ''
-            is_celsius = current_unit in ['', '℃', '°c', 'c'] or '℃' in temp_str
-            is_fahrenheit = current_unit in ['℉', '°f', 'f'] or '℉' in temp_str
+            current_unit_raw = match.group(2) or ''
+            current_unit_lower = current_unit_raw.lower()
+            is_celsius = (
+                not current_unit_raw  # 无单位默认摄氏度
+                or current_unit_raw == '℃'
+                or current_unit_lower in ['°c', 'c']
+                or '℃' in temp_str
+            )
+            is_fahrenheit = (
+                current_unit_raw == '℉' or current_unit_lower in ['°f', 'f'] or '℉' in temp_str
+            )
             if not is_celsius and not is_fahrenheit:
-                is_celsius = True
-            if target_unit == 'fahrenheit':
+                is_celsius = True  # 无法确定默认摄氏度
+            if target_unit == '℉':
                 if is_celsius:
-                    # 摄氏度->华氏度: F = C * 9/5 + 32
+                    # 摄氏度 → 华氏度: F = C * 9/5 + 32
                     converted_temp = temp_value * 9 / 5 + 32
                     return f"{converted_temp:.1f}℉"
                 return f"{temp_value:.1f}℉"
             if is_fahrenheit:
-                # 华氏度->摄氏度: C = (F - 32) * 5/9
+                # 华氏度 → 摄氏度: C = (F - 32) * 5/9
                 converted_temp = (temp_value - 32) * 5 / 9
                 return f"{converted_temp:.1f}℃"
             return f"{temp_value:.1f}℃"
+
         except Exception as e:
             logger.error(f"温度单位转换失败: {e}")
             return temp_str
@@ -2933,7 +2942,7 @@ class WeatherDataProcessor:
                 temp_result = provider.parse_temperature(weather_data)
                 # 应用温度单位转换
                 if temp_result:
-                    return self._convert_temperature_unit(temp_result)
+                    return self.convert_temperature_unit(temp_result)
                 return temp_result
             if key == 'icon':
                 icon_code = provider.parse_weather_icon(weather_data)
@@ -2965,7 +2974,7 @@ class WeatherDataProcessor:
                     feels_like_result = provider.parse_feels_like(weather_data)
                     # 应用温度单位转换
                     if feels_like_result:
-                        return self._convert_temperature_unit(feels_like_result)
+                        return self.convert_temperature_unit(feels_like_result)
                     return feels_like_result
                 return self._legacy_extract_weather_data(key, weather_data)
             if key == 'wind_direction':
