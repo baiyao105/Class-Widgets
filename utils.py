@@ -1040,7 +1040,6 @@ class SingleInstanceGuard:
 
 
 class PreviousWindowFocusManager(QObject):
-
     restore_requested = pyqtSignal()  # 请求恢复焦点信号
     ignore = pyqtSignal(int)  # 忽略特定窗口句柄信号
     remove_ignore = pyqtSignal(int)  # 移除忽略窗口句柄信号

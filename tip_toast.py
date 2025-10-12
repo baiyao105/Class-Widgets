@@ -489,7 +489,15 @@ def main(
     if detect_enable_toast(state):
         return
 
-    global start_x, start_y, total_width, height, radius, attend_class_color, finish_class_color, prepare_class_color
+    global \
+        start_x, \
+        start_y, \
+        total_width, \
+        height, \
+        radius, \
+        attend_class_color, \
+        finish_class_color, \
+        prepare_class_color
 
     widgets = list_.get_widget_config()
     for widget in widgets:  # 检查组件
