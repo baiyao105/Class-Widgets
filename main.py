@@ -124,6 +124,8 @@ notification = tip_toast
 excluded_lessons = []
 last_notify_time = None
 notify_cooldown = 2  # 2秒内仅能触发一次通知(防止触发114514个通知导致爆炸
+sent_notifications = {}  # 格式: {notification_key: timestamp}
+notification_dedup_timeout = 10  # 通知去重超时时间(秒)
 
 timeline_data = []
 next_lessons = []
@@ -423,16 +425,34 @@ def get_current_lessons() -> None:  # 获取当前课程
 
 # 获取倒计时、弹窗提示
 def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # 重构好累aaaa
-    global last_notify_time
+    global last_notify_time, sent_notifications
     current_dt = TimeManagerFactory.get_instance().get_current_time()
     if last_notify_time and (current_dt - last_notify_time).seconds < notify_cooldown:
         return None
 
+    def can_send_notification(state: int, lesson_name: str = '') -> bool:
+        """检查是否可以发送通知"""
+        notification_key = f"{state}_{lesson_name}_{current_dt.strftime('%Y-%m-%d_%H:%M')}"
+        current_timestamp = current_dt.timestamp()
+        expired_keys = [
+            key for key, timestamp in sent_notifications.items()
+            if current_timestamp - timestamp > notification_dedup_timeout
+        ]
+        for key in expired_keys:
+            del sent_notifications[key]
+        if notification_key in sent_notifications:
+            return False
+        sent_notifications[notification_key] = current_timestamp
+        print(True)
+        return True
+
     def after_school():  # 放学
         if parts_type[part] == 'break':  # 休息段
-            notification.push_notification(0, current_lesson_name)  # 下课
+            if can_send_notification(0, current_lesson_name):
+                notification.push_notification(0, current_lesson_name)  # 下课
         elif config_center.read_conf('Toast', 'after_school') == '1':
-            notification.push_notification(2)  # 放学
+            if can_send_notification(2):
+                notification.push_notification(2)  # 放学
 
     # 当前时间舍去毫秒，否则后面判定时间相等始终是False
     current_dt = TimeManagerFactory.get_instance().get_current_time_without_ms()
@@ -449,11 +469,13 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                     # 判断时间是否上下课，发送通知
                     if current_dt == c_time and toast:
                         if not isbreak:
-                            notification.push_notification(1, next_lessons[0])  # 上课
-                            last_notify_time = current_dt
+                            if can_send_notification(1, next_lessons[0]):
+                                notification.push_notification(1, next_lessons[0])  # 上课
+                                last_notify_time = current_dt
                         elif next_lessons:  # 下课/放学
-                            notification.push_notification(0, next_lessons[0])  # 下课
-                            last_notify_time = current_dt
+                            if can_send_notification(0, next_lessons[0]):
+                                notification.push_notification(0, next_lessons[0])  # 下课
+                                last_notify_time = current_dt
                         else:
                             after_school()
 
@@ -473,8 +495,9 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                         )
                         and not current_state
                     ):  # 课间
-                        notification.push_notification(3, next_lessons[0])  # 准备上课（预备铃）
-                        last_notify_time = current_dt
+                        if can_send_notification(3, next_lessons[0]):
+                            notification.push_notification(3, next_lessons[0])  # 准备上课（预备铃）
+                            last_notify_time = current_dt
 
                     # 放学
                     if (
@@ -532,7 +555,9 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # �
                             not last_notify_time
                             or (now - last_notify_time).seconds >= notify_cooldown
                         ) and next_lesson_name is not None:
-                            notification.push_notification(3, next_lesson_name)
+                            if can_send_notification(3, next_lesson_name):
+                                notification.push_notification(3, next_lesson_name)
+                                last_notify_time = now
             # if f'a{part}1' in timeline_data:
 
             def have_class():
