@@ -435,7 +435,8 @@ def get_countdown(toast: bool = False) -> Optional[List[Union[str, int]]]:  # é‡
         notification_key = f"{state}_{lesson_name}_{current_dt.strftime('%Y-%m-%d_%H:%M')}"
         current_timestamp = current_dt.timestamp()
         expired_keys = [
-            key for key, timestamp in sent_notifications.items()
+            key
+            for key, timestamp in sent_notifications.items()
             if current_timestamp - timestamp > notification_dedup_timeout
         ]
         for key in expired_keys:
