@@ -451,8 +451,8 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH" || true
           echo "::group::Python-Version"
           echo "[DEBUG] uvx-python: $(uvx python --version) | system-python: $(python --version)" || true
-          echo "[DEBUG] 已安装的Python:"
-          uv python list --only-installed || true
+          # echo "[DEBUG] 已安装的Python:"
+          # uv python list --only-installed || true
           echo "::endgroup::"
 
       - name: Cache Python dependencies
@@ -469,7 +469,6 @@ jobs:
         shell: bash
         run: |
           uv sync --group package --no-dev
-          uv pip install cffi ply --upgrade
           uv pip list --outdated
 
       - name: Prepare output directory
