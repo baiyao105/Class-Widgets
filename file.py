@@ -392,7 +392,8 @@ class ScheduleCenter:
             require_save = True
         except Exception as e:
             logger.error(f"课程表数据校验失败: {e}")
-        require_save and self.save_data(self.schedule_data, self.config_center.schedule_name)
+        if require_save:
+            self.save_data(self.schedule_data, self.config_center.schedule_name)
 
     def update_url(self, url: str) -> None:
         """
