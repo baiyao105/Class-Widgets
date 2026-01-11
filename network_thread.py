@@ -653,9 +653,7 @@ class scheduleThread(QThread):  # 获取课表
     def post_schedule(self):
         try:
             logger.info(f"正在上传课表 {self.url}")
-            response = requests.post(
-                self.url, timeout=30, json={"data": json.dumps(self.data)}
-            )
+            response = requests.post(self.url, timeout=30, json={"data": json.dumps(self.data)})
             logger.debug(f"课表 {self.url} 请求响应: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()

@@ -267,8 +267,14 @@ def get_timeline_data() -> List[Tuple[int, str, int, int]]:
 
 def get_schedule_map() -> Dict[str, List[str]]:
     try:
-        use_even = config_center.read_conf('General', 'enable_alt_schedule') == '1' or conf.is_temp_week()
-        schedule_raw = loaded_data.get('schedule_even') if use_even and conf.get_week_type() else loaded_data.get('schedule')
+        use_even = (
+            config_center.read_conf('General', 'enable_alt_schedule') == '1' or conf.is_temp_week()
+        )
+        schedule_raw = (
+            loaded_data.get('schedule_even')
+            if use_even and conf.get_week_type()
+            else loaded_data.get('schedule')
+        )
         if isinstance(schedule_raw, dict):
             return {k: (v if isinstance(v, list) else []) for k, v in schedule_raw.items()}
         return {str(i): [] for i in range(7)}
@@ -552,7 +558,10 @@ def get_countdown(toast: bool = False) -> Optional[Tuple[str, str, int]]:  # 重
                 if current_state == 0:
                     now = TimeManagerFactory.get_instance().get_current_time()
                     if (
-                        (not last_notify_time or (now - last_notify_time).seconds >= notify_cooldown)
+                        (
+                            not last_notify_time
+                            or (now - last_notify_time).seconds >= notify_cooldown
+                        )
                         and next_lesson_name is not None
                         and can_send_notification(3, next_lesson_name)
                     ):
