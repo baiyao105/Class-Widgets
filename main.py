@@ -80,9 +80,7 @@ from qfluentwidgets import FluentIcon as fIcon
 
 import splash
 
-splash_window = splash.Splash()
-splash_window.run()
-splash_window.update_status((0, QCoreApplication.translate('main', '加载模块...')))
+splash_window = None
 
 import conf
 import list_
@@ -3834,17 +3832,19 @@ def setup_signal_handlers_optimized() -> None:
 
 
 if __name__ == '__main__':
-    splash_window.update_status((10, QCoreApplication.translate('main', '检查多开...')))
-    utils.guard = utils.SingleInstanceGuard("ClassWidgets.lock")
+    utils.guard = utils.SingleInstanceGuard("ClassWidgets")
 
     old_config_file = CW_HOME / "config.ini"
     if old_config_file.exists():
         old_config_file.replace(CONFIG_HOME / "config.ini")
 
     if config_center.read_conf('Other', 'multiple_programs') != '1':
-        if not utils.guard.try_acquire() and (info := utils.guard.get_lock_info()):
-            splash_window.error()
+        if not utils.guard.try_acquire():
+            info = utils.guard.get_lock_info()
             logger.debug(f'不允许多开实例，{info}')
+            if platform.system() == 'Darwin':
+                sys.exit(0)
+            splash_window and splash_window.error()
             from qfluentwidgets import Dialog
 
             app = QApplication.instance() or QApplication(sys.argv)
@@ -3862,6 +3862,11 @@ if __name__ == '__main__':
             dlg.setFixedWidth(550)
             dlg.exec()
             sys.exit(0)
+
+    splash_window = splash.Splash()
+    splash_window.run()
+    splash_window.update_status((0, QCoreApplication.translate('main', '加载模块...')))
+    splash_window.update_status((10, QCoreApplication.translate('main', '检查多开...')))
 
     scale_factor = float(config_center.read_conf('General', 'scale'))
     logger.info(f"当前缩放系数：{scale_factor * 100}%")
