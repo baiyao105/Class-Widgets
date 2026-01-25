@@ -53,6 +53,7 @@ jobs:
             exit 1
           fi
           find artifacts -name "*.zip" -type f -exec cp {} release/ \;
+          find artifacts -name "*.deb" -type f -exec cp {} release/ \;
           if [ -f "artifacts/file_provenance.json" ]; then
             cp -f artifacts/file_provenance.json release/
           fi

@@ -593,7 +593,7 @@ jobs:
           # 计算 Installed-Size
           installed_size=$(du -sk deb/opt deb/usr 2>/dev/null | awk '{s+=$1} END{print s}')
 
-          # 填入 control 文件中
+          # 填入 control 文件
           sed -i "s/^Version:.*/Version: $RELEASE_VERSION/" "$control_file"
           sed -i "s/^Installed-Size:.*/Installed-Size: ${installed_size}/" "$control_file"
 
